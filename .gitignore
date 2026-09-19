@@ -1,0 +1,7 @@
+.DS_Store
+node_modules/
+.playwright/
+*.log
+.env
+.env.*
+!.env.example
