@@ -371,3 +371,6 @@ table.data tr.hl td { background: var(--accent-soft); }
 .trace .k { color: var(--ink-3); }
 .build-step { font-family: var(--sans); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--violet); margin: 2.4em 0 .2em; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+/* Keep navigation controls inside a narrow phone viewport. */
+@media (max-width:480px) { .topbar #navToggle .small { display:none; } .topbar .brand { min-width:0;overflow:hidden;text-overflow:ellipsis; } .topbar .icon-btn { flex-shrink:0; } }

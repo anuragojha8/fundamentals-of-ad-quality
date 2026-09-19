@@ -20,6 +20,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="05-labels-and-bias">
 <main class="chapter">
@@ -126,6 +128,8 @@
 <div class="callout trap"><div class="label">Common trap</div>
 <p>Judging exploration by this quarter's revenue. Exploration usually <em>costs</em> money in the short term, because you're deliberately showing ads you think are worse. The payoff is <strong>information</strong>, and it arrives later, when models get trained on logs that contain it. Short tests will always make "no exploration" look like the winner. You'll see the payoff (or the lack of it) on your own stack in Chapter 9.</p>
 </div>
+
+<div id="w-feedback-diagram"></div>
 
 <h2 id="decide"><span class="sec">5.6</span>Your decision: exploration in production</h2>
 

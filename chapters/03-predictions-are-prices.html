@@ -20,6 +20,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="03-predictions-are-prices">
 <main class="chapter">
@@ -59,6 +61,8 @@
   <details class="hint"><summary>Hint</summary><p>The auction only knows the prediction: price = runner-up score ÷ Lumen's <em>predicted</em> CTR.</p></details>
   <div class="explain"><p>0.03 / 0.02 = <strong>$1.50</strong> per click. With a correct prediction, Lumen would've paid 0.03 / 0.04 = $0.75. The model's 2× under-prediction is a 2× overcharge. Here's the neat part: Lumen's cost per impression (true CTR × price) is 0.04 × 1.50 = 6 cents, which is <em>exactly the runner-up's score</em>. GSP makes each winner pay, per impression, what the next ad would've been worth, <em>as measured by the model</em>. So if the model's measuring stick is off, so is the bill.</p></div>
 </div>
+
+<figure id="d-errors"></figure>
 
 <h2 id="calibration"><span class="sec">3.2</span>Calibration</h2>
 

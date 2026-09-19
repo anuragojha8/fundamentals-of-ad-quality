@@ -20,6 +20,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="09-evaluation">
 <main class="chapter">
@@ -45,6 +47,8 @@
 <p>There are two reasons AUC is so popular: it completely ignores calibration (only the order matters), and it doesn't care about the base rate. And there are two reasons it's dangerous: it completely ignores calibration, and it averages over <em>every</em> pair, including pairs the auction never actually compares, like two different users at two different times. Yes, I listed "ignores calibration" twice. That's the whole problem.</p>
 
 <div class="code-cell" data-slot="auc"></div>
+
+<div id="w-auc-diagram"></div>
 
 <h2 id="ne"><span class="sec">9.2</span>Normalized entropy: are the numbers right?</h2>
 

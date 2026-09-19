@@ -20,6 +20,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="07-how-models-learn">
 <main class="chapter">
@@ -86,6 +88,8 @@
 <p>Now write the step. I know it seems small, but this really is the whole learning algorithm. You'll also add <dfn>L2 regularization</dfn>, which gently pulls every weight toward zero on each step (that's the <code>l2 * w[i]</code> term). Section 7.6 explains why we'd want that.</p>
 
 <div class="code-cell" data-slot="sgdStep"></div>
+
+<div id="w-gradient-diagram"></div>
 
 <h2 id="train"><span class="sec">7.5</span>Train your model</h2>
 

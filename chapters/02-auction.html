@@ -20,6 +20,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="02-auction">
 <main class="chapter">
@@ -281,6 +283,7 @@
       t.appendChild(tb);
       tbl.appendChild(el('div', { class: 'table-wrap', style: 'margin:0' }, [t]));
       st({ rev: '$' + (rev * 1000).toFixed(2) + ' eCPM', clk: (clk * 100).toFixed(2) + '%' });
+      AQDiagrams.gsp(host, ads, cands, res, rankBy);
     }
     render();
   })();

@@ -1,0 +1,22 @@
+
+/* Mechanism diagrams: generous SVG type remains legible on a phone. */
+.aq-diagram { min-width: 0; }
+.aq-diagram svg { display:block; width:100%; height:auto; overflow:hidden; }
+.aq-diagram svg text { font-family:var(--sans); fill:var(--ink); }
+.aq-diagram .box { fill:var(--card);stroke:var(--ink-3);stroke-width:1.2; }
+.aq-diagram .box.a { fill:var(--accent-soft);stroke:var(--accent); }
+.aq-diagram .box.b { fill:var(--blue-soft);stroke:var(--blue); }
+.aq-diagram .box.g { fill:var(--green-soft);stroke:var(--green); }
+.aq-diagram .box.v { fill:var(--violet-soft);stroke:var(--violet); }
+.aq-diagram .arrow { fill:none;stroke:var(--ink-3);stroke-width:2.5; }
+.aq-diagram svg .t-md { font-size:30px; }
+.aq-diagram svg .t-sm { font-size:28px;fill:var(--ink-2); }
+.aq-diagram svg .t-b { font-weight:700; }
+.aq-diagram .chart svg text { font-size:27px; }
+.aq-diagram .chart svg .lbl { font-size:28px; }
+.aq-diagram .w-sub,.aq-diagram figcaption { line-height:1.65; }
+.aq-diagram .aq-status { font-size:14px;line-height:1.6;min-height:1.6em; }
+.aq-diagram .btn-row { flex-wrap:wrap;gap:10px;margin-bottom:16px; }
+.aq-diagram .aq-check { display:flex;align-items:center;gap:8px;margin:12px 0 20px; }
+.aq-diagram input[type=text] { max-width:100%;width:100%;box-sizing:border-box; }
+@media (max-width:480px) { .widget.aq-diagram { padding:16px 10px; } }
