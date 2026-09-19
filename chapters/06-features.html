@@ -20,6 +20,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="06-features">
 <main class="chapter">
@@ -71,6 +73,8 @@
   <details class="hint"><summary>Hint</summary><p>50,000,000 × 64 × 4 bytes.</p></details>
   <div class="explain"><p>50M × 64 × 4 = 12.8 × 10⁹ bytes = <strong>12.8 GB</strong>. For <em>one</em> feature's table. That's why ID features dominate the memory (and the cost) of big recommender models, why hashing and pruning matter so much, and why "let's just add an ID feature for X" is actually an infrastructure request wearing a modeling costume.</p></div>
 </div>
+
+<div id="w-hashing-diagram"></div>
 
 <h2 id="counting"><span class="sec">6.3</span>Counting features and smoothing</h2>
 

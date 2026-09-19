@@ -16,6 +16,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="15-beyond-the-click">
 <main class="chapter">
@@ -39,6 +41,8 @@
 \[ \text{score} = \underbrace{\text{bid} \times \text{pCTR} \,(\times \text{pCVR})}_{\text{advertiser value}} \;+\; \underbrace{\text{quality}}_{\text{user value}} \;-\; \underbrace{\lambda \cdot \text{pHide} \cdot c}_{\text{user cost}} \]
 
 <p>Now look closely, because two numbers in that formula aren't predictions at all. They're <strong>policy</strong>: the weight \(\lambda\) on user cost, and how many ad slots to show in the first place (<dfn>ad load</dfn>). No model can learn those from clicks. They encode how much short-term revenue Pebble is willing to trade for long-term user health. Setting them well is one of the most consequential things you'll ever do as an ads quality PM. No pressure. (Okay, a lot of pressure.)</p>
+
+<figure id="d-objective"></figure>
 
 <h2 id="phide"><span class="sec">15.2</span>Predicting annoyance</h2>
 

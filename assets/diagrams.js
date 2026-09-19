@@ -90,14 +90,82 @@
         for(var i=0;i<10;i++){var a=data.pos[Math.floor(rng()*data.pos.length)],b=data.neg[Math.floor(rng()*data.neg.length)],v=a>b?1:a===b?.5:0;pairs.push([a,b,v]);sum+=v;n++;}
         var last=pairs[9],c=Book.chart(out,{w:760,h:240,x:[0,Math.max(.05,last[0],last[1])*1.15],y:[0,1],xticks:[0,Math.max(.05,last[0],last[1])],yticks:[.25,.75],yfmt:function(v){return v===.75?'clicked':'no click';},xfmt:function(v){return v.toFixed(3);},xlabel:'Prediction · latest pair',label:'Latest sampled clicked and non-clicked row on a prediction axis.',margin:{l:165,r:45,b:72,t:22}});
         c.dots([[last[0],.75,10,'var(--green)'],[last[1],.25,10,'var(--accent)']]);
-        var s=svg(out,650,'Ten sampled AUC pairs with clicked score, non-clicked score and pair credit.');txt(s,24,38,'Clicked score     Non-click score      Credit','t-sm t-b');
-        pairs.forEach(function(p,i){txt(s,24,97+i*56,p[0].toFixed(4)+'                 '+p[1].toFixed(4)+'                 '+(p[2]===.5?'½ · tie':p[2]?'1 · correct':'0 · reversed'),'t-sm');});
+        var s=svg(out,650,'Ten sampled AUC pairs with clicked score, non-clicked score and pair credit.');txt(s,24,38,'Clicked','t-sm t-b');txt(s,265,38,'Non-click','t-sm t-b');txt(s,505,38,'Credit','t-sm t-b');
+        pairs.forEach(function(p,i){txt(s,24,97+i*56,p[0].toFixed(4),'t-sm');txt(s,265,97+i*56,p[1].toFixed(4),'t-sm');txt(s,505,97+i*56,p[2]===.5?'½ · tie':p[2]?'1 · correct':'0 · reversed','t-sm');});
         status.textContent=n+' pairs · sampled AUC '+(sum/n).toFixed(3)+' · full-log AUC '+data.full.toFixed(3)+' · Using '+data.source+'.';
       }catch(e){status.textContent='Could not sample pairs: '+e.message;}finally{btn.disabled=false;reset.disabled=false;}
     }
     var btn=button(controls,'Sample 10 pairs',sample),reset=button(controls,'Reset sample',function(){n=0;sum=0;data=null;rng=Book.rng(91);out.replaceChildren();status.textContent='Reset. The next sample reloads the current stack.';});
+    document.addEventListener('stackchange',function(){data=null;n=0;sum=0;rng=Book.rng(91);out.replaceChildren();status.textContent='Stack changed. Sample again to use its current predictions.';});
     status.textContent='Ready. Sampling uses observed click labels, not oracle probabilities.';
   }
-  window.AQDiagrams={gsp:gsp};
-  document.addEventListener('DOMContentLoaded',function(){errors();gradient();feedback();auc();});
+  function hashing() {
+    var h=mount('w-hashing-diagram','Two features. One unfortunate address.','This uses the real feature hash and the table size in your stack. Different strings can land in the same bucket, which means they share a weight. The four boxes show a neighborhood, not the whole table.',true);if(!h)return;
+    var label=E('label',{text:'Feature string'}),input=E('input',{type:'text',value:'hour=12',maxlength:'120'});label.appendChild(input);h.appendChild(label);
+    var controls=E('div',{class:'btn-row'}),out=E('div');h.append(controls,out);var status=output(h),pair=null;
+    function draw(){out.replaceChildren();var bits=Stack.state.settings.hashBits,feats=pair||[input.value],idx=Stack.hashFeatures(feats,bits),B=Math.pow(2,bits),s=svg(out,510,'Feature strings are hashed into a fixed-size table; a collision makes unrelated features share a weight.');
+      box(s,12,feats[0].length>35?feats[0].slice(0,32)+'…':feats[0],pair?'Also: '+feats[1]:'String → unsigned FNV-1a hash','b');down(s,112);
+      box(s,152,'FNV-1a = '+Stack.fnv1a(feats[0]),bits+' bits → '+B.toLocaleString()+' buckets','v');down(s,252);
+      var start=Math.max(0,Math.min(B-4,idx[0]-1));
+      for(var j=0;j<4;j++){var n=start+j,x=24+j*182;S('rect',{x:x,y:316,width:166,height:112,rx:10,class:'box '+(n===idx[0]?'a':'')},s);txt(s,x+12,357,'Bucket','t-sm');txt(s,x+12,402,String(n),'t-md t-b');}
+      txt(s,24,483,pair?'Collision: both strings update bucket '+idx[0]: 'Selected weight: w['+idx[0]+']','t-sm');
+      status.textContent=feats.join(' and ')+' → '+Array.from(idx).join(', ')+'. Using Stack.fnv1a and Stack.hashFeatures; '+bits+'-bit table from your settings.';
+    }
+    button(controls,'Show a collision',function(){var bits=Stack.state.settings.hashBits,seen=new Map(),found=null;for(var i=0;i<50000;i++){var f='feature='+i,b=Stack.hashFeatures([f],bits)[0];if(seen.has(b)){found=[seen.get(b),f];break;}seen.set(b,f);}if(found){pair=found;input.value=pair[0];draw();}else status.textContent='No collision found in this bounded search. Try a smaller table in your stack.';});
+    input.addEventListener('input',function(){pair=null;draw();});document.addEventListener('stackchange',function(){pair=null;draw();});draw();
+  }
+  function timeline() {
+    var h=mount('w-timeline-diagram','Same window. Different clocks.','Two illustrative users: each sees an impression 15 minutes before clicking at hour 0. One converts at hour 2; the other at hour 120. Move the post-click window. This changes the illustration; use the next widget to compare windows on your logs.',true);if(!h)return;
+    var label=E('label',{text:'Attribution window: '}),range=E('input',{type:'range',min:'0',max:'168',step:'1',value:'24','aria-label':'Attribution window in hours'});label.appendChild(range);h.appendChild(label);var out=E('div');h.appendChild(out);var status=output(h);
+    function draw(){var v=+range.value;out.replaceChildren();stage(out,[['Impression → click','−0.25 hours → hour 0 (both users)','b']], 'Both users see an impression a quarter hour before clicking at hour zero.');
+      var c=Book.chart(out,{w:760,h:350,x:[-12,180],y:[0,1],xticks:[0,24,72,120,168],yticks:[.25,.75],yfmt:function(y){return y===.75?'fast':'slow';},xlabel:'Hours after click',label:'Attribution window shaded from click time to the selected cutoff; fast and slow conversion events shown on separate rows.',margin:{l:100,r:45,t:45,b:75}});
+      c.rect(0,0,v,1,{fill:'var(--green)',opacity:.16});c.vline(0);c.vline(v,{color:'var(--accent)'});
+      [[2,.75],[120,.25]].forEach(function(r){c.line([[0,r[1]],[168,r[1]]],{color:'var(--ink-3)',width:1});c.dots([[0,r[1],7,'var(--blue)'],[r[0],r[1],12,r[0]<=v?'var(--green)':'var(--accent)']]);});
+      status.textContent='Window: '+v+' hours. Fast conversion at 2h: '+(v>=2?'counted':'outside')+'. Slow conversion at 120h: '+(v>=120?'counted':'outside')+'. Boundary rule: event time ≤ cutoff.';
+    }range.addEventListener('input',draw);draw();
+  }
+  function worlds() {
+    var h=mount('d-two-worlds','Two worlds, one causal question','Illustrative population expectations under random assignment: 10% convert with ads and 6% without. The 4 percentage-point difference is aggregate lift. We cannot point to a particular person and say the ad caused their purchase.',false);if(!h)return;
+    var s=svg(h,490,'Ad-assigned and randomized holdout populations have conversion rates of ten and six percent, for four percentage points of aggregate lift.');
+    [[24,'Ads assigned','10% convert','6% baseline','4 pp net lift','a'],[400,'Random holdout','6% convert','6% baseline','No campaign ads','b']].forEach(function(r){S('rect',{x:r[0],y:20,width:336,height:260,rx:12,class:'box '+r[5]},s);r.slice(1,5).forEach(function(t,i){txt(s,r[0]+18,65+i*55,t,i?'t-sm':'t-md t-b');});});
+    arrow(s,'M 192 280 V 315 H 380 V 346');arrow(s,'M 568 280 V 315 H 380');box(s,355,'10% − 6% = 4 percentage points','40 extra conversions per 1,000 assigned users.','g');
+    h.appendChild(E('p',{class:'w-sub',text:'The baseline-plus-lift split is an aggregate illustration. Identifying “would convert anyway” people requires unobservable potential outcomes; interpreting lift as a count helped also assumes no one is discouraged. Real estimates need uncertainty and checks for spillovers.'}));
+  }
+  function objective() {
+    var h=mount('d-objective','Predictions inform the score. People set the policy.','A simplified CPC objective, with every term expressed in value per impression. A conversion goal replaces bidCPC × pCTR with targetCPA × pCTR × pCVR before controller adjustments. The score is not the clearing payment.',false);if(!h)return;
+    stage(h,[['Advertiser term: bidCPC × pCTR','Bid: dollars/click. pCTR: model prediction.','b'],['Alternative: conversion bidding','Replace CPC term with CPA × pCTR × pCVR.','b'],['User cost: λ × c × pHide','pHide: prediction. λ and value scale c: policy.','v'],['Total score = advertiser term','+ user-value term − user-cost term','a'],['Ad load: how many slots may be filled','A policy constraint, outside the score formula.','g']], 'Predicted click, conversion and hide probabilities feed a value score; human policy sets tradeoff weights and the number of ad slots.');
+  }
+  function latency(host,segs,lat) {
+    var f=E('figure',{class:'diagram aq-diagram aq-latency'});host.appendChild(f);
+    f.appendChild(E('figcaption',{text:'The chapter’s full request has a 200 ms reference budget. This widget models selection with a 100 ms timeout budget. Colored segments below use this widget’s actual stage costs; the budget lines are references, not extra work.'}));
+    var max=Math.max(220,lat*1.1),c=Book.chart(f,{w:760,h:270,x:[0,max],y:[0,1],xticks:[0,100,200],yticks:[],xlabel:'Milliseconds · current selection path',label:'Current selection stage latencies compared with the simulator’s 100 millisecond timeout budget and the chapter’s 200 millisecond full-request reference.',margin:{l:24,r:45,t:60,b:75}}),start=0;
+    segs.forEach(function(s){c.rect(start,.25,start+s[1],.75,{fill:s[2]});start+=s[1];});c.vline(100,{color:'var(--accent)'});c.vline(200,{color:'var(--ink-3)'});
+    c.text(100,.93,'100',{anchor:'middle',size:28});c.text(200,.93,'200',{anchor:'middle',size:28});
+    var s=svg(f,210,'Current latency in milliseconds for fixed overhead, retrieval, early ranking and late ranking.');segs.forEach(function(r,i){txt(s,24,35+i*46,r[0]+': '+r[1].toFixed(1)+' ms','t-sm');});
+    f.appendChild(E('p',{class:'w-sub',text:'Total selection latency: '+lat.toFixed(1)+' ms. Increasing candidates or late-ranker size changes these numbers and the timeout rate shown below.'}));
+  }
+  function levers() {
+    var h=mount('d-levers','The decisions behind your dashboard','Use this map when a capstone metric moves. Pick the mechanism you suspect, then return to the chapter that lets you inspect it.',false);if(!h)return;
+    var rows=[['Candidate eligibility','01-two-hundred-ms','Ch. 1 · who enters'],['Reserves and auction prices','02-auction','Ch. 2 · who wins and pays'],['Calibration and conversion bids','12-conversion-modeling','Ch. 3 + 12 · prediction scale'],['Exploration and retrieval','10-retrieval','Ch. 5 + 10 · who gets a chance'],['Model refresh','14-pretrain-train-refresh','Ch. 14 · what the model remembers'],['Hide penalty and ad load','15-beyond-the-click','Ch. 15 · cost to users']];
+    var s=svg(h,rows.length*124,'Clickable capstone levers lead back to their mechanism chapters.');rows.forEach(function(r,i){var a=S('a',{href:r[1]+'.html','aria-label':r[0]+': '+r[2]},s);box(a,10+i*124,r[0],r[2],i%2?'b':'a');});
+    h.appendChild(E('p',{class:'w-sub',text:'Pacing controls when an advertiser’s budget can be spent; revisit the capstone budget rules. For credible impact measurement, return to Chapters 9 and 16.'}));
+  }
+  function privacy() {
+    var h=mount('w-privacy-diagram','Watch one reporting cell disappear','Illustrative cell: nine conversions for one advertiser on one day. Your reporting function applies the threshold; the diagram then adds a fixed Gaussian noise draw scaled by the noise dial. This does not establish differential privacy.',true);if(!h)return;
+    var controls=E('div'),out=E('div');h.append(controls,out);var status=output(h),z=Book.rng(99).normal();
+    var ctl=Book.controls(controls,[{key:'k',label:'Minimum conversions to publish',min:1,max:15,step:1,value:5},{key:'noise',label:'Noise standard deviation',min:0,max:6,step:.5,value:2}],draw);
+    function draw(){if(!ctl)return;out.replaceChildren();var rows=Array.from({length:9},function(){return {adv:1,day:0,conv:1};}),report;
+      try{report=Stack.impl('privacyReport')(rows,{k:ctl.values.k});}catch(e){status.textContent=e.message;return;}
+      var count=report['1:0'],published=count==null?null:Math.max(0,Math.round(count+ctl.values.noise*z));
+      stage(out,[['Input cell: 9 conversions','One advertiser × one day; illustrative counts.','b'],['Threshold: k = '+ctl.values.k,count==null?'Suppressed: no published cell.':'Passes: '+count+' conversions before noise.','v'],['Noise draw: '+(ctl.values.noise*z).toFixed(2),'Same random draw; change only its scale.',''],['Published result',published==null?'No value (not a reported zero).':String(published)+' conversions after rounding / clipping.','a']], 'A conversion count passes or fails a threshold, then receives scaled noise before publication.');
+      status.textContent='Using '+source('privacyReport')+'. Published: '+(published==null?'suppressed':published)+'. No privacy budget, contribution bound or guarantee is modeled.';
+    }draw();
+  }
+  function ann() {
+    var h=mount('d-ann','Why retrieval gets to be fast','Two towers move ad-side work out of the request path. Approximate search visits part of an index and trades recall for speed; it does not promise a fixed millisecond latency. The book’s small corpus uses exact top-K.',false);if(!h)return;
+    stage(h,[['Before the request: encode each ad','Store vectors in a versioned, refreshed index.','b'],['At request time: encode the user once','Search the index using dot-product similarity.','g'],['Retrieve K candidates → ranking','Measure both index recall and relevance recall.','a'],['Cross tower: combine each user–ad pair','A fresh joint forward pass for each candidate.','v'],['That cost grows with candidate count','Cache invariant work; reserve joint work for K.','']], 'Two-tower retrieval precomputes ad vectors and searches with one user vector, while cross-tower ranking performs joint work for each retained candidate.');
+  }
+
+  window.AQDiagrams={gsp:gsp,latency:latency};
+  document.addEventListener('DOMContentLoaded',function(){errors();gradient();feedback();auc();hashing();timeline();worlds();objective();levers();privacy();ann();});
 })();

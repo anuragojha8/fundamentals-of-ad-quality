@@ -16,6 +16,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="16-what-the-ad-caused">
 <main class="chapter">
@@ -45,6 +47,8 @@
 
 <p>The window is the one your stack can feel right now. Your join takes <code>convWindowH</code>, so let's move it and watch the training labels change shape.</p>
 
+<div id="w-timeline-diagram"></div>
+
 <div class="widget" id="w-window">
   <div class="w-title">The window decides which advertisers look good</div>
   <div class="w-sub">Your ten days of logs, joined with different attribution windows, then a pCVR model trained under the shortest and the longest. Graded on day 10 against the truth.</div>
@@ -65,6 +69,8 @@
 <div class="code-cell" data-slot="liftEstimate"></div>
 
 <p>Now the part people underestimate. Conversions are rare, so the difference between two small conversion rates is buried in noise, and the experiment has to be big to see it. Play with an honest toy: choose how much of the campaign's conversion volume would have happened anyway, and see whether a holdout could tell.</p>
+
+<figure id="d-two-worlds"></figure>
 
 <div class="widget" id="w-lift">
   <div class="w-title">Could your holdout even see it?</div>

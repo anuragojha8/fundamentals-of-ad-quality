@@ -20,6 +20,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="01-two-hundred-ms">
 <main class="chapter">
@@ -295,14 +297,7 @@
       bar.innerHTML = '';
       var W = 100 / Math.max(160, lat);
       var segs = [['Fixed overhead', fixed, 'var(--ink-3)'], ['Retrieval', latR, 'var(--s5)'], ['Early ranking', latE, 'var(--s1)'], ['Late ranking', latL, 'var(--s4)']];
-      var track = el('div', { style: 'position:relative;height:26px;background:var(--paper-2);border-radius:6px;overflow:hidden;display:flex' });
-      segs.forEach(function (s) { track.appendChild(el('div', { title: s[0] + ': ' + s[1].toFixed(1) + ' ms', style: 'width:' + (s[1] * W) + '%;background:' + s[2] + ';opacity:.85' })); });
-      track.appendChild(el('div', { style: 'position:absolute;top:0;bottom:0;left:' + (100 * W) + '%;border-left:2px dashed var(--red)' }));
-      bar.appendChild(track);
-      var lg = el('div', { class: 'legend' });
-      segs.forEach(function (s) { lg.appendChild(el('span', null, [el('i', { style: 'background:' + s[2] }), s[0] + ' ' + s[1].toFixed(0) + ' ms'])); });
-      lg.appendChild(el('span', { style: 'color:var(--red)' }, ['┆ 100 ms budget']));
-      bar.appendChild(lg);
+      AQDiagrams.latency(bar, segs, lat);
       st({
         lat: { v: lat.toFixed(0) + ' ms', tone: lat > 100 ? 'bad' : '' },
         to: { v: Book.pct(timeout, 1), tone: timeout > 0.05 ? 'bad' : timeout < 0.01 ? 'good' : '' },

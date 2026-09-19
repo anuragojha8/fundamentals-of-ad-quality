@@ -1,5 +1,7 @@
 # Plan: more (and more dynamic) diagrams
 
+**Status — 19 September 2026:** items 1–13 are implemented and verified. Item 14 is intentionally omitted because the existing attention heatmap already covers it. Gradient and AUC use reader-triggered steps/samples instead of timed animation. See [implementation, data sources, and verification](diagram-implementation.md). The original planning notes follow.
+
 Today the book has 10 static SVG diagrams and 47 interactive widgets, unevenly spread. Chapters 2, 3, 5, 6, 7, 9, 15, 16 and 17 have **no** diagram at all, and those are some of the most mechanism-heavy chapters in the book.
 
 This plan lists what to add, in priority order. Read the conventions first; they're what keeps a new diagram from looking bolted on.

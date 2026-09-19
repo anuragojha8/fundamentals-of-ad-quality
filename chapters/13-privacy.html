@@ -16,6 +16,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="13-privacy">
 <main class="chapter">
@@ -86,6 +88,8 @@
 <p>Suppression alone isn't enough, though, so real systems add noise on top: a small random amount, drawn from a fixed distribution, added to every published count. That way, whether any single person converted changes the published number by an amount that's lost in the noise.</p>
 
 <p>Tune both below, then look at who pays for them. The third dial is the one platforms actually reach for when advertisers complain: group more days into each cell. Bigger cells clear the threshold, so the suppressed advertisers reappear, and the price is reporting that arrives days late.</p>
+
+<div id="w-privacy-diagram"></div>
 
 <div class="widget" id="w-aggregate">
   <div class="w-title">What the report costs</div>

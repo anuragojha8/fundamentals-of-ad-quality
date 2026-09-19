@@ -20,6 +20,8 @@
 <script src="../assets/nn.js"></script>
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/diagrams.js"></script>
 </head>
 <body data-chapter="10-retrieval">
 <main class="chapter">
@@ -77,6 +79,8 @@
   </ul>
   <div class="explain"><p>Every input has to live in exactly one tower, and a (user, ad) pair feature doesn't belong to either. That's the fundamental accuracy-for-speed deal you make with two-tower models, and it's why retrieval is always followed by a ranking model that <em>can</em> look at the pair.</p></div>
 </div>
+
+<figure id="d-ann"></figure>
 
 <h2 id="training"><span class="sec">10.2</span>Training a retrieval model</h2>
 
