@@ -152,7 +152,7 @@
 <div class="recap">
   <h3>What you built</h3>
   <p>A <strong>conversion model</strong> (naive and ESMM), a <strong>delay correction</strong> using your <code>observedFraction()</code>, and <strong>conversion bidding</strong> in your auction, judged by whether advertisers actually paid what they asked to pay.</p>
-  <p>Here's an uncomfortable truth, though. Every model in your stack was trained on days 0 through 9. And Pebble didn't stop on day 9. Users' tastes are shifting, new ads launch every day, and your models are slowly, quietly going stale. Next time, we find out how fast, and what to do about it.</p>
+  <p>There's a catch, though, and it's a big one. This whole chapter assumed every conversion comes back to you as a neat little record with a user attached to it. Out in the world, users say no to tracking, browsers drop cookies, and conversions arrive as coarse, noisy, delayed aggregates instead. Next time, we find out what your beautiful pCVR model is worth when the data stops being so generous.</p>
   <h3>Key terms</h3>
   <div class="terms">
     <div><b>pCVR</b>P(conversion | click); rare, delayed, observed only after clicks.</div>

@@ -23,6 +23,7 @@
     { ch: 10, label: 'Two-tower retrieval', sub: 'embeddings, recall@K' },
     { ch: 11, label: 'Deep ranker', sub: 'crosses + attention' },
     { ch: 12, label: 'Conversion model', sub: 'delayed labels, ESMM' },
+    { ch: 13, label: 'Privacy reporting', sub: 'aggregates & noise' },
     { ch: 14, label: 'Freshness', sub: 'drift & retraining' },
     { ch: 15, label: 'Quality & ad load', sub: 'pHide, λ, slots' }
   ];

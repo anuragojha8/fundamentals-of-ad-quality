@@ -59,3 +59,15 @@ Every citation from the list above was checked for authors, year, venue, and whe
 
 ### Not checked
 Uncited general claims (e.g. "logistic regression ran most of the world's ad auctions for about a decade") were read for plausibility only.
+
+## Pass 3 — new chapter (Claude, 2026-09-19)
+
+Added **Chapter 13, Privacy and Measurement**, the biggest content gap: the book assumed per-event conversion data that mostly no longer exists.
+
+- §13.1 three distinct losses: fewer events (opt-out), coarser events (SKAdNetwork, Privacy Sandbox), protected aggregates (k-anonymity plus noise).
+- §13.2 widget: retrain the Ch 12 ESMM model with only part of the conversions observable. Rescaling restores the level (calibration 0.45 → 1.13) but not the signal (ranking 66.4% → 64.4%).
+- §13.3 build step `privacyReport()`: aggregate per advertiser and time bucket, suppress cells under k. Widget adds noise and shows who pays: at k=5 on daily cells, 17 of 25 advertisers get no report at all; grouping 10 days per cell brings that down to 7.
+- §13.4 modeled conversions and differential privacy, with the privacy-budget idea.
+- Chapters 13-15 became 14-16. Old URLs redirect; reader progress migrates on first load.
+
+Still open from the gap review: attribution and incrementality (recommended next), ad review/policy and brand safety, invalid traffic, creative, bandits, and variance reduction.

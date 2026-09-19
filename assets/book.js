@@ -17,6 +17,7 @@
     { id: '10-retrieval', n: '10', part: 'IV · The Models', title: 'Retrieval', blurb: 'Two-tower models, embeddings, approximate nearest neighbours, negative sampling, and recall.' },
     { id: '11-ranking-architectures', n: '11', part: 'IV · The Models', title: 'Towers, Crosses, and Transformers', blurb: 'The anatomy of a modern ranking model: embeddings, interaction layers, cross towers, multi-task, and attention over user history.' },
     { id: '12-conversion-modeling', n: '12', part: 'IV · The Models', title: 'Conversion Modeling', blurb: 'pCVR, sparse and delayed labels, sample selection bias, ESMM, and value optimization.' },
+    { id: '13-privacy', n: '13', part: 'IV · The Models', title: 'Privacy and Measurement', blurb: 'Opt-outs, aggregated and noisy conversion reports, k-anonymity, differential privacy, and modeled conversions.' },
     { id: '14-pretrain-train-refresh', n: '14', part: 'IV · The Models', title: 'Pre-training, Fine-tuning, and Freshness', blurb: 'Foundation embeddings, warm starts, continuous training, distillation, and model staleness.' },
     { id: '15-beyond-the-click', n: '15', part: 'V · The Job', title: 'Quality Beyond the Click', blurb: 'Ad load, user experience, negative feedback, long-term value, and the objective function you actually own.' },
     { id: '16-capstone', n: '16', part: 'V · The Job', title: 'Capstone: Run the Marketplace', blurb: 'A simulation game. Make the calls a real ads quality PM makes, and live with the results.' },

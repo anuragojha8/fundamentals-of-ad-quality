@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy and Measurement — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="13-privacy">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 13 · Part IV · The Models</div>
+  <h1>Privacy and Measurement</h1>
+  <p class="dek">In which the conversions stop telling me who they were.</p>
+</header>
+
+<div class="stack-panel" data-chapter="13"></div>
+
+<p class="lead">Chapter 12 handed you a conversion model, and I let you believe something generous: that every conversion comes back to you as a tidy little record saying <em>this person, this ad, this moment</em>. For most of the 2010s, that was roughly true.</p>
+
+<p>It isn't anymore. Phones ask users whether an app may track them, and most say no. Browsers have been cutting back third-party cookies for years. Privacy laws mean a slice of your users never consented to measurement in the first place. And where conversion data still arrives, it increasingly arrives <strong>aggregated</strong>: counts per campaign per day rather than per person, delayed on purpose, with a bit of deliberate noise mixed in, and with small numbers withheld entirely.</p>
+
+<p>So this chapter is about doing your job with worse data. Not <em>less</em> data, exactly. Coarser data. You'll measure what disappearing conversions do to your pCVR model, build a report that can be shared without exposing anyone, and see what's left of your numbers after the privacy machinery has had its way with them.</p>
+
+<h2 id="coarse"><span class="sec">13.1</span>Three ways the data gets worse</h2>
+
+<p>It helps to separate three things that often get lumped together as "privacy killed our measurement," because they break different parts of your stack:</p>
+
+<ul>
+  <li><strong>Fewer events.</strong> Some conversions simply never reach you. The user opted out of tracking, declined consent, or is on a browser that blocks the mechanism you used to rely on. Your logs aren't wrong, they're incomplete, and they're incomplete <em>unevenly</em>: opt-in rates differ by platform, country, and app.</li>
+  <li><strong>Coarser events.</strong> What does arrive may carry no user identifier, a coarse timestamp, or a conversion "value" squeezed into a handful of buckets. Apple's SKAdNetwork and its successor hand you a campaign-level postback with a small value field and a randomized timer. The Privacy Sandbox's attribution reporting is similar in spirit: aggregate reports, batched and noisy.</li>
+  <li><strong>Protected aggregates.</strong> Where reports are aggregated, they usually come with a <dfn>k-anonymity</dfn> threshold (cells with fewer than k conversions are withheld) and deliberate noise. Those two rules are what let a platform publish numbers at all without leaking an individual.</li>
+</ul>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 170" role="img" aria-label="Conversions move from per-event records to a thinned, aggregated, noisy report">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <rect x="10" y="40" width="165" height="72" rx="10" class="box b"/><text x="92" y="66" text-anchor="middle" class="t-md t-b">Per-event</text><text x="92" y="84" text-anchor="middle" class="t-sm">user, ad, time, value</text><text x="92" y="99" text-anchor="middle" class="t-sm">what Ch. 12 assumed</text>
+  <rect x="205" y="40" width="165" height="72" rx="10" class="box v"/><text x="287" y="66" text-anchor="middle" class="t-md t-b">Consented only</text><text x="287" y="84" text-anchor="middle" class="t-sm">a fraction opt in;</text><text x="287" y="99" text-anchor="middle" class="t-sm">the rest go dark</text>
+  <rect x="400" y="40" width="165" height="72" rx="10" class="box a"/><text x="482" y="66" text-anchor="middle" class="t-md t-b">Aggregated</text><text x="482" y="84" text-anchor="middle" class="t-sm">counts per campaign</text><text x="482" y="99" text-anchor="middle" class="t-sm">per day, delayed</text>
+  <rect x="595" y="40" width="155" height="72" rx="10" class="box g"/><text x="672" y="66" text-anchor="middle" class="t-md t-b">Protected</text><text x="672" y="84" text-anchor="middle" class="t-sm">small cells withheld,</text><text x="672" y="99" text-anchor="middle" class="t-sm">noise added</text>
+  <path class="arrow" d="M175,76 H203"/><path class="arrow" d="M370,76 H398"/><path class="arrow" d="M565,76 H593"/>
+</svg>
+<figcaption>Each step protects the user and costs you resolution. Your models were designed for the box on the left. Increasingly they're fed from the box on the right.</figcaption>
+</figure>
+
+<h2 id="thinning"><span class="sec">13.2</span>What missing conversions do to your model</h2>
+
+<p>Start with the simplest version: the events just go away. Say only some share of conversions is observable, and the rest silently never arrive. Your join (Chapter 4) does what it's told and labels those rows 0, exactly like the delayed ones in Chapter 12, except these never mature.</p>
+
+<p>Before you run it, predict what happens. Two things could break: the model's <em>numbers</em> (it should under-predict, since it sees fewer positives) and its <em>ranking</em> (it has less signal to learn from). Which one breaks first? Which one can you fix without any new data?</p>
+
+<div class="widget" id="w-optin">
+  <div class="w-title">Train pCVR on the conversions you still get</div>
+  <div class="w-sub">Your ESMM conversion model from Chapter 12, retrained with only the chosen share of conversions observable. Graded on day 10 against the simulator's true P(convert | click), on clicked impressions.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Missing conversions hurt in two different ways, and only one of them is cheap to fix. <strong>The level</strong> is easy: if you know roughly what share of conversions you observe, you divide by it, and your average comes back. That's the same inverse-propensity move you built in Chapter 5, and the same delay correction from Chapter 12, wearing a new hat. <strong>The signal</strong> is not easy: a model trained on a third of the positives has genuinely learned less about which user–ad pairs convert, and no rescaling fixes that. You can repair the average. You can't invent the evidence.</p>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Assuming the opt-in rate is one number. It never is. It differs by platform, country, app version, and advertiser vertical, and it moves whenever a browser or an OS ships a change. Dividing everything by one global constant fixes the total while quietly shifting money between segments, which is Chapter 3's problem all over again: a correction applied unevenly <em>is</em> a pricing error. Estimate the rate per segment, and re-estimate it often.</p>
+</div>
+
+<h2 id="report"><span class="sec">13.3</span>Build: a report that doesn't expose anyone</h2>
+
+<p>Now the other direction. Instead of asking what you lose when events vanish, let's build the thing that makes aggregate reporting safe in the first place, and then look at what it costs.</p>
+
+<p>The rule is simple enough to write in a few lines: group conversions into cells (here, one per advertiser per day), count them, and refuse to publish any cell with fewer than <em>k</em> conversions in it. A cell of one is a person. A cell of three is nearly a person. The threshold is the whole point.</p>
+
+<div class="code-cell" data-slot="privacyReport"></div>
+
+<p>Suppression alone isn't enough, though, so real systems add noise on top: a small random amount, drawn from a fixed distribution, added to every published count. That way, whether any single person converted changes the published number by an amount that's lost in the noise.</p>
+
+<p>Tune both below, then look at who pays for them. The third dial is the one platforms actually reach for when advertisers complain: group more days into each cell. Bigger cells clear the threshold, so the suppressed advertisers reappear, and the price is reporting that arrives days late.</p>
+
+<div class="widget" id="w-aggregate">
+  <div class="w-title">What the report costs</div>
+  <div class="w-sub">Your ten days of logs, aggregated per advertiser and time bucket with your <code>privacyReport()</code>, then noised. Compared against the conversions that actually happened.</div>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Notice who absorbs the damage: <strong>small advertisers</strong>. A big spender's daily cells clear any threshold and swamp the noise, so their reports look fine. A local business with four conversions a day may see nothing at all, forever, which means no conversion data, a worse pCVR model, worse delivery, and an account manager who can't explain why. When a privacy change ships, ask for the metric impact split by advertiser size. The average will look survivable and the bottom decile usually won't.</p>
+</div>
+
+<h2 id="modeled"><span class="sec">13.4</span>Modeled conversions</h2>
+
+<p>So you have a model that sees too few conversions, and reports that are coarse, delayed, and noisy. The industry's answer, and you should know its name because you'll hear it in every review, is <dfn>modeled conversions</dfn>: use the data you do have (consented users, aggregate totals, your own experiments) to estimate the conversions you can't observe, then report and optimize against the estimate.</p>
+
+<p>In practice that means a few things stacked together:</p>
+<ul>
+  <li><strong>Scale to the aggregate.</strong> Your per-event data covers a biased slice, but the aggregate report knows the true total for a cell (give or take the noise). Fit your model on what you can see, then calibrate it so its totals match the reported totals. It's the Chapter 3 calibration layer, fitted against a noisy target instead of a clean one.</li>
+  <li><strong>Learn from the consented slice, apply everywhere.</strong> Which is a textbook sample-selection problem, the one ESMM was built for in Chapter 12, except the selection is now consent rather than clicks.</li>
+  <li><strong>Lean on experiments.</strong> When per-user attribution is impossible, randomized geo or user holdouts still measure the effect of ads, because they compare groups rather than individuals. Privacy takes away the log line. It doesn't take away the experiment.</li>
+</ul>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Treating modeled conversions as though they were counted ones. They carry uncertainty, and that uncertainty widens exactly where data is thinnest: new advertisers, small campaigns, rare verticals. Ask for confidence intervals on modeled numbers, and never put a modeled conversion into a billing calculation without knowing how far off it can be.</p>
+</div>
+
+<div class="label">Going deeper: differential privacy in one paragraph</div>
+<p>The formal version of "noise makes an individual unknowable" is <dfn>differential privacy</dfn>. A mechanism is ε-differentially private if the published result is almost equally likely whether or not any single person's data was included, where "almost" is set by ε. Small ε means more noise and stronger protection. Publishing repeatedly from the same data spends a <em>privacy budget</em>, because many noisy answers can be averaged back toward the truth, which is why aggregate reporting systems limit how many queries you get. For a PM, the practical translation is short: privacy isn't a switch, it's a dial with a price, and somebody has to decide where it's set. Increasingly, that somebody is in the room with you.</p>
+
+<div class="quiz" data-id="ch13-q1">
+  <p class="q">Only 40% of conversions are observable, and your pCVR model trains on the rest labeled 0. You divide every prediction by 0.4. What does that fix, and what does it leave broken?</p>
+  <ul>
+    <li data-why="Rescaling doesn't change the order of predictions at all.">It fixes the ranking of ads, but the average is still wrong</li>
+    <li data-correct>It fixes the overall level, so CPA maths out, but the model still learned from 60% fewer positives, so it discriminates between user–ad pairs less well</li>
+    <li data-why="Rescaling can't recover information that was never logged.">It fixes both: the model is as good as before</li>
+    <li data-why="Rescaling by a constant is exactly what restores the level.">It fixes neither</li>
+  </ul>
+  <div class="explain"><p>A constant multiplier moves every prediction by the same factor, so the ordering is untouched and the average comes back to where it belongs. What it can't do is restore signal. Fewer positives means noisier weights, especially for rare advertisers and new ads. And if the observable share varies by segment and you divide by a single global number, you've introduced a per-segment miscalibration, which Chapter 3 taught you is a transfer of money.</p></div>
+</div>
+
+<div class="quiz" data-id="ch13-q2">
+  <p class="q">Your aggregate reports use a k-anonymity threshold of 50 conversions per cell. Which advertiser is hurt most?</p>
+  <ul>
+    <li data-why="A national brand's daily cells clear the threshold easily.">A national retailer with thousands of conversions a day</li>
+    <li data-correct>A small advertiser with a handful of conversions a day, whose cells are suppressed almost every day</li>
+    <li data-why="Bid type doesn't determine cell size.">Whoever bids on CPM</li>
+    <li data-why="The threshold applies to conversion counts, not to how fast they arrive.">Whoever has the fastest conversions</li>
+  </ul>
+  <div class="explain"><p>Thresholds are flat, but advertisers aren't. Below the threshold you get nothing, so the smallest advertisers lose their conversion data entirely, and every downstream system that depends on it degrades for them first. The usual mitigations are wider cells (longer windows, campaigns grouped together), which trade timeliness for visibility, and modeled conversions for the cells that stay dark.</p></div>
+</div>
+
+<div class="reflect" data-id="ch13-r1">
+  <p class="q">A platform change means only a third of Pebble's conversions will be observable next quarter, and the rest arrive as daily aggregates with a k-threshold. Write the plan you'd bring to your team: what breaks, what you'd measure, and what you'd tell advertisers.</p>
+  <div class="model">
+    <ul>
+      <li><strong>What breaks, in order:</strong> pCVR calibration drops toward the observable share (oCPM under-delivers, since eCPM = CPA × pCTR × pCVR); ranking quality degrades as positives get scarce; small advertisers lose reporting entirely under the threshold; and anything trained on conversion labels (ESMM, value models) inherits all of it.</li>
+      <li><strong>Measure first:</strong> the observable share <em>by segment</em> (platform, country, vertical, advertiser size), not globally. Then simulate the loss the way the widget above does: retrain on a thinned sample and grade against your best available truth. That gives you a number to plan around before the change lands.</li>
+      <li><strong>Mitigations, cheapest first:</strong> per-segment rescaling and a recalibration layer fitted to aggregate totals; longer training windows to recover positives; reweighting the consented slice (IPW) or an ESMM-style model to handle the selection; modeled conversions for suppressed cells; geo or user holdout experiments for the campaign-level truth that per-user attribution used to provide.</li>
+      <li><strong>Tell advertisers early and specifically:</strong> which metrics change definition (counted vs. modeled), when, and with what uncertainty. A reported number that quietly changes meaning is how you lose trust. Also expect reported conversions to fall short of the advertiser's own analytics, and prepare the reconciliation guidance before the escalations arrive.</li>
+      <li><strong>Guardrails:</strong> watch CPA adherence and delivery for small advertisers specifically; keep a holdout where you can still measure end to end, if consent allows; and set a review date, because opt-in rates move.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>A <strong>privacy-safe conversion report</strong>: conversions aggregated into cells, small cells suppressed, noise on top. And a measurement of what that costs, both to your pCVR model when events go missing and to the advertisers whose cells are too small to report.</p>
+  <p>Here's the uncomfortable part. Every model in your stack was trained on days 0 through 9, and Pebble didn't stop on day 9. Users' tastes are shifting, new ads launch daily, and your models are quietly going stale, with or without privacy. Next time, we find out how fast, and what to do about it.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Opt-in / consent rate</b>The share of users whose conversions you can observe; varies by segment and moves over time.</div>
+    <div><b>Aggregate reporting</b>Counts per campaign per period instead of per-person records.</div>
+    <div><b>k-anonymity threshold</b>Cells with fewer than k conversions are withheld entirely.</div>
+    <div><b>Differential privacy</b>Calibrated noise that makes any one person's presence unknowable; ε sets the strength.</div>
+    <div><b>Modeled conversions</b>Estimates of unobservable conversions, used for reporting and optimization.</div>
+    <div><b>Privacy budget</b>The limit on how much can be published from the same data before noise stops protecting it.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el;
+  var logP = null;
+  function logs(progress) {
+    if (!logP) logP = (async function () {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.8, 'Collecting logs…'); } });
+      var ev = await Stack.evalLog({ onProgress: function (p) { progress(0.8 + p * 0.2, 'Collecting day 10…'); } });
+      return { tl: tl, ev: ev };
+    })();
+    return logP;
+  }
+  document.addEventListener('stackchange', function () { logP = null; });
+
+  /* ---------------- missing conversions ---------------- */
+  (function () {
+    var host = document.getElementById('w-optin');
+    var ctlHost = el('div'); host.appendChild(ctlHost);
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var ctl = Book.controls(ctlHost, [
+      { key: 'rate', label: 'Share of conversions you can observe', min: 0.1, max: 1, step: 0.1, value: 0.4, fmt: function (v) { return Book.pct(v, 0); } }
+    ], function () {});
+    StackUI.asyncButton(btnHost, 'Train on what\'s left', async function (progress) {
+      var rate = ctl.values.rate;
+      var d = await logs(progress);
+      var rows = Stack.labeledRows(d.tl), er = Stack.labeledRows(d.ev);
+      // Hide a share of the conversions, deterministically, the way an opt-out would.
+      var r = World.Rand(4242);
+      var thinned = rows.map(function (row) {
+        if (!row.conv) return row;
+        return r.next() < rate ? row : Object.assign({}, row, { conv: 0 });
+      });
+      var full = await Stack.trainCVR({ rows: rows, method: 'esmm', onProgress: function (p) { progress(0.1 + 0.4 * p, 'Training with every conversion…'); } });
+      var part = await Stack.trainCVR({ rows: thinned, method: 'esmm', onProgress: function (p) { progress(0.5 + 0.45 * p, 'Training with what survived…'); } });
+      var tcv = d.ev.truth.map(function (t) { return t.pcvr; });
+      var clicked = er.map(function (row, i) { return row.click ? i : -1; }).filter(function (i) { return i >= 0; });
+      function grade(m, scale) {
+        var p = Stack.cvrPredictRows(m, er).map(function (v) { return v * scale; });
+        var pc = clicked.map(function (i) { return p[i]; }), tc = clicked.map(function (i) { return tcv[i]; });
+        return { cal: Stack.sum(pc) / Stack.sum(tc), acc: Stack.pairOrderAcc(pc, tc) };
+      }
+      var gFull = grade(full, 1), gRaw = grade(part, 1), gFix = grade(part, 1 / rate);
+      out.innerHTML = '';
+      StackUI.table(out, [
+        { label: 'Model', key: 'k' },
+        { label: 'Calibration (Σp ÷ Σtruth)', num: true, get: function (x) { return x.cal.toFixed(2); } },
+        { label: 'Ranking accuracy vs. truth', num: true, get: function (x) { return Book.pct(x.acc, 1); } },
+        { label: 'What an advertiser feels', key: 'note' }
+      ], [
+        { k: 'Every conversion observable', cal: gFull.cal, acc: gFull.acc, note: 'The Chapter 12 world.' },
+        { k: 'Only ' + Book.pct(rate, 0) + ' observable', cal: gRaw.cal, acc: gRaw.acc, note: 'Under-predicts, so oCPM bids too low and campaigns under-deliver.' },
+        { k: 'Same model ÷ ' + Book.pct(rate, 0), cal: gFix.cal, acc: gFix.acc, note: 'Level restored. Ranking is whatever the thinner data could teach.' }
+      ]);
+      out.appendChild(el('p', { class: 'small', html: 'Dividing by the observable share fixes the <em>level</em> and leaves ranking accuracy untouched, because scaling every prediction by the same factor can\'t reorder anything. Compare the ranking column with the first row to see what the missing positives actually cost.' }));
+    });
+  })();
+
+  /* ---------------- the cost of a protected report ---------------- */
+  (function () {
+    var host = document.getElementById('w-aggregate');
+    var ctlHost = el('div'); host.appendChild(ctlHost);
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var ctl = Book.controls(ctlHost, [
+      { key: 'k', label: 'Suppress cells under k conversions', min: 1, max: 25, step: 1, value: 5, fmt: function (v) { return v + ' conv.'; } },
+      { key: 'sd', label: 'Noise added to each published count', min: 0, max: 6, step: 0.5, value: 2, fmt: function (v) { return '± ' + v.toFixed(1); } },
+      { key: 'span', label: 'Days grouped into one cell', min: 1, max: 10, step: 1, value: 1, fmt: function (v) { return v === 1 ? 'daily' : v + ' days'; } }
+    ], function () {});
+    StackUI.asyncButton(btnHost, 'Publish the report', async function (progress) {
+      var v = ctl.values, w = Stack.world();
+      var d = await logs(progress);
+      var rows = Stack.labeledRows(d.tl);
+      // Wider cells = fewer, bigger counts. Same report function, coarser time bucket.
+      var celled = v.span === 1 ? rows : rows.map(function (row) { return Object.assign({}, row, { day: Math.floor(row.day / v.span) }); });
+      var report = Stack.impl('privacyReport')(celled, { k: v.k });
+      // True per-cell counts, for comparison only. A real platform can compute these; an
+      // advertiser reading the report cannot.
+      var truth = {};
+      celled.forEach(function (row) { if (row.conv) { var key = row.adv + ':' + row.day; truth[key] = (truth[key] || 0) + 1; } });
+      var r = World.Rand(99), byAdv = {};
+      Object.keys(truth).forEach(function (key) {
+        var adv = +key.split(':')[0], b = byAdv[adv] || (byAdv[adv] = { adv: adv, real: 0, published: 0, cells: 0, shown: 0 });
+        b.real += truth[key]; b.cells++;
+        if (report[key] != null) {
+          b.shown++;
+          // Gaussian noise, rounded, never negative: the shape of a real protected count.
+          var noisy = Math.max(0, Math.round(report[key] + r.normal(0, v.sd)));
+          b.published += noisy;
+        }
+      });
+      var list = Object.keys(byAdv).map(function (k2) { return byAdv[k2]; }).sort(function (a, b) { return b.real - a.real; });
+      var totReal = Stack.sum(list.map(function (x) { return x.real; })), totPub = Stack.sum(list.map(function (x) { return x.published; }));
+      var dark = list.filter(function (x) { return x.published === 0; }).length;
+      out.innerHTML = '';
+      Book.stats(out, [
+        { key: 'real', label: 'Conversions that happened' },
+        { key: 'pub', label: 'Conversions the report shows' },
+        { key: 'dark', label: 'Advertisers with no report at all' }
+      ])({
+        real: String(totReal),
+        pub: { v: String(totPub), d: Book.pct(totPub / totReal, 0) + ' of what happened' },
+        dark: { v: dark + ' of ' + list.length, d: 'every cell under k', tone: dark ? 'bad' : '' }
+      });
+      var c = Book.chart(out, {
+        w: 640, h: 260, x: [0, Math.max.apply(null, list.map(function (x) { return x.real; })) * 1.1 + 1], y: [0, Math.max.apply(null, list.map(function (x) { return Math.max(x.real, x.published); })) * 1.1 + 1],
+        xlabel: 'Conversions that actually happened (10 days)', ylabel: 'Conversions reported'
+      });
+      c.line([[0, 0], [1e5, 1e5]], { color: 'var(--ink-3)', dash: '5 4' });
+      c.dots(list.map(function (x) { return [x.real, x.published, 4, x.published === 0 ? 'var(--s2)' : 'var(--s1)']; }));
+      Book.legend(out, [{ label: 'Reported', color: 'var(--s1)' }, { label: 'Fully suppressed', color: 'var(--s2)' }, { label: 'Perfect reporting', color: 'var(--ink-3)', dash: true }]);
+      StackUI.table(out, [
+        { label: 'Advertiser', get: function (x) { return w.advertisers[x.adv].name; } },
+        { label: 'Real conversions', num: true, key: 'real' },
+        { label: 'Reported', num: true, key: 'published' },
+        { label: 'Error', num: true, get: function (x) { return x.real ? Book.signed((x.published - x.real) / x.real * 100, 0) + '%' : '—'; } },
+        { label: 'Cells reported', num: true, get: function (x) { return x.shown + ' / ' + x.cells; } }
+      ], list, { maxHeight: 320 });
+      out.appendChild(el('p', { class: 'small', html: 'Big advertisers sit on the dashed line: their cells clear the threshold and the noise is small next to their counts. The small ones fall below it, and their conversions vanish from reporting entirely. Using ' + (Stack.implSource('privacyReport') === 'you' ? 'your <code>privacyReport()</code>.' : 'the reference <code>privacyReport()</code>.') }));
+    });
+  })();
+})();
+</script>
+</body>
+</html>

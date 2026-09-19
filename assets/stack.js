@@ -816,6 +816,51 @@
     }
   });
 
+  slot({
+    id: 'privacyReport', chapter: 13, title: 'A privacy-safe conversion report',
+    starter: [
+      '// Aggregate conversions into a report that can be shared without exposing',
+      '// any one person. Group the rows by (advertiser, day) and count conversions.',
+      '//   rows:  [{ adv, day, conv }]   conv is 0 or 1',
+      '//   opts:  { k }                  the minimum count that may be reported',
+      '// Return an object keyed by adv + ":" + day, holding the conversion count.',
+      '// Any cell whose count is below k is SUPPRESSED: leave the key out entirely.',
+      '// Cells with no conversions at all never appear.',
+      'function privacyReport(rows, opts) {',
+      '  // TODO',
+      '  return {};',
+      '}'
+    ].join('\n'),
+    reference: [
+      'function privacyReport(rows, opts) {',
+      '  const counts = {};',
+      '  for (const r of rows) {',
+      '    if (!r.conv) continue;',
+      '    const key = r.adv + ":" + r.day;',
+      '    counts[key] = (counts[key] || 0) + 1;',
+      '  }',
+      '  const out = {};',
+      '  for (const key in counts) if (counts[key] >= opts.k) out[key] = counts[key];',
+      '  return out;                       // small cells never leave the building',
+      '}'
+    ].join('\n'),
+    tests: function (fn, T) {
+      var rows = [], i;
+      for (i = 0; i < 9; i++) rows.push({ adv: 3, day: 0, conv: 1 });      // big cell
+      for (i = 0; i < 2; i++) rows.push({ adv: 7, day: 0, conv: 1 });      // small cell
+      for (i = 0; i < 50; i++) rows.push({ adv: 7, day: 0, conv: 0 });     // non-conversions
+      rows.push({ adv: 3, day: 1, conv: 0 });                              // empty cell
+      var r = fn(rows, { k: 5 }) || {};
+      T.close('Counts conversions per advertiser and day', r['3:0'], 9, 1e-9);
+      T.check('Suppresses a cell below k', r['7:0'] === undefined, 'advertiser 7 had only 2 conversions, under k = 5, so "7:0" must be absent. Got ' + JSON.stringify(r['7:0']) + '.');
+      T.check('Never reports a cell with no conversions', r['3:1'] === undefined, 'Got ' + JSON.stringify(r['3:1']) + ' for a day with no conversions.');
+      T.check('Non-conversion rows are not counted', Object.keys(r).length === 1, 'Expected exactly one reportable cell, got ' + JSON.stringify(r) + '.');
+      var r2 = fn(rows, { k: 2 }) || {};
+      T.close('A lower k lets the small cell through', r2['7:0'], 2, 1e-9);
+      T.check('Nothing to report is an empty object', Object.keys(fn([{ adv: 1, day: 0, conv: 0 }], { k: 1 }) || {}).length === 0, 'Expected {}.');
+    }
+  });
+
   /* ---------- compile & test ---------- */
   var FN_NAME = {};
   Object.keys(SLOTS).forEach(function (id) { FN_NAME[id] = id; });
