@@ -7,13 +7,21 @@
     var id = 'aq-arrow-' + (++serial), d = S('defs', {}, s);
     var m = S('marker', {id:id, viewBox:'0 0 10 10', refX:9, refY:5, markerWidth:7, markerHeight:7, orient:'auto-start-reverse'}, d);
     S('path', {d:'M 0 0 L 10 5 L 0 10 z', fill:'var(--ink-3)'}, m);
+    ['', 'a', 'b', 'g', 'v'].forEach(function(tone) {
+      var colors = {a:'accent',b:'blue',g:'green',v:'violet'}, color = colors[tone];
+      var gradient = S('linearGradient', {id:id+'-wash-'+(tone||'base'), x1:'0%',y1:'0%',x2:'100%',y2:'100%'}, d);
+      S('stop', {offset:'0%', 'stop-color':color?'var(--'+color+'-soft)':'var(--card)'}, gradient);
+      S('stop', {offset:'100%', 'stop-color':'var(--card)'}, gradient);
+      s.style.setProperty('--aq-fill-'+(tone||'base'), 'url(#'+id+'-wash-'+(tone||'base')+')');
+    });
     s._arrow = id; return s;
   }
   function txt(s,x,y,t,cls) { return S('text',{x:x,y:y,text:t,class:cls || 't-md'},s); }
   function box(s,y,title,detail,tone,x,width) {
     x = x == null ? 24 : x; width = width || 684;
-    S('rect',{x:x,y:y,width:width,height:100,rx:12,class:'box '+(tone || '')},s);
-    txt(s,x+20,y+39,title,'t-md t-b'); if(detail) txt(s,x+20,y+77,detail,'t-sm');
+    S('rect',{x:x,y:y,width:width,height:100,rx:18,class:'box '+(tone || '')},s);
+    S('rect',{x:x+1,y:y+21,width:4,height:58,rx:2,fill:'var(--'+({a:'accent',b:'blue',g:'green',v:'violet'}[tone]||'ink-3')+')'},s);
+    txt(s,x+24,y+39,title,'t-md t-b'); if(detail) txt(s,x+24,y+77,detail,'t-sm');
   }
   function arrow(s,d) { S('path',{d:d,class:'arrow',style:'marker-end:url(#'+s._arrow+')'},s); }
   function down(s,y) { arrow(s,'M 366 '+y+' V '+(y+27)); }
@@ -37,7 +45,8 @@
     var max=Math.max.apply(null,cands.map(function(c){return c.score;}))||1;
     cands.forEach(function(c,k){
       var a=ads[c.i],y=12+k*173,r=res[c.i];
-      S('rect',{x:20,y:y,width:650,height:154,rx:12,class:'box '+(r?'a':'')},s);
+      S('rect',{x:20,y:y,width:650,height:154,rx:20,class:'box '+(r?'a':'')},s);
+      S('rect',{x:40,y:y+87,width:590,height:9,rx:4,fill:'var(--rule)'},s);
       txt(s,40,y+36,a.name+' · '+(r?'slot '+(r.slot+1):'not shown'),'t-md t-b');
       txt(s,40,y+72,'$'+a.bid.toFixed(2)+' × '+a.pctr.toFixed(3)+' = $'+c.score.toFixed(4),'t-sm');
       S('rect',{x:40,y:y+87,width:590*c.score/max,height:9,rx:4,fill:'var(--accent)'},s);
@@ -197,15 +206,15 @@
     var stages=[];
     ['All ads','Eligible','Ranked','Shown'].forEach(function(name,i){
       var x=20+i*186, g=S('g',{},s),y=20+i*8;
-      var shape=S('polygon',{points:x+','+y+' '+(x+160)+','+(y+8)+' '+(x+160)+','+(152-i*8)+' '+x+','+(160-i*8),class:'box'},g);
-      txt(g,x+80,77,name,'t-sm t-b').setAttribute('text-anchor','middle');
-      var count=txt(g,x+80,119,String([12,8,8,3][i]),'t-md t-b');count.setAttribute('text-anchor','middle');
+      var shape=S('rect',{x:x,y:20,width:160,height:140,rx:22,class:'box'},g);
+      txt(g,x+80,68,name,'t-sm t-b').setAttribute('text-anchor','middle');
+      var count=txt(g,x+80,124,String([12,8,8,3][i]),'aq-count t-b');count.setAttribute('text-anchor','middle');
       stages.push(shape);
       if(i<3)arrow(s,'M '+(x+164)+' 92 H '+(x+179));
     });
     var heading=txt(s,20,207,'12 candidates · before filtering','t-md t-b');
     var tiles=candidates.map(function(a){
-      var g=S('g',{class:'aq-candidate'},s),rect=S('rect',{x:0,y:0,width:166,height:108,rx:10,class:'box'},g);
+      var g=S('g',{class:'aq-candidate'},s),rect=S('rect',{x:0,y:0,width:166,height:108,rx:18,class:'box'},g);
       var name=txt(g,14,35,'Ad '+a.id,'t-md t-b'),detail=txt(g,14,68,'$'+a.bid.toFixed(2)+'/click','t-sm'),note=txt(g,14,94,'pCTR '+(a.p*100).toFixed(1)+'%','t-sm');
       return {ad:a,g:g,rect:rect,name:name,detail:detail,note:note};
     });
@@ -222,7 +231,7 @@
         var cols=narrow.matches?2:4;
         t.rect.setAttribute('width',narrow.matches?352:166);
         t.g.style.transform='translate('+(20+(k%cols)*(narrow.matches?372:186))+'px,'+(232+Math.floor(k/cols)*128)+'px)';
-        t.g.style.opacity=out||loser?'0.32':'1';
+        t.g.style.opacity=out||loser?'0.58':'1';
         t.rect.setAttribute('class','box '+(win?'g':n>=2&&!out?'b':''));
         t.name.textContent=win?'Slot '+(k+1)+' · '+a.id:'Ad '+a.id;
         t.detail.textContent=out?({B:'Country',E:'Inactive',H:'Budget',K:'Freq. cap'}[a.id]):n>=2?'$'+a.score.toFixed(3):'$'+a.bid.toFixed(2)+'/click';
