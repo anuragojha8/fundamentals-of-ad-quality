@@ -17,22 +17,22 @@
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
 </head>
-<body data-chapter="13-pretrain-train-refresh">
+<body data-chapter="14-pretrain-train-refresh">
 <main class="chapter">
 
 <header class="chapter-head">
-  <div class="kicker">Chapter 13 · Part IV · The Models</div>
+  <div class="kicker">Chapter 14 · Part IV · The Models</div>
   <h1>Pre-training, Fine-tuning, and Freshness</h1>
   <p class="dek">In which the world moves on and my model doesn't notice.</p>
 </header>
 
-<div class="stack-panel" data-chapter="13"></div>
+<div class="stack-panel" data-chapter="14"></div>
 
 <p class="lead">You know how you find an old photo of yourself and think, "who <em>is</em> that?" Models have the same problem, except they don't know it.</p>
 
 <p>Every model in your stack was trained on days 0 through 9. But Pebble kept going after day 9. Users' interests wander. Seasons change what people click on. Advertisers launch new creatives every day that your model has literally never seen. A model is just a snapshot of a world that refuses to hold still, and keeping it current matters just as much as how cleverly you built it. In this chapter we measure how fast your model goes stale, design a retraining schedule, and meet the ideas modern systems use to learn faster from less: <strong>warm starts, pre-training, and distillation</strong>.</p>
 
-<h2 id="drift"><span class="sec">13.1</span>Drift: watching a model go stale</h2>
+<h2 id="drift"><span class="sec">14.1</span>Drift: watching a model go stale</h2>
 
 <p>Pebble's simulated world drifts in three ways, just like the real one. Each user's interests <strong>slowly shift</strong> toward a different set of favorite categories over the 90 days (the hiking person gets really into cooking, it happens). Categories have <strong>seasonal trends</strong> (Travel rises and falls over weeks). And about 40% of ads <strong>launch after day 0</strong>, so a model trained early has never even heard of them. Let's put your day-0–9 model up against a freshly trained one, on the same later days:</p>
 
@@ -45,7 +45,7 @@
 <p>Staleness hurts in two ways. <strong>Ranking decays</strong> as the patterns it learned become less true. A user ID's weight describes who that user <em>used to be</em>, and new ads don't have an ID weight at all. <strong>Calibration wanders</strong> as the mix of users, ads, and seasons shifts around, sometimes up, sometimes down, which makes it really easy to miss on an aggregate dashboard. That's why production systems pair a periodic full retrain with a calibration layer that gets refreshed often (Chapter 3 to the rescue, again).</p>
 </div>
 
-<h2 id="cadence"><span class="sec">13.2</span>Designing a retraining schedule</h2>
+<h2 id="cadence"><span class="sec">14.2</span>Designing a retraining schedule</h2>
 
 <p>So how often should you retrain? Retrain every hour and the model stays fresh, but you pay in compute, pipeline complexity, and risk (every retrain is a brand-new model that could break something). Retrain once a month and it's cheap, and also stale. And there are two more choices hiding in there:</p>
 <ul>
@@ -59,7 +59,7 @@
   <div class="w-sub">Days 10–45 of Pebble. Your logistic regression recipe, retrained on the schedule you pick. Each point is that day's AUC and calibration (vs. the truth) for the model in production that day.</div>
 </div>
 
-<div class="quiz" data-id="ch13-q1">
+<div class="quiz" data-id="ch14-q1">
   <p class="q">Your model's AUC is stable week over week, but its calibration ratio drifts from 1.00 to 1.18 over three weeks. What's the cheapest effective fix?</p>
   <ul>
     <li data-why="A full retrain would fix it but isn't the cheapest option.">Retrain the full model daily</li>
@@ -70,7 +70,7 @@
   <div class="explain"><p>Stable AUC means the ordering is still fine; only the scale moved. A calibration layer is just a handful of parameters, and it's cheap to refit on recent data. This is exactly the job it was born to do.</p></div>
 </div>
 
-<h2 id="pretrain"><span class="sec">13.3</span>Pre-training and fine-tuning</h2>
+<h2 id="pretrain"><span class="sec">14.3</span>Pre-training and fine-tuning</h2>
 
 <p>Here's something we've been dancing around for a few chapters. Ad clicks are a thin, biased signal: rare, and only available for ads that got shown (Chapters 5 and 10). But Pebble knows <em>so</em> much more about its users than their ad clicks. Every like, comment, follow, and search is a clue about what they're into.</p>
 
@@ -91,13 +91,13 @@
 
 <p>If this sounds familiar, it should. It's the same idea behind large language models, which get pre-trained on the whole web and then fine-tuned for specific tasks. In ads, "foundation" user models pre-trained on engagement sequences, and content embeddings from image and text encoders, increasingly get shared across lots of ranking models. A brand-new ad has zero click history, but its image and text have an embedding from day one. A brand-new user has zero ad clicks, but they've already liked a bunch of posts. So the biggest wins land exactly where it hurts most: <strong>cold start and sparse labels</strong>.</p>
 
-<h2 id="distill"><span class="sec">13.4</span>Distillation</h2>
+<h2 id="distill"><span class="sec">14.4</span>Distillation</h2>
 
 <p>Sometimes your best model is just too expensive to run at every stage of the funnel. <dfn>Knowledge distillation</dfn> trains a small "student" model to imitate a big "teacher." Instead of learning from 0/1 labels, the student learns from the teacher's predicted probabilities, which are way more informative per example. A click label just says "0." The teacher says "this was a 7% case, not a 0.1% case," which tells you a whole lot more.</p>
 
 <p>In ads, a common use is having a heavy late-stage ranker teach the early-stage ranker, so the early stage agrees more with the late one and the eventual winners survive the funnel more often (hi again, Chapter 1). It's also how a slow offline model can teach a fast online one.</p>
 
-<div class="quiz" data-id="ch13-q2">
+<div class="quiz" data-id="ch14-q2">
   <p class="q">Why do soft labels from a teacher help a student more than the original 0/1 click labels?</p>
   <ul>
     <li data-why="Distillation usually uses the same examples, just different targets.">The teacher sees more examples</li>
@@ -108,7 +108,7 @@
   <div class="explain"><p>Clicks are noisy coin flips drawn from probabilities. The teacher's estimate strips out a lot of that noise, the same way "expected clicks" did all through this book. So the student picks up the teacher's knowledge at a fraction of the data cost.</p></div>
 </div>
 
-<div class="reflect" data-id="ch13-r1">
+<div class="reflect" data-id="ch14-r1">
   <p class="q">Infra says moving your ranking model from daily to hourly retraining will cost an extra 30% in training compute. How would you decide whether it's worth it?</p>
   <div class="model">
     <ul>

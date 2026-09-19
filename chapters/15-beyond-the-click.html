@@ -17,22 +17,22 @@
 <script src="../assets/stack.js"></script>
 <script src="../assets/stack-ui.js"></script>
 </head>
-<body data-chapter="14-beyond-the-click">
+<body data-chapter="15-beyond-the-click">
 <main class="chapter">
 
 <header class="chapter-head">
-  <div class="kicker">Chapter 14 · Part V · The Job</div>
+  <div class="kicker">Chapter 15 · Part V · The Job</div>
   <h1>Quality Beyond the Click</h1>
   <p class="dek">In which I remember that nobody opened Pebble to see ads. (Shocking, I know.)</p>
 </header>
 
-<div class="stack-panel" data-chapter="14"></div>
+<div class="stack-panel" data-chapter="15"></div>
 
 <p class="lead">Let's take stock. For thirteen chapters, we've optimized clicks, conversions, and revenue. Those are what advertisers pay for, and you can measure them within a day. Very satisfying.</p>
 
 <p>But here's the part nobody puts on the dashboard: ads have a cost that never shows up in the auction. Every irrelevant or annoying ad makes Pebble a tiny bit worse. People hide ads. They scroll faster. They open the app a little less often. Those effects are slow, spread thin, and super easy to ignore, right up until the day they aren't. Pebble's users didn't open the app to see ads. Every ad spends a little of their patience. The real job of a quality PM is to spend it wisely. So in this chapter we finally put users into your stack's objective.</p>
 
-<h2 id="objective"><span class="sec">14.1</span>The objective you actually own</h2>
+<h2 id="objective"><span class="sec">15.1</span>The objective you actually own</h2>
 
 <p>A healthy ads marketplace keeps three parties reasonably happy: <strong>advertisers</strong> (value for their money), <strong>users</strong> (a good experience), and <strong>the platform</strong> (revenue, both now and later). Lots of large platforms rank ads by some version of <dfn>total value</dfn>:</p>
 
@@ -40,7 +40,7 @@
 
 <p>Now look closely, because two numbers in that formula aren't predictions at all. They're <strong>policy</strong>: the weight \(\lambda\) on user cost, and how many ad slots to show in the first place (<dfn>ad load</dfn>). No model can learn those from clicks. They encode how much short-term revenue Pebble is willing to trade for long-term user health. Setting them well is one of the most consequential things you'll ever do as an ads quality PM. No pressure. (Okay, a lot of pressure.)</p>
 
-<h2 id="phide"><span class="sec">14.2</span>Predicting annoyance</h2>
+<h2 id="phide"><span class="sec">15.2</span>Predicting annoyance</h2>
 
 <p>Pebble lets users hide an ad ("not interested"). Hides are the clearest negative signal you'll ever get: a user literally telling you "please stop." They're also rare, about one per 180 impressions in your logs. In Pebble's world, hides come mostly from ads that don't match the user's interests, and from "annoying" creatives, which some advertisers are just really, really good at making.</p>
 
@@ -51,7 +51,7 @@
   <div class="w-sub">Logistic regression on your logs with label = hide. Graded against the true hide probabilities on day 10.</div>
 </div>
 
-<h2 id="lambda"><span class="sec">14.3</span>Pricing annoyance into the auction</h2>
+<h2 id="lambda"><span class="sec">15.3</span>Pricing annoyance into the auction</h2>
 
 <p>Now let's add the penalty. Each ad's score becomes bid × pCTR − λ · pHide. Your stack does this by handing the auction a quality-adjusted pCTR, so the penalty affects both who wins and what they pay. Sweep λ and take a look at the frontier.</p>
 
@@ -64,7 +64,7 @@
 <p>Wait, revenue went <em>up</em>? Yep. The first bit of quality penalty is often <strong>free, or even better than free</strong>. Ads that people hide are usually ads they wouldn't have clicked anyway, so pushing them down makes room for ads that actually earn more. Turn λ up far enough, though, and the penalty starts kicking out ads that make real money and are only mildly annoying. That's where the genuine tradeoff begins, and where you, the PM, have to make a call.</p>
 </div>
 
-<h2 id="load"><span class="sec">14.4</span>Ad load and the long run</h2>
+<h2 id="load"><span class="sec">15.4</span>Ad load and the long run</h2>
 
 <p>And now, the biggest lever of all: how many ads to show. More slots means more revenue <em>today</em>, almost linearly. It's so tempting. The cost shows up later: users who see more ads (and more hideable ones) come back a little less often. And a little less often, compounded over a year, is a lot.</p>
 
@@ -81,7 +81,7 @@
 
 <!-- ANURAG: if you've lived through an ad-load debate (finance vs. product vs. quality), a sentence or two here would make this very real. -->
 
-<div class="quiz" data-id="ch14-q1">
+<div class="quiz" data-id="ch15-q1">
   <p class="q">Adding a hide penalty (λ = 1) raised revenue <em>and</em> reduced hides in your simulation. Why can that happen?</p>
   <ul>
     <li data-why="The penalty changes rankings, not just prices.">The penalty only changes prices</li>
@@ -92,7 +92,7 @@
   <div class="explain"><p>When pCTR isn't perfect (and it never is), pHide carries extra information about relevance. So the first bit of quality penalty partly fixes ranking mistakes. The real tradeoff only shows up once the penalty starts removing ads that are genuinely profitable.</p></div>
 </div>
 
-<div class="reflect" data-id="ch14-r1">
+<div class="reflect" data-id="ch15-r1">
   <p class="q">Finance proposes raising Pebble's ad load from 1 ad in 8 posts to 1 in 6, projecting +18% revenue. Write your response: what you'd need to see, how you'd test it, and what guardrails you'd set.</p>
   <div class="model">
     <ul>

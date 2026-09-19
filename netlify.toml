@@ -1,6 +1,6 @@
 # Publish only the book itself. Drafts (docs/), tests, and tools stay in the repo.
 [build]
-  command = "rm -rf dist && mkdir dist && cp -R index.html chapters assets dist/"
+  command = "rm -rf dist && mkdir dist && cp -R index.html chapters assets _redirects dist/"
   publish = "dist"
 
 # Unlisted until launch: ask search engines not to index anything.

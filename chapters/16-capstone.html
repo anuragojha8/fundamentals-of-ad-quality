@@ -29,28 +29,28 @@
   .grade { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
 </style>
 </head>
-<body data-chapter="15-capstone">
+<body data-chapter="16-capstone">
 <main class="chapter">
 
 <header class="chapter-head">
-  <div class="kicker">Chapter 15 · Part V · The Job · Capstone</div>
+  <div class="kicker">Chapter 16 · Part V · The Job · Capstone</div>
   <h1>Run the Marketplace</h1>
   <p class="dek">In which I get the keys to the whole marketplace and try very hard not to crash it.</p>
 </header>
 
-<div class="stack-panel" data-chapter="15"></div>
+<div class="stack-panel" data-chapter="16"></div>
 
 <p class="lead">Okay. Deep breath. You're the Ads Quality PM at Pebble, and the next quarter is yours.</p>
 
 <p>Everything you built in this book is now live: your eligibility filter, your auction, your features, your models, your retrieval, your quality penalty. All of it. Each simulated week, Pebble's world keeps moving: interests drift, new ads launch, budgets get spent, users get a little happier or a little more annoyed. You make the calls a real quality PM makes, and then you live with the results. Advertisers, users, and a finance team are all watching.</p>
 
-<h2 id="rules"><span class="sec">15.1</span>How the quarter works</h2>
+<h2 id="rules"><span class="sec">16.1</span>How the quarter works</h2>
 
 <ul>
   <li><strong>Each week</strong> is one simulated day of Pebble traffic, served by your stack with whatever levers you've set. The world jumps forward five days per week, so drift is very real.</li>
   <li><strong>Advertisers have budgets.</strong> They're sized from a pre-season week, so the bigger spenders will run into them. Once an advertiser's budget runs out, it stops bidding for the rest of the day, unless <strong>pacing</strong> spreads its spend out.</li>
   <li><strong>Advertisers leave</strong> if their return on ad spend (conversion value ÷ spend) stays below 0.85 for three weeks in a row. Overcharge people and they walk. Just like real life.</li>
-  <li><strong>Users react slowly.</strong> Pebble's active users grow about 1% a week on their own, and shrink with ad load and hides (a gentler version of the Chapter 14 toy model: weekly loss = 0.4% × ad slots + 40% × hides per request). Fewer users next week means less traffic to monetize.</li>
+  <li><strong>Users react slowly.</strong> Pebble's active users grow about 1% a week on their own, and shrink with ad load and hides (a gentler version of the Chapter 15 toy model: weekly loss = 0.4% × ad slots + 40% × hides per request). Fewer users next week means less traffic to monetize.</li>
   <li><strong>You're graded against autopilot.</strong> A shadow Pebble runs the exact same weeks with the default levers (heuristic ranker, 3 ad slots, no pacing, no penalties). Your job: beat it on revenue, users, and advertiser value, without losing more advertisers than it does. It's the same logic as a long-term holdout, which you now know all about.</li>
   <li><strong>Everything is measured against the truth</strong>: expected revenue, conversions, and hides, not noisy coin flips. Real life will not be this kind to you. Enjoy it.</li>
 </ul>
@@ -60,20 +60,20 @@
   <div class="w-sub">Set your levers, then run the week. You can change levers between weeks.</div>
 </div>
 
-<h2 id="debrief"><span class="sec">15.2</span>After the quarter</h2>
+<h2 id="debrief"><span class="sec">16.2</span>After the quarter</h2>
 
 <p>How'd it go? However it went, every lever in that game is one you've studied, and almost all of them trade something now for something later. Here are some patterns strong players tend to find:</p>
 <ul>
   <li><strong>Calibration is an advertiser-retention problem.</strong> Switching to oCPM with a miscalibrated pCVR can juice revenue early and quietly lose you advertisers a few weeks later (Chapters 3 and 12).</li>
   <li><strong>Budgets cap revenue.</strong> Once advertisers hit their budgets, a better ranker shows up more as advertiser value than as revenue. Pacing rarely hurts, and it helps most when budgets really bind (without it, big spenders drop out early and the rest of the day turns into one of Chapter 2's thin markets).</li>
-  <li><strong>Stale models decay quietly.</strong> Warm-start retraining on recent weeks keeps your model honest as the world drifts (Chapter 13).</li>
-  <li><strong>Ad load is a slow-motion tradeoff.</strong> An extra slot wins every single week-one revenue comparison, and sends the bill to user health (Chapter 14).</li>
-  <li><strong>The first bit of quality penalty is often free</strong> (Chapter 14). And exploration is an investment whose returns only land if something learns from it (Chapter 5).</li>
+  <li><strong>Stale models decay quietly.</strong> Warm-start retraining on recent weeks keeps your model honest as the world drifts (Chapter 14).</li>
+  <li><strong>Ad load is a slow-motion tradeoff.</strong> An extra slot wins every single week-one revenue comparison, and sends the bill to user health (Chapter 15).</li>
+  <li><strong>The first bit of quality penalty is often free</strong> (Chapter 15). And exploration is an investment whose returns only land if something learns from it (Chapter 5).</li>
 </ul>
 
 <p>If you didn't win on your first try, good. That means the game is doing its job. Change one lever at a time, and watch which metric actually moves. That habit, more than any model, is the job.</p>
 
-<div class="reflect" data-id="ch15-r1">
+<div class="reflect" data-id="ch16-r1">
   <p class="q">Write your end-of-quarter review for Pebble's leadership, in five bullet points: what you changed, what happened to revenue, advertisers, and users, what you'd do differently, and what you'd put on next quarter's roadmap.</p>
   <div class="model">
     <p>A strong review is short, quantified, and honest about tradeoffs. Something like:</p>
@@ -149,7 +149,7 @@
     lever('Bidding', [['cpc', 'CPC'], ['ocpm', 'oCPM (your pCVR)', has('esmm'), 'Train in Ch. 12']], 'pricing', 'oCPM prices with CPA × pCTR × pCVR.');
     lever('Exploration', [[0, '0%'], [0.02, '2%'], [0.05, '5%'], [0.1, '10%']], 'epsilon', 'Explored impressions are served free.');
     lever('Reserve (eCPM)', [[0, 'None'], [5, '$5'], [10, '$10'], [20, '$20']], 'reserve');
-    lever('Hide penalty λ', [[0, '0'], [1, '1', has('phide'), 'Train pHide in Ch. 14'], [2, '2', has('phide')], [4, '4', has('phide')]], 'lambda');
+    lever('Hide penalty λ', [[0, '0'], [1, '1', has('phide'), 'Train pHide in Ch. 15'], [2, '2', has('phide')], [4, '4', has('phide')]], 'lambda');
     lever('Ad load', [[1, '1 slot'], [2, '2 slots'], [3, '3 slots']], 'adLoad');
     lever('Budget pacing', [[false, 'Off'], [true, 'On']], 'pacing', 'Throttles each advertiser so its budget lasts the day.');
     lever('Retrain your LR weekly', [[false, 'No'], [true, 'Yes (warm start)', has('lr')]], 'retrain', 'Fine-tunes your Ch. 7 model on the last 4 weeks of logs.');
@@ -218,7 +218,7 @@
     var hpr = s.expHides / Math.max(1, s.requests), prev = P.userIndex;
     P.userIndex *= 1.01 - (0.004 * lev.adLoad + 0.4 * hpr);
     if (say && exhausted >= 3 && !lev.pacing) say(exhausted + ' advertisers ran out of budget before the day ended. Evening auctions ran thin.');
-    // Warm-start retraining (Ch. 13): fine-tune your Ch. 7 model on a rolling window of the last 4 weeks.
+    // Warm-start retraining (Ch. 14): fine-tune your Ch. 7 model on a rolling window of the last 4 weeks.
     if (lev.retrain && lev.ranker === 'lr' && P.lr) {
       P.window = (P.window || []).concat([Stack.labeledRows(l)]).slice(-4);
       P.lr = await Stack.trainLR({ rows: [].concat.apply([], P.window), epochs: 1, lr: 0.02, init: Stack.getModel('lr').w, decay: true });
@@ -277,10 +277,10 @@
     if (Y.churned.size > A.churned.size && used('pricing', 'ocpm')) tips.push('You lost advertisers while oCPM was on. Your pCVR likely overcharged some verticals (Ch. 12: calibration and delayed feedback).');
     if (Y.churned.size > A.churned.size && H.some(function (h) { return h.lev.reserve >= 20; })) tips.push('High reserves priced some advertisers out (Ch. 2).');
     if (H.some(function (h) { return !h.lev.pacing && h.exhausted >= 3; })) tips.push('Budgets ran out mid-day in weeks without pacing (Ch. 2).');
-    if (dUsers < 0) tips.push('Your users fell behind autopilot. Ad load and hides compound week over week (Ch. 14).');
-    if (dRev < 0 && H.some(function (h) { return h.lev.adLoad < 3; })) tips.push('Fewer ad slots cost revenue now, and users only recover slowly. Within one quarter it rarely pays back in revenue alone. That\'s the short-vs-long-term tension from Ch. 14. A hide penalty often buys user health more cheaply.');
-    if (H.some(function (h) { return h.lev.ranker === 'lr' && !h.lev.retrain; }) && H.length > 6) tips.push('Your LR ran unretrained while the world drifted (Ch. 13).');
-    if (!H.some(function (h) { return h.lev.lambda > 0; }) && has('phide')) tips.push('You never used the hide penalty. Its first units are usually free (Ch. 14).');
+    if (dUsers < 0) tips.push('Your users fell behind autopilot. Ad load and hides compound week over week (Ch. 15).');
+    if (dRev < 0 && H.some(function (h) { return h.lev.adLoad < 3; })) tips.push('Fewer ad slots cost revenue now, and users only recover slowly. Within one quarter it rarely pays back in revenue alone. That\'s the short-vs-long-term tension from Ch. 15. A hide penalty often buys user health more cheaply.');
+    if (H.some(function (h) { return h.lev.ranker === 'lr' && !h.lev.retrain; }) && H.length > 6) tips.push('Your LR ran unretrained while the world drifted (Ch. 14).');
+    if (!H.some(function (h) { return h.lev.lambda > 0; }) && has('phide')) tips.push('You never used the hide penalty. Its first units are usually free (Ch. 15).');
     var avgEps = Stack.mean(H.map(function (h) { return h.lev.epsilon; }));
     if (avgEps >= 0.05) tips.push('Exploration averaged ' + Math.round(100 * avgEps) + '% of traffic, served free: a direct revenue cost this quarter, repaid only when models learn from it (weekly retraining ' + (used('retrain', true) ? 'was on' : 'was off') + ').');
     if (H.some(function (h) { return h.exhausted >= 5; })) tips.push('Several advertisers hit their budgets. When budgets bind, better ranking shows up more in advertiser value than in revenue.');

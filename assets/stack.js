@@ -1268,7 +1268,7 @@
       else if (s.cvrModel === 'cvr-naive' && getModel('cvr-naive')) cvr = { model: getModel('cvr-naive') };
       else cvr = { oracle: true };
     }
-    // Quality penalty (Ch. 14): score = bid × pCTR − λ · pHide. Implemented by passing the
+    // Quality penalty (Ch. 15): score = bid × pCTR − λ · pHide. Implemented by passing the
     // auction a quality-adjusted pCTR, so ranking and pricing both account for it.
     if (s.hideLambda > 0 && getModel('phide')) {
       var ph = getModel('phide'), base = ranker, featF = impl('featurize'), Lb = lib(), s0h = slotBucket(0, ph.bits), lam = s.hideLambda;
@@ -1634,7 +1634,7 @@
     } else if (ch === 12) {
       var em = await trainCVR({ rows: rows, method: 'esmm', onProgress: function (p) { report(0.4 + 0.6 * p, 'Training ESMM'); } });
       putModel('esmm', em, { source: 'reference' });
-    } else if (ch === 14) {
+    } else if (ch === 15) {
       var hm = await trainLR({ rows: rows, epochs: 2, label: 'hide', onProgress: function (p) { report(0.4 + 0.6 * p, 'Training pHide'); } });
       putModel('phide', hm, { source: 'reference' });
     }

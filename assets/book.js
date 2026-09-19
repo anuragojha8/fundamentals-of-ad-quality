@@ -17,9 +17,9 @@
     { id: '10-retrieval', n: '10', part: 'IV · The Models', title: 'Retrieval', blurb: 'Two-tower models, embeddings, approximate nearest neighbours, negative sampling, and recall.' },
     { id: '11-ranking-architectures', n: '11', part: 'IV · The Models', title: 'Towers, Crosses, and Transformers', blurb: 'The anatomy of a modern ranking model: embeddings, interaction layers, cross towers, multi-task, and attention over user history.' },
     { id: '12-conversion-modeling', n: '12', part: 'IV · The Models', title: 'Conversion Modeling', blurb: 'pCVR, sparse and delayed labels, sample selection bias, ESMM, and value optimization.' },
-    { id: '13-pretrain-train-refresh', n: '13', part: 'IV · The Models', title: 'Pre-training, Fine-tuning, and Freshness', blurb: 'Foundation embeddings, warm starts, continuous training, distillation, and model staleness.' },
-    { id: '14-beyond-the-click', n: '14', part: 'V · The Job', title: 'Quality Beyond the Click', blurb: 'Ad load, user experience, negative feedback, long-term value, and the objective function you actually own.' },
-    { id: '15-capstone', n: '15', part: 'V · The Job', title: 'Capstone: Run the Marketplace', blurb: 'A simulation game. Make the calls a real ads quality PM makes, and live with the results.' },
+    { id: '14-pretrain-train-refresh', n: '14', part: 'IV · The Models', title: 'Pre-training, Fine-tuning, and Freshness', blurb: 'Foundation embeddings, warm starts, continuous training, distillation, and model staleness.' },
+    { id: '15-beyond-the-click', n: '15', part: 'V · The Job', title: 'Quality Beyond the Click', blurb: 'Ad load, user experience, negative feedback, long-term value, and the objective function you actually own.' },
+    { id: '16-capstone', n: '16', part: 'V · The Job', title: 'Capstone: Run the Marketplace', blurb: 'A simulation game. Make the calls a real ads quality PM makes, and live with the results.' },
     { id: 'appendix-a-glossary', n: 'A', part: 'Appendices', title: 'Glossary', blurb: 'Every term in the book, in one place.' },
     { id: 'appendix-b-question-bank', n: 'B', part: 'Appendices', title: 'The Model Review Question Bank', blurb: 'The questions to ask in a launch review, a metrics readout, or a roadmap debate.' }
   ];
@@ -33,6 +33,32 @@
   store.solved = store.solved || {};
   store.notes = store.notes || {};
   store.required = store.required || {};
+
+  // One-time migration: Chapter 13 (Privacy and Measurement) was inserted, so the
+  // old chapters 13-15 became 14-16. Move saved progress onto the new keys, highest
+  // number first so nothing is overwritten on the way.
+  (function migrateChapter13Insert() {
+    if (store.shifted13) return;
+    var ids = [['15-capstone', '16-capstone'], ['14-beyond-the-click', '15-beyond-the-click'], ['13-pretrain-train-refresh', '14-pretrain-train-refresh']];
+    ids.forEach(function (p) {
+      if (store.required[p[0]] && !store.required[p[1]]) { store.required[p[1]] = store.required[p[0]]; delete store.required[p[0]]; }
+    });
+    ['15', '14', '13'].forEach(function (n) {
+      var from = 'ch' + n + '-', to = 'ch' + (Number(n) + 1) + '-';
+      [store.solved, store.notes, store.required].forEach(function (bag) {
+        Object.keys(bag).forEach(function (k) {
+          if (k.indexOf(from) === 0 && !bag[to + k.slice(from.length)]) { bag[to + k.slice(from.length)] = bag[k]; delete bag[k]; }
+        });
+      });
+      // The required lists hold quiz ids too, so shift those as well.
+      Object.keys(store.required).forEach(function (chap) {
+        var req = store.required[chap];
+        if (Array.isArray(req)) store.required[chap] = req.map(function (id) { return id.indexOf(from) === 0 ? to + id.slice(from.length) : id; });
+      });
+    });
+    store.shifted13 = true;
+    saveStore(store);
+  })();
 
   function isChapterDone(id) {
     var req = store.required[id];
