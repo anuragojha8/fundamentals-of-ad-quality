@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Predictions Are Prices — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="03-predictions-are-prices">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 3 · Part I · The Marketplace</div>
+  <h1>Predictions Are Prices</h1>
+  <p class="dek">When the model is wrong about an ad, it isn't just a quality problem. Someone is being overcharged, or Pebble is giving inventory away.</p>
+</header>
+
+<div class="stack-panel" data-chapter="3"></div>
+
+<p class="lead">In Chapter 2 you wrote the line <code>price = next.score / c.pctr</code>. That division is where machine learning turns into money. This chapter is about what happens when <code>c.pctr</code> is wrong, which is always, by some amount, for every ad.</p>
+
+<h2 id="two-errors"><span class="sec">3.1</span>Two ways to be wrong about an ad</h2>
+
+<p>Suppose the true CTR of Trailhead's ad is 3%, but the model says 6%. Two things happen in the auction, and they pull in opposite directions:</p>
+
+<ol>
+  <li><strong>Trailhead wins more.</strong> Its score (bid × pCTR) doubled, so it takes slots from ads that users would actually have clicked more.</li>
+  <li><strong>Trailhead pays less per click.</strong> The price divides by pCTR, so a doubled pCTR halves the per-click price for the same position.</li>
+</ol>
+
+<p>Pebble loses twice. It shows a worse ad and charges it less. Now flip it: if the model <em>under</em>-predicts Trailhead, Trailhead loses auctions it deserved to win, and when it does win, <strong>it pays more per click than is fair</strong>. The model's error has become an overcharge on one specific advertiser's invoice.</p>
+
+<p>See it on real traffic. Start from perfect predictions (the simulator's truth), then make the model wrong about one advertiser. Everything else stays perfect.</p>
+
+<div class="widget" id="w-skew">
+  <div class="w-title">Make the model wrong about one advertiser</div>
+  <div class="w-sub">Each row is a full simulated day with oracle predictions, except that the chosen advertiser's pCTR is multiplied by the factor shown. Expected values use true click probabilities.</div>
+</div>
+
+<div class="exercise" data-id="ch3-e1" data-answer="1.5" data-tol="0.005" data-unit="$ per click">
+  <p class="q">Lumen's ad has a true CTR of 4%, but the model predicts 2%. Lumen wins the slot, and the runner-up's score (bid × pCTR) is 0.03. What does Lumen pay per click under GSP?</p>
+  <details class="hint"><summary>Hint</summary><p>The auction only knows the prediction: price = runner-up score ÷ Lumen's <em>predicted</em> CTR.</p></details>
+  <div class="explain"><p>0.03 / 0.02 = <strong>$1.50</strong> per click. With a correct prediction, Lumen would pay 0.03 / 0.04 = $0.75. The model's 2× under-prediction is a 2× overcharge. Lumen's cost per impression (true CTR × price) is 0.04 × 1.50 = 6 cents, which is <em>exactly the runner-up's score</em>. GSP makes each winner pay, per impression, what the next ad would have been worth, <em>as measured by the model</em>.</p></div>
+</div>
+
+<h2 id="calibration"><span class="sec">3.2</span>Calibration</h2>
+
+<p>A model is <dfn>calibrated</dfn> if its predictions mean what they say: among all the impressions where it predicts 2%, about 2% get clicked. Formally:</p>
+
+\[ \mathbb{E}[\,y \mid \hat{p} = p\,] = p \quad \text{for every } p \]
+
+<p>The simplest summary is the <dfn>calibration ratio</dfn>: total predicted clicks divided by total actual clicks, \( \sum \hat{p}_i / \sum y_i \). A value of 1.0 is perfect, 1.2 means the model over-predicts by 20%, 0.8 means it under-predicts by 20%. A ratio of 1.0 overall can still hide big errors in both directions, so we also draw a <dfn>reliability diagram</dfn>: sort predictions into bins, then plot each bin's average prediction against its actual click rate. A calibrated model sits on the diagonal.</p>
+
+<p>Here is your Chapter 1 heuristic's reliability diagram on a day of its own traffic. The dots are measured against observed clicks, which is all you'd have in real life. The line is measured against the true probabilities.</p>
+
+<div class="widget" id="w-rel">
+  <div class="w-title">How calibrated is your heuristic?</div>
+  <div class="w-sub">Top-slot impressions from one simulated day served by your stack, in 10 equal-sized bins by predicted CTR.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p><strong>Ranking and calibration are different skills.</strong> Ranking asks whether the model puts better ads above worse ones. Calibration asks whether the numbers are right. Multiply every prediction by 2 and ranking is unchanged, while calibration is ruined. Chapter 9 measures them separately: AUC for ranking, calibration ratio and normalized entropy for the numbers.</p>
+</div>
+
+<h2 id="when"><span class="sec">3.3</span>When does calibration matter?</h2>
+
+<p>Here's a subtle point that trips up even experienced people. If <em>every</em> pCTR is off by the <em>same</em> factor, a pure CPC GSP auction doesn't care. Scores all scale together, so the ranking is unchanged. Prices divide one prediction by another, so the factor cancels. So why does everyone obsess over calibration? Because real systems break those conditions all the time:</p>
+
+<ul>
+  <li><strong>Errors aren't uniform.</strong> The model is too high for some advertisers and too low for others, as in the widget above. Every non-uniform error is a transfer of money between advertisers, or from Pebble to an advertiser.</li>
+  <li><strong>Mixed bid types.</strong> A CPM bid's score doesn't involve pCTR. If pCTR is 20% too high overall, every CPC ad gets a 20% boost against every CPM ad.</li>
+  <li><strong>Reserve prices</strong> are in eCPM, so they compare predicted value against a fixed number.</li>
+  <li><strong>Conversion bidding</strong> multiplies pCTR × pCVR. Errors compound, and the advertiser's cost per conversion depends directly on both being right (Chapter 12).</li>
+  <li><strong>Ads vs. organic content.</strong> Deciding whether a slot should show an ad or a friend's photo compares the ad's predicted value with the post's. Inflated pCTR means too many ads (Chapter 14).</li>
+  <li><strong>Forecasting and budgets.</strong> Delivery forecasts, pacing, and advertiser reach estimates all take predictions at face value.</li>
+</ul>
+
+<div class="quiz" data-id="ch3-q1">
+  <p class="q">A new pCTR model is 15% over-calibrated on every impression, uniformly. All advertisers use CPC bids and there's no reserve. What happens to the auction?</p>
+  <ul>
+    <li data-why="Prices are ratios of predictions; a uniform factor cancels.">Every advertiser pays 15% less per click</li>
+    <li data-why="All scores scale by the same factor, so the order is unchanged.">Rankings change in favour of high-CTR ads</li>
+    <li data-correct>Nothing changes: rankings and per-click prices are the same</li>
+    <li data-why="Pebble charges per click, and the actual click rate is unchanged.">Pebble earns 15% more</li>
+  </ul>
+  <div class="explain"><p>Scores all scale by 1.15, so the order is the same. Prices are (1.15 × next score) / (1.15 × own pCTR), so the factor cancels. This is <em>only</em> true in that idealized setup: no CPM bids, no reserve, no conversion bidding, no ad-vs-organic decisions, and a perfectly uniform error. The next question removes one of those conditions.</p></div>
+</div>
+
+<div class="quiz" data-id="ch3-q2">
+  <p class="q">Same model, 15% over-calibrated uniformly, but now half of Pebble's advertisers buy on CPM (a fixed price per impression, no pCTR involved). What happens?</p>
+  <ul>
+    <li data-why="CPM scores don't depend on pCTR, so the two groups move relative to each other.">Still nothing: the error is uniform</li>
+    <li data-correct>CPC advertisers win more auctions against CPM advertisers, and the CPM advertisers lose delivery</li>
+    <li data-why="CPM advertisers' scores are unchanged; they don't gain anything.">CPM advertisers win more auctions</li>
+    <li data-why="Revenue does change: inventory shifts to ads that are actually no better.">Only the CPC advertisers' prices change</li>
+  </ul>
+  <div class="explain"><p>CPC scores are inflated by 15% while CPM scores aren't, so CPC ads win impressions that CPM ads would have won on true value. Delivery shifts, prices shift, and CPM advertisers see their campaigns under-deliver for no reason they can see. This is why calibration is monitored <em>per bid type</em> and per segment, not just in aggregate.</p></div>
+</div>
+
+<h2 id="build"><span class="sec">3.4</span>Build: a calibration layer</h2>
+
+<p>Almost every production ranking model has a <dfn>calibration layer</dfn>: a small, separate function applied after the model, fitted to recent outcomes, that maps raw predictions to calibrated probabilities. It's cheap, it can be refitted hourly, and it absorbs slow drift between full retrains. Common choices are:</p>
+<ul>
+  <li><strong>Histogram binning</strong>: bucket predictions and replace each with its bucket's observed rate. It's the one you'll build.</li>
+  <li><strong>Platt scaling</strong>: fit \( \sigma(a \cdot \text{logit}(\hat p) + b) \), two parameters.</li>
+  <li><strong>Isotonic regression</strong>: the best monotone step function.</li>
+</ul>
+<p>Production systems often calibrate <em>per segment</em> (per country, surface, or ad type) because miscalibration is rarely uniform.</p>
+
+<div class="code-cell" data-slot="fitCalibrator"></div>
+
+<p>Now fit your calibrator to one day of your heuristic's top-slot traffic, apply it to the <em>next</em> day, and check it against the truth. We use only top-slot impressions because your pCTR is a prediction for the top slot. Chapter 5 deals with the other slots properly.</p>
+
+<div class="widget" id="w-fit">
+  <div class="w-title">Calibrate your heuristic</div>
+  <div class="w-sub">Fit on day 0, evaluate on day 1. Measured against the true click probabilities.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Calibrating on the same data you evaluate on. It always looks perfect. Fit on one period and check on the next, the way it will run in production. Also watch for bins with few impressions: a bin with 40 impressions and 3 clicks says the rate is "7.5%," but the uncertainty is huge. That's why the reference solution shrinks each bin a little toward its average prediction.</p>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Treat calibration like a pricing SLA. Good ads teams have dashboards of calibration ratio <strong>by advertiser, by vertical, by country, by bid type, by new vs. established ads</strong>, with alerts when any slice drifts outside a band (say ±10%). When an advertiser escalates about costs, the first chart to pull is their predicted vs. actual CTR over time. And when a model launch shows a great AUC gain, ask for the calibration slices before celebrating.</p>
+</div>
+
+<div class="reflect" data-id="ch3-r1">
+  <p class="q">A calibration dashboard shows that ads launched in the last 48 hours are over-predicted by 40% on average, while established ads are well calibrated. What does this do to the marketplace, who is affected, and what would you ask the team to consider?</p>
+  <div class="model">
+    <ul>
+      <li><strong>Effect:</strong> new ads win auctions they shouldn't (inflated scores) and pay too little per click (inflated denominator). Established advertisers lose delivery and pay more. Pebble loses revenue, and users see less relevant ads.</li>
+      <li><strong>Why it happens:</strong> new ads have no history, so the model falls back on priors (category, advertiser) that may be too optimistic. Their ID features are also untrained (Chapter 6 covers cold start).</li>
+      <li><strong>Options:</strong> a calibration layer segmented by ad age; smoothing new-ad predictions toward a conservative prior; a deliberate, <em>bounded</em> exploration budget for new ads, since some over-exposure is how the system learns about them (Chapter 5); and monitoring whether the over-prediction decays as data arrives.</li>
+      <li><strong>Question to ask:</strong> is the over-exposure intentional (exploration) or accidental? If it's intentional, who pays for it? Some platforms explicitly discount new-ad pricing or fund exploration from a budget.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>A <strong>calibration layer</strong>, fitted to your own traffic, that your stack can apply after ranking. You also know why the division by pCTR in your auction makes calibration a money problem, not just a modeling one.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Calibration</b>Predictions match observed rates: among ads predicted at 2%, about 2% get clicked.</div>
+    <div><b>Calibration ratio</b>Σ predicted / Σ actual. 1.0 is perfect overall, but it can hide slice errors.</div>
+    <div><b>Reliability diagram</b>Binned predicted vs. actual rates; the diagonal is perfect.</div>
+    <div><b>Calibration layer</b>A small post-model map (binning, Platt, isotonic), refitted often.</div>
+    <div><b>Over-prediction</b>Wins too much, pays too little per click.</div>
+    <div><b>Under-prediction</b>Loses deserved auctions and pays too much per click.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el;
+
+  /* ---------------- miscalibrate one advertiser ---------------- */
+  (function () {
+    var host = document.getElementById('w-skew');
+    var w = Stack.world();
+    // The five advertisers with the most eligible reach on day 0, so effects are visible.
+    var reach = w.advertisers.map(function () { return 0; });
+    w.activeAds(0).forEach(function (a) { reach[w.ads[a].advertiser] += w.ads[a].cpcBid; });
+    var big = reach.map(function (r, i) { return [i, r]; }).sort(function (x, y) { return y[1] - x[1]; }).slice(0, 5).map(function (x) { return x[0]; });
+    var adv = big[0];
+    var row = el('div', { class: 'btn-row', style: 'margin-bottom:8px' });
+    row.appendChild(el('span', { class: 'small', text: 'Advertiser:' }));
+    Book.seg(row, big.map(function (i) { return { label: w.advertisers[i].name + ' (' + w.categories[w.advertisers[i].category].name + ')', value: i }; }), adv, function (v) { adv = v; });
+    host.appendChild(row);
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var factors = [0.5, 0.7, 1, 1.4, 2];
+    function skewPolicy(a, k) {
+      var pol = Stack.policy({ ranker: 'oracle', reserveEcpm: 0, calibrate: false, epsilon: 0, shuffle: 0, pricing: 'cpc', retrieval: 'eligible' });
+      var base = pol.ranker.predict;
+      pol.ranker = { name: 'skew', predict: function (req, uv, ids, st) { return base(req, uv, ids, st).map(function (x, i) { return w.ads[ids[i]].advertiser === a ? Math.min(0.99, x * k) : x; }); } };
+      return pol;
+    }
+    StackUI.asyncButton(btnHost, 'Run 5 simulated days', async function (progress) {
+      var res = [];
+      for (var i = 0; i < factors.length; i++) {
+        var log = await Stack.simulate({ days: [0], requestsPerDay: 3000, logFeatures: false, policy: skewPolicy(adv, factors[i]), onProgress: function (p) { progress((i + p) / factors.length, '× ' + factors[i]); } });
+        var r = { k: factors[i], imps: 0, clicks: 0, spend: 0, fair: 0, value: 0, rev: log.summary.expRevenue, clicksAll: log.summary.expClicks, others: 0 };
+        log.impressions.forEach(function (imp, j) {
+          var t = log.truth[j];
+          if (imp.adv !== adv) { r.others += t.pctr * imp.price; return; }
+          r.imps++; r.clicks += t.pctr; r.spend += t.pctr * imp.price; r.value += t.pctr * t.pcvr * w.advertisers[adv].valuePerConv;
+          // What a correct model would have charged in this same auction: price × (predicted / true).
+          r.fair += t.pctr * imp.price * imp.pctr / t.rel;
+        });
+        res.push(r);
+      }
+      render(res);
+    });
+    function render(res) {
+      out.innerHTML = '';
+      var base = res[2];
+      StackUI.table(out, [
+        { label: 'Model says', get: function (r) { return r.k === 1 ? '<b>correct</b>' : (r.k > 1 ? 'too high ×' : 'too low ×') + r.k; } },
+        { label: 'Impressions won', num: true, get: function (r) { return r.imps.toLocaleString(); } },
+        { label: 'Paid per click', num: true, get: function (r) { return r.clicks ? '$' + (r.spend / r.clicks).toFixed(2) : '—'; } },
+        { label: 'Fair price, same auctions', num: true, get: function (r) { return r.clicks ? '$' + (r.fair / r.clicks).toFixed(2) : '—'; } },
+        { label: 'Over/under-charge', num: true, get: function (r) { return r.fair ? '<b class="' + (r.spend > r.fair * 1.01 ? 'neg' : r.spend < r.fair * 0.99 ? 'pos' : '') + '">' + Book.signed(100 * (r.spend / r.fair - 1), 0, '%') + '</b>' : '—'; } },
+        { label: 'Other advertisers\' spend', num: true, get: function (r) { return r.k === 1 ? '$' + r.others.toFixed(0) : Book.signed(100 * (r.others / base.others - 1), 1, '%'); } },
+        { label: 'Users\' clicks', num: true, get: function (r) { return r.k === 1 ? r.clicksAll.toFixed(0) : Book.signed(100 * (r.clicksAll / base.clicksAll - 1), 1, '%'); } }
+      ], res, { rowClass: function (r) { return r.k === 1 ? 'hl' : ''; } });
+      var lo = res[0], hi = res[4];
+      out.appendChild(el('p', { class: 'small', html: 'When the model is <b>too low</b> (×0.5), ' + w.advertisers[adv].name + ' wins ' + (base.imps ? Book.pct(1 - lo.imps / base.imps, 0) : '') + ' fewer impressions, and in the auctions it still wins it pays <b>double</b> the fair price per click. When the model is <b>too high</b> (×2), it wins ' + (hi.imps / Math.max(1, base.imps)).toFixed(1) + '× the impressions at half the fair price. The other advertisers lose delivery, and users click less, because worse ads took the slots. Nobody set a price. The model did.' }));
+    }
+  })();
+
+  /* ---------------- reliability of the heuristic ---------------- */
+  var dayCache = {};
+  async function heuristicDay(day, progress) {
+    if (dayCache[day]) return dayCache[day];
+    var log = await Stack.simulate({ days: [day], requestsPerDay: 4000, logFeatures: false, stream: 0,
+      policy: Stack.policy({ ranker: 'heuristic', calibrate: false, epsilon: 0, shuffle: 0, retrieval: 'eligible', pricing: 'cpc' }), onProgress: progress });
+    var rows = Stack.labeledRows(log), out = { preds: [], labels: [], truth: [] };
+    rows.forEach(function (r, i) { if (r.slot === 0) { out.preds.push(r.pctr); out.labels.push(r.click); out.truth.push(log.truth[i].rel); } });
+    dayCache[day] = out;
+    return out;
+  }
+  function relChart(host, series, title) {
+    var mx = 0;
+    series.forEach(function (s) { s.bins.forEach(function (b) { mx = Math.max(mx, b.pred, b.actual); }); });
+    mx = Math.min(1, mx * 1.1);
+    var c = Book.chart(host, { w: 480, h: 300, x: [0, mx], y: [0, mx], xlabel: 'Predicted CTR', ylabel: 'Actual CTR', xfmt: function (v) { return (v * 100).toFixed(0) + '%'; }, yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+    c.line([[0, 0], [mx, mx]], { color: 'var(--ink-3)', dash: '4 4', width: 1.2 });
+    series.forEach(function (s) {
+      if (s.dots) c.dots(s.bins.map(function (b) { return [b.pred, b.actual, 4.5, s.color]; }));
+      else c.line(s.bins.map(function (b) { return [b.pred, b.actual]; }), { color: s.color });
+    });
+    Book.legend(host, series.map(function (s) { return { label: s.label, color: s.color, dot: s.dots }; }).concat([{ label: 'Perfect calibration', color: 'var(--ink-3)', dash: true }]));
+    return c;
+  }
+  (function () {
+    var host = document.getElementById('w-rel');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Serve a day and measure', async function (progress) {
+      var d = await heuristicDay(0, function (p) { progress(p, 'Serving day 0…'); });
+      out.innerHTML = '';
+      var g = el('div', { class: 'w-grid two' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); out.appendChild(g);
+      relChart(L, [
+        { label: 'vs. observed clicks', color: 'var(--s2)', dots: true, bins: Stack.reliability(d.preds, d.labels, 10) },
+        { label: 'vs. true probability', color: 'var(--s1)', bins: Stack.reliability(d.preds, d.truth, 10) }
+      ]);
+      var ratio = Stack.sum(d.preds) / Stack.sum(d.labels), ratioT = Stack.sum(d.preds) / Stack.sum(d.truth);
+      var st = Book.stats(R, [{ key: 'n', label: 'Top-slot impressions' }, { key: 'r', label: 'Calibration ratio', sub: 'Σ predicted / Σ clicks' }, { key: 'rt', label: 'vs. the truth', sub: 'Σ predicted / Σ true p' }, { key: 'e', label: 'Calibration error (ECE)', sub: 'vs. truth, avg |pred − actual|' }]);
+      st({ n: d.preds.length.toLocaleString(), r: { v: ratio.toFixed(2), tone: Math.abs(ratio - 1) > 0.15 ? 'bad' : 'good' }, rt: ratioT.toFixed(2), e: Book.pct(Stack.ece(d.preds, d.truth, 10), 2) });
+      R.appendChild(el('p', { class: 'small', style: 'margin-top:8px', html: ratio < 0.9 ? 'Your heuristic <b>under-predicts</b>. Per the table above, that means your stack overcharges advertisers per click wherever the error isn\'t uniform.' : ratio > 1.1 ? 'Your heuristic <b>over-predicts</b>, so ads win cheaply and Pebble leaves money on the table wherever the error isn\'t uniform.' : 'Close to calibrated overall. But look at the shape: is it right at both ends?' }));
+    });
+  })();
+
+  /* ---------------- fit the reader's calibrator ---------------- */
+  (function () {
+    var host = document.getElementById('w-fit');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var fitted = null;
+    StackUI.asyncButton(btnHost, 'Fit on day 0, test on day 1', async function (progress) {
+      var d0 = await heuristicDay(0, function (p) { progress(p / 2, 'Day 0…'); });
+      var d1 = await heuristicDay(1, function (p) { progress(0.5 + p / 2, 'Day 1…'); });
+      var fit = Stack.impl('fitCalibrator');
+      var cal = fit(d0.preds.slice(), d0.labels.slice(), 20);
+      var after = d1.preds.map(function (p) { return cal(p); });
+      fitted = d0;
+      out.innerHTML = '';
+      var g = el('div', { class: 'w-grid two' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); out.appendChild(g);
+      relChart(L, [
+        { label: 'Before (vs. truth)', color: 'var(--s2)', bins: Stack.reliability(d1.preds, d1.truth, 10) },
+        { label: 'After your calibrator (vs. truth)', color: 'var(--s3)', bins: Stack.reliability(after, d1.truth, 10) }
+      ]);
+      var st = Book.stats(R, [{ key: 'b', label: 'ECE before' }, { key: 'a', label: 'ECE after' }, { key: 'rb', label: 'Ratio before' }, { key: 'ra', label: 'Ratio after' }]);
+      var eb = Stack.ece(d1.preds, d1.truth, 10), ea = Stack.ece(after, d1.truth, 10);
+      st({ b: Book.pct(eb, 2), a: { v: Book.pct(ea, 2), tone: ea < eb ? 'good' : 'bad' }, rb: (Stack.sum(d1.preds) / Stack.sum(d1.truth)).toFixed(2), ra: (Stack.sum(after) / Stack.sum(d1.truth)).toFixed(2) });
+      R.appendChild(el('p', { class: 'small', style: 'margin-top:8px', text: 'Using ' + (Stack.implSource('fitCalibrator') === 'you' ? 'your fitCalibrator().' : 'the reference fitCalibrator(). Yours will be used once its tests pass.') + ' Notice the calibrator can\'t improve ranking: it maps every prediction in a bin to the same value.' }));
+      var ship = el('button', { type: 'button', class: 'btn accent', text: Stack.state.settings.calibrate ? '✓ Calibration layer is on in production' : 'Turn on the calibration layer in production' });
+      ship.onclick = function () {
+        var n = fitted.preds.length, step = Math.max(1, Math.floor(n / 4000)), sp = [], sl = [];
+        for (var i = 0; i < n; i += step) { sp.push(+fitted.preds[i].toFixed(5)); sl.push(fitted.labels[i]); }
+        Stack.state.calib.heuristic = { preds: sp, labels: sl };
+        Stack.state.settings.calibrate = true;
+        var c = Stack.state.code.fitCalibrator;
+        if (c && c.passed) Stack.markBuilt(3, 'you'); else Stack.save();
+        Stack.clearLogCache();
+        ship.textContent = '✓ Calibration layer is on in production';
+        document.dispatchEvent(new CustomEvent('stackchange'));
+      };
+      R.appendChild(el('div', { class: 'btn-row', style: 'margin-top:10px' }, [ship]));
+    });
+  })();
+})();
+</script>
+</body>
+</html>

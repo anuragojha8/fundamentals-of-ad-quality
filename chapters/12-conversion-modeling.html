@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversion Modeling — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="12-conversion-modeling">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 12 · Part IV · The Models</div>
+  <h1>Conversion Modeling</h1>
+  <p class="dek">In which advertisers inform me they wanted customers, not clicks. (Rude, but fair.)</p>
+</header>
+
+<div class="stack-panel" data-chapter="12"></div>
+
+<p class="lead">Every ad your stack has served so far was sold per click. And for eleven chapters, we've acted like clicks were the whole point. They're not. A click is just a means to an end. Sprout wants meal-kit subscriptions. Nimbus wants bank accounts. Orbit wants installs. Nobody's out there celebrating a really great click.</p>
+
+<p>So modern ad platforms let advertisers bid for the outcome they actually want, and the platform takes on the job of predicting it. In this chapter we build the conversion model (<dfn>pCVR</dfn>) your stack needs to do that. And I'll warn you now: conversions are harder than clicks in every single way. They're <strong>rare</strong>, they're <strong>late</strong>, and they <strong>only exist for people who clicked first</strong>. Three problems, one chapter. Let's go.</p>
+
+<h2 id="ocpm"><span class="sec">12.1</span>Bidding for outcomes</h2>
+
+<p>With <dfn>oCPM</dfn> (optimized CPM), or conversion bidding, an advertiser just states a <strong>target cost per acquisition</strong> (CPA): "I'll pay up to $40 for each new customer." The platform turns that into an auction score by predicting both steps, the click and then the conversion:</p>
+
+\[ \text{eCPM} = \text{CPA}_{\text{target}} \times \text{pCTR} \times \text{pCVR} \times 1000 \]
+
+<p>where pCVR = P(conversion | click). The nice part for advertisers is they don't need to know their own conversion rate anymore. The platform is effectively bidding on their behalf, which is the whole idea behind <dfn>autobidding</dfn>. The catch for the platform: your predictions now directly decide how much the advertiser pays <em>per conversion</em>. Predict too high and they overpay. Predict too low and they under-deliver, get frustrated, and leave. It's Chapter 3 all over again, except now there's twice as much prediction to get wrong.</p>
+
+<div class="exercise" data-id="ch12-e1" data-answer="40" data-tol="0.05" data-unit="$ eCPM">
+  <p class="q">Sprout's target CPA is $40. For some impression, pCTR = 2% and pCVR = 5%. What's the eCPM?</p>
+  <details class="hint"><summary>Hint</summary><p>40 × 0.02 × 0.05 × 1000.</p></details>
+  <div class="explain"><p>40 × 0.02 × 0.05 × 1000 = <strong>$40</strong>. So each impression of Sprout's ad is worth about 4 cents to Pebble: a 1-in-1,000 shot at a conversion worth $40. And notice that eCPM is the <em>product</em> of two predictions, so if each one is 20% off, the errors compound to about 44%. Fun!</p></div>
+</div>
+
+<h2 id="sparse"><span class="sec">12.2</span>Sparse labels</h2>
+
+<p>Let's look at what we're working with. Your ten days of logs have about 180,000 impressions, roughly 7,000 clicks, and only a few hundred conversions. That's one conversion for every ~350 impressions. A model with a weight per ad ID gets, on average, one or two conversions per ad to learn from. One or two! You can't learn much from that.</p>
+
+<p>That's why conversion models lean hard on <em>shared</em> signal: category, advertiser, and user-level features, plus tricks that borrow strength from the much more plentiful click data (we'll get to one in Section 12.4).</p>
+
+<h2 id="delay"><span class="sec">12.3</span>Delayed labels</h2>
+
+<p>A click on a Gaming ad turns into an install within minutes. A click on Nimbus's bank ad turns into a new account within <em>days</em>, if it ever does. In Pebble's world, the average delay ranges from 2 hours (Gaming) all the way to 5 days (Finance). So when your training job runs, the most recent clicks simply haven't had time to convert yet. You saw this back in Chapter 4: they get labeled 0 when the honest answer is "not yet."</p>
+
+<p>But if you know roughly how the delays are distributed, you can correct for it. If delays are exponential with mean \(\mu\), then the fraction of eventual conversions you've already seen, \(t\) hours after the click, is</p>
+
+\[ F(t) = 1 - e^{-t/\mu} \]
+
+<p>So instead of dividing observed conversions by clicks, you divide by the <em>expected number of clicks that have had time to convert</em>: \( \widehat{\text{CVR}} = \frac{\text{conversions observed}}{\sum_{\text{clicks}} F(t_{\text{now}} - t_{\text{click}})} \). In other words, you give the slow ones partial credit for still being on their way.</p>
+
+<div class="code-cell" data-slot="observedFraction"></div>
+
+<div class="widget" id="w-delay">
+  <div class="w-title">Correcting for delayed conversions</div>
+  <div class="w-sub">Post-click CVR by day, as your training job would see it at the end of day 9: naive, delay-corrected with your observedFraction(), and eventual (the labels 30 days later).</div>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Delayed feedback is behind a <em>lot</em> of "your model under-predicts for advertiser X" escalations. Advertisers with long conversion cycles (finance, travel, B2B, big purchases) get systematically under-predicted by models trained on fresh data, so they under-deliver, and they're usually the ones spending the most. Ask how the conversion model handles delay. The usual answers: wait N days before using data (stale but clean), reweight or correct for the expected delay, or model the delay distribution explicitly (Chapelle, 2014, "Modeling Delayed Feedback in Display Advertising"). And ask what happens to conversions that show up <em>after</em> the attribution window closes.</p>
+</div>
+
+<h2 id="ssb"><span class="sec">12.4</span>Sample selection bias and ESMM</h2>
+
+<p>Okay, here's the sneakiest problem of the three. pCVR is defined as P(conversion | click). So the obvious way to train it is on clicked impressions only, right? That's where the conversions are!</p>
+
+<p>But the auction needs pCVR for <em>every candidate</em>, clicked or not, because it multiplies pCTR × pCVR before anybody has clicked anything. And clicked impressions are not a random sample of candidates. People who click a lot, and creatives designed to grab clicks, are over-represented. In Pebble's world (and, honestly, in the real one), <strong>clicky users and clickbait creatives convert less</strong>. So a model trained only on clicks learns the conversion rate of the click-happy crowd, and then gets applied to everyone. That's called <dfn>sample selection bias</dfn>.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 240" role="img" aria-label="Impression space contains click space which contains conversions. Naive pCVR trains on click space; ESMM trains pCTR and pCTCVR on impression space">
+  <rect x="30" y="20" width="330" height="200" rx="14" class="box b"/><text x="50" y="45" class="t-md t-b">All impressions (where the auction uses pCVR)</text>
+  <rect x="120" y="70" width="210" height="130" rx="12" class="box a"/><text x="140" y="95" class="t-md t-b">Clicked</text><text x="140" y="112" class="t-sm">naive pCVR trains only here</text>
+  <rect x="200" y="130" width="110" height="55" rx="10" class="box g"/><text x="255" y="162" text-anchor="middle" class="t-md t-b">Converted</text>
+  <rect x="400" y="30" width="340" height="180" rx="14" class="box"/>
+  <text x="570" y="60" text-anchor="middle" class="t-md t-b">ESMM (Alibaba, 2018)</text>
+  <text x="420" y="92" class="t-md">Two heads, one shared model:</text>
+  <text x="420" y="116" class="t-md">pCTR head → loss on click (all impressions)</text>
+  <text x="420" y="140" class="t-md">pCTCVR = pCTR × pCVR → loss on conversion</text>
+  <text x="420" y="160" class="t-sm">(also on all impressions)</text>
+  <text x="420" y="188" class="t-md">pCVR is never trained on clicks alone</text>
+</svg>
+<figcaption>The Entire Space Multi-task Model trains on the full impression space, so pCVR gets learned where it'll actually be used.</figcaption>
+</figure>
+
+<p><dfn>ESMM</dfn> (Ma et al., 2018) fixes this with a clever multi-task trick straight out of Chapter 8. It has two heads, pCTR and pCVR, and it <em>never</em> trains pCVR by itself. Instead, it trains the <em>product</em>, pCTR × pCVR = P(click and convert), against the conversion label over <strong>all</strong> impressions. So pCVR ends up being whatever makes that product right everywhere, not just on the clicked subset. Sneaky problem, sneaky solution.</p>
+
+<div class="widget" id="w-esmm">
+  <div class="w-title">Naive pCVR vs. ESMM, graded against the truth</div>
+  <div class="w-sub">Both trained on your logs (labels matured). Evaluated on day 10 against the true P(convert | click), on clicked impressions and on <em>all</em> impressions.</div>
+</div>
+
+<div class="quiz" data-id="ch12-q1">
+  <p class="q">A naive pCVR model (trained on clicks only) is well calibrated on clicked impressions. Why can it still be biased in the auction?</p>
+  <ul>
+    <li data-why="The issue isn't the conversion window.">The attribution window is too short</li>
+    <li data-correct>The auction applies it to all candidates, and non-clicking users and less clickbaity ads convert differently from the clicked population it learned from</li>
+    <li data-why="Calibration on clicks doesn't imply calibration elsewhere, but this isn't about sample size.">It has too few conversions</li>
+    <li data-why="pCTR errors are separate; this is about pCVR's training population.">pCTR is miscalibrated</li>
+  </ul>
+  <div class="explain"><p>Calibrated on the data you trained on doesn't mean calibrated on the data you serve on. The mismatch here is selection: training only saw clicks. ESMM fixes it, and so does reweighting clicked examples by the inverse of their click probability (IPW, our old friend from Chapter 5).</p></div>
+</div>
+
+<h2 id="ship"><span class="sec">12.5</span>Switch on conversion bidding</h2>
+
+<p>Time to change how Pebble sells ads. In the treatment arm, every advertiser bids their target CPA, and your stack computes CPA × pCTR × pCVR. But here's the thing: for conversion bidding, the metric that matters most isn't revenue. It's <dfn>CPA adherence</dfn>. Did advertisers actually pay about what they asked to pay per conversion? If they paid 30% more than their target, Pebble broke its promise. If they paid way less, Pebble under-delivered. Either way, somebody's writing an angry email.</p>
+
+<div class="widget" id="w-ocpm">
+  <div class="w-title">A/B: CPC bidding vs. oCPM with your pCVR</div>
+  <div class="w-sub">Same pCTR model in both arms. Treatment prices every ad with CPA × pCTR × pCVR.</div>
+</div>
+
+<div class="quiz" data-id="ch12-q2">
+  <p class="q">After launching oCPM, revenue is up 20%, but advertisers' actual CPA is 35% above their targets. What's the most likely model issue, and the risk?</p>
+  <ul>
+    <li data-correct>pCVR is over-predicted, so bids and prices are inflated. Advertisers overpay per conversion and will cut budgets</li>
+    <li data-why="An under-prediction would make CPA come in below target.">pCVR is under-predicted</li>
+    <li data-why="pCTR errors would show up in CPC campaigns too.">pCTR is too low</li>
+    <li data-why="A 20% revenue gain that breaks CPA promises is a problem, not a success.">No issue: revenue is up</li>
+  </ul>
+  <div class="explain"><p>Under oCPM, the platform prices using its own predictions, so over-predicting is literally overcharging. Revenue goes up this month, and advertisers notice when they look at their bills. Real autobidding systems usually add a feedback controller that nudges bids per campaign when actual CPA drifts from target. But that controller is only as good as the calibration it's correcting.</p></div>
+</div>
+
+<div class="reflect" data-id="ch12-r1">
+  <p class="q">Nimbus (a bank, where conversions take ~5 days) reports that under oCPM they get 40% fewer conversions than their budget should buy, while their actual CPA is well <em>below</em> target. What's happening, and what do you propose?</p>
+  <div class="model">
+    <ul>
+      <li><strong>Diagnosis:</strong> CPA below target plus under-delivery means pCVR is <em>under</em>-predicted for Nimbus. Their effective bids are too low, so they keep losing auctions. The prime suspect is delayed feedback: with ~5-day delays and daily training, a big chunk of recent Nimbus clicks get labeled as non-conversions.</li>
+      <li><strong>Evidence to pull:</strong> Nimbus's pCVR calibration by <em>label age</em> (recent vs. matured), and the actual delay distribution of their conversions.</li>
+      <li><strong>Fixes:</strong> delay correction or delayed-feedback modeling for slow advertisers; excluding immature negatives from training; a calibration layer segmented by vertical; and, in the short term, letting the autobidder's CPA controller raise Nimbus's bids.</li>
+      <li><strong>Why it matters:</strong> systematically under-delivering for long-cycle verticals is both a revenue problem and a fairness problem. Finance and travel advertisers are often among the most valuable ones on the platform.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>A <strong>conversion model</strong> (naive and ESMM), a <strong>delay correction</strong> using your <code>observedFraction()</code>, and <strong>conversion bidding</strong> in your auction, judged by whether advertisers actually paid what they asked to pay.</p>
+  <p>Here's an uncomfortable truth, though. Every model in your stack was trained on days 0 through 9. And Pebble didn't stop on day 9. Users' tastes are shifting, new ads launch every day, and your models are slowly, quietly going stale. Next time, we find out how fast, and what to do about it.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>pCVR</b>P(conversion | click); rare, delayed, observed only after clicks.</div>
+    <div><b>oCPM / target CPA</b>The advertiser bids per outcome; eCPM = CPA × pCTR × pCVR.</div>
+    <div><b>Delayed feedback</b>Recent negatives aren't final; correct with the delay distribution.</div>
+    <div><b>Sample selection bias</b>Training on clicks, serving on all impressions.</div>
+    <div><b>ESMM</b>Train pCTR × pCVR on all impressions so pCVR learns where it's used.</div>
+    <div><b>CPA adherence</b>Actual cost per conversion vs. target; the oCPM promise.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world();
+  var logP = null;
+  function logs(progress) {
+    if (!logP) logP = (async function () {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.8, 'Collecting logs…'); } });
+      var ev = await Stack.evalLog({ onProgress: function (p) { progress(0.8 + p * 0.2, 'Collecting day 10…'); } });
+      return { tl: tl, ev: ev };
+    })();
+    return logP;
+  }
+  document.addEventListener('stackchange', function () { logP = null; });
+
+  /* ---------------- delayed feedback ---------------- */
+  (function () {
+    var host = document.getElementById('w-delay');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Compute', async function (progress) {
+      var d = await logs(progress), nowT = 240;
+      var join = Stack.impl('joinLabels'), F = Stack.impl('observedFraction');
+      var fresh = join(d.tl.impressions, d.tl.events, { clickWindowH: 1, convWindowH: 168, nowT: nowT });
+      var matured = join(d.tl.impressions, d.tl.events, { clickWindowH: 1, convWindowH: 168, nowT: nowT + 720 });
+      var naive = [], corr = [], mat = [], byCat = {};
+      for (var day = 0; day < 10; day++) { naive.push([0, 0]); corr.push([0, 0]); mat.push([0, 0]); }
+      fresh.forEach(function (r, i) {
+        if (!r.click) return;
+        // Share of the conversions that the 7-day window will eventually count, already visible now.
+        var m = matured[i], mu = w.truth.delayMeanH(r.ad), f = F(Math.min(nowT - r.t, 168), mu) / F(168, mu);
+        naive[r.day][0] += r.conv; naive[r.day][1] += 1;
+        corr[r.day][0] += r.conv; corr[r.day][1] += f;
+        mat[r.day][0] += m.conv; mat[r.day][1] += 1;
+        var cn = w.categories[r.cat].name, b = byCat[cn] || (byCat[cn] = { n: 0, c: 0, f: 0, m: 0, mu: mu });
+        if (r.day >= 7) { b.n++; b.c += r.conv; b.f += f; b.m += m.conv; }
+      });
+      out.innerHTML = '';
+      var rate = function (x) { return x[1] ? x[0] / x[1] : 0; };
+      var ys = naive.concat(corr, mat).map(rate);
+      var c = Book.chart(out, { w: 640, h: 250, x: [-0.5, 9.5], y: [0, Math.max.apply(null, ys) * 1.2], xticks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], xlabel: 'Day of click', ylabel: 'Post-click CVR', yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+      c.line(mat.map(function (x, i) { return [i, rate(x)]; }), { color: 'var(--ink-3)', dash: '5 4' });
+      c.line(naive.map(function (x, i) { return [i, rate(x)]; }), { color: 'var(--s2)' });
+      c.line(corr.map(function (x, i) { return [i, rate(x)]; }), { color: 'var(--s1)' });
+      c.dots(corr.map(function (x, i) { return [i, rate(x), 3.5, 'var(--s1)']; }));
+      Book.legend(out, [{ label: 'Naive (as seen at end of day 9)', color: 'var(--s2)' }, { label: 'Delay-corrected', color: 'var(--s1)' }, { label: 'Eventual (matured labels)', color: 'var(--ink-3)', dash: true }]);
+      var rows = Object.keys(byCat).map(function (k) { var b = byCat[k]; return { k: k, mu: b.mu, naive: b.c / b.n, corr: b.c / b.f, mat: b.m / b.n }; }).sort(function (a, b) { return b.mu - a.mu; });
+      out.appendChild(el('h3', { text: 'Last three days (7–9), by category', style: 'font-size:14px;margin:12px 0 0' }));
+      StackUI.table(out, [
+        { label: 'Category', key: 'k' }, { label: 'Mean delay', num: true, get: function (r) { return r.mu >= 24 ? (r.mu / 24).toFixed(1) + ' days' : r.mu + ' h'; } },
+        { label: 'Naive CVR', num: true, get: function (r) { return Book.pct(r.naive, 1); } }, { label: 'Corrected', num: true, get: function (r) { return Book.pct(r.corr, 1); } }, { label: 'Eventual', num: true, get: function (r) { return Book.pct(r.mat, 1); } }
+      ], rows, { maxHeight: 300 });
+      out.appendChild(el('p', { class: 'small', text: 'Slow categories lose the most to naive labeling; the correction recovers most of it. (Corrected estimates get noisy where very few conversions have arrived yet.) Using ' + (Stack.implSource('observedFraction') === 'you' ? 'your observedFraction().' : 'the reference observedFraction().') }));
+    });
+  })();
+
+  /* ---------------- ESMM vs naive ---------------- */
+  (function () {
+    var host = document.getElementById('w-esmm');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Train both', async function (progress) {
+      var d = await logs(progress), rows = Stack.labeledRows(d.tl), er = Stack.labeledRows(d.ev);
+      var naive = await Stack.trainCVR({ rows: rows, method: 'naive', onProgress: function (p) { progress(0.1 + 0.4 * p, 'Training naive pCVR…'); } });
+      var esmm = await Stack.trainCVR({ rows: rows, method: 'esmm', onProgress: function (p) { progress(0.5 + 0.45 * p, 'Training ESMM…'); } });
+      var tcv = d.ev.truth.map(function (t) { return t.pcvr; }), clicked = er.map(function (r, i) { return r.click ? i : -1; }).filter(function (i) { return i >= 0; });
+      function grade(m) {
+        var p = Stack.cvrPredictRows(m, er), pc = clicked.map(function (i) { return p[i]; }), tc = clicked.map(function (i) { return tcv[i]; });
+        return { allCal: Stack.sum(p) / Stack.sum(tcv), allAcc: Stack.pairOrderAcc(p, tcv), clkCal: Stack.sum(pc) / Stack.sum(tc), clkAcc: Stack.pairOrderAcc(pc, tc) };
+      }
+      var gN = grade(naive), gE = grade(esmm);
+      out.innerHTML = '';
+      var cal = function (x) { return '<span class="' + (Math.abs(x - 1) > 0.15 ? 'neg' : 'pos') + '">' + x.toFixed(2) + '</span>'; };
+      StackUI.table(out, [
+        { label: 'Model', key: 'n' },
+        { label: 'Calibration on clicked', num: true, get: function (r) { return cal(r.g.clkCal); } },
+        { label: 'Calibration on all impressions', num: true, get: function (r) { return cal(r.g.allCal); } },
+        { label: 'Ordering accuracy (all)', num: true, get: function (r) { return r.g.allAcc.toFixed(3); } }
+      ], [{ n: 'Naive (trained on clicks only)', g: gN }, { n: 'ESMM (trained on all impressions)', g: gE }]);
+      var clickedMean = Stack.mean(clicked.map(function (i) { return tcv[i]; })), allMean = Stack.mean(tcv);
+      out.appendChild(el('p', { class: 'small', html: 'True average P(convert | click): <b>' + Book.pct(clickedMean, 1) + '</b> for impressions that were clicked, <b>' + Book.pct(allMean, 1) + '</b> across all impressions. That gap is sample selection bias, and it\'s what the naive model can\'t see. ' + (Math.abs(gN.allCal - 1) - Math.abs(gE.allCal - 1) > 0.03 ? 'ESMM lands clearly closer on the full impression space.' : 'On your logs the two end up close. With only a few hundred conversions both models are data-starved, and ESMM\'s advantage (published gains are modest too) needs more data to show. Look at ordering accuracy as well as calibration.') }));
+      var save = el('button', { type: 'button', class: 'btn accent', text: 'Save both to your stack' });
+      save.onclick = function () {
+        Stack.putModel('esmm', esmm, { source: 'you' }); Stack.putModel('cvr-naive', naive, { source: 'you' });
+        var c = Stack.state.code.observedFraction; Stack.markBuilt(12, c && c.passed ? 'you' : 'reference');
+        save.disabled = true; save.textContent = '✓ Saved';
+        document.dispatchEvent(new CustomEvent('stackchange'));
+      };
+      out.appendChild(el('div', { class: 'btn-row' }, [save]));
+    });
+  })();
+
+  /* ---------------- oCPM A/B ---------------- */
+  (function () {
+    var host = document.getElementById('w-ocpm');
+    var model = 'esmm';
+    var r = el('div', { class: 'btn-row', style: 'margin-bottom:10px' }); r.appendChild(el('span', { class: 'small', text: 'pCVR used by the treatment:' }));
+    Book.seg(r, [{ label: 'Your ESMM', value: 'esmm' }, { label: 'Your naive pCVR', value: 'cvr-naive' }, { label: 'Perfect (oracle)', value: 'oracle' }], 'esmm', function (v) { model = v; });
+    host.appendChild(r);
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var hist = [];
+    StackUI.asyncButton(btnHost, 'Run the A/B', async function (progress) {
+      out.innerHTML = '';
+      if (model !== 'oracle' && !Stack.getModel(model)) { out.appendChild(el('p', { class: 'note warn', text: 'Train and save your pCVR models above first.' })); return; }
+      await logs(progress);
+      var res = await Stack.abTest({ control: { pricing: 'cpc' }, treatment: { pricing: 'ocpm', cvrModel: model }, controlName: 'CPC', treatmentName: 'oCPM', onProgress: function (p) { progress(p, 'Running both arms…'); } });
+      var a = res.arms[0].summary, b = res.arms[1].summary;
+      var tgt = Stack.mean(w.advertisers.map(function (x) { return x.targetCPA; }));
+      hist.push({ model: model === 'esmm' ? 'Your ESMM' : model === 'oracle' ? 'Oracle pCVR' : 'Your naive pCVR', rev: res.diffs.trueRpm.lift, val: res.diffs.trueValue.lift, cpaC: a.expRevenue / a.expConvs, cpaT: b.expRevenue / b.expConvs, roiC: a.expValue / a.expRevenue, roiT: b.expValue / b.expRevenue });
+      var pc = function (x) { return Book.signed(100 * x, 1, '%'); };
+      StackUI.table(out, [
+        { label: 'Treatment pCVR', key: 'model' },
+        { label: 'Revenue', num: true, get: function (h) { return pc(h.rev); } },
+        { label: 'Advertiser value', num: true, get: function (h) { return '<b class="' + (h.val > 0 ? 'pos' : 'neg') + '">' + pc(h.val) + '</b>'; } },
+        { label: 'Cost per conversion (CPC → oCPM)', num: true, get: function (h) { return '$' + h.cpaC.toFixed(0) + ' → $' + h.cpaT.toFixed(0); } },
+        { label: 'Advertiser ROI (value ÷ spend)', num: true, get: function (h) { return h.roiC.toFixed(2) + ' → <b class="' + (h.roiT >= h.roiC ? 'pos' : 'neg') + '">' + h.roiT.toFixed(2) + '</b>'; } }
+      ], hist);
+      out.appendChild(el('p', { class: 'small', html: 'All numbers use true expected values. Compare the oracle row with yours: with <em>perfect</em> pCVR, oCPM raises advertiser value and their ROI together, because conversions go to the ads most likely to produce them. With a learned pCVR, the outcome depends on how well it ranks and how well it\'s calibrated. Inaccurate pCVR sends conversions-per-dollar to the wrong ads, and miscalibration moves prices. So judge it by cost per conversion against targets (average target CPA here: $' + tgt.toFixed(0) + ') and by advertiser ROI, not by revenue alone. ' + (hist[hist.length - 1].roiT < hist[hist.length - 1].roiC ? 'Here, advertisers get <b>less</b> value per dollar than under CPC. Shipping this trades their ROI for Pebble\'s revenue.' : 'Here, advertisers get more value per dollar than under CPC.') }));
+      var ship = el('button', { type: 'button', class: 'btn accent', text: 'Use oCPM with this pCVR in production' });
+      var keep = el('button', { type: 'button', class: 'btn secondary', text: 'Stay on CPC' });
+      ship.disabled = model === 'oracle';
+      ship.onclick = function () { Stack.state.settings.pricing = 'ocpm'; Stack.state.settings.cvrModel = model; Stack.save(); Stack.clearLogCache(); ship.textContent = '✓ oCPM in production'; document.dispatchEvent(new CustomEvent('stackchange')); };
+      keep.onclick = function () { Stack.state.settings.pricing = 'cpc'; Stack.save(); Stack.clearLogCache(); keep.textContent = '✓ CPC'; document.dispatchEvent(new CustomEvent('stackchange')); };
+      out.appendChild(el('div', { class: 'btn-row' }, [ship, keep]));
+    });
+  })();
+})();
+</script>
+</body>
+</html>

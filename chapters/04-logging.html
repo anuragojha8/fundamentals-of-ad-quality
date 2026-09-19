@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logging: The Memory of the System — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="04-logging">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 4 · Part II · Data</div>
+  <h1>Logging: The Memory of the System</h1>
+  <p class="dek">In which I learn that nothing happened unless somebody wrote it down (correctly, at the right time).</p>
+</header>
+
+<div class="stack-panel" data-chapter="4"></div>
+
+<p class="lead">Here's an awkward confession about your stack: it has the memory of a goldfish. It's been happily serving ads for three chapters, and every single request vanished the moment it was served. Poof. Gone. So before we can train even one model, we need logs.</p>
+
+<p>I'll be upfront: this is the least glamorous chapter in the book. Nobody ever got a standing ovation for a join. But it might be the most important one. When an ML team says "our model got worse and we don't know why," I'd bet you a nice dinner the answer is hiding in the logs.</p>
+
+<!-- ANURAG: a real "it was the logs all along" debugging story would be perfect here. -->
+
+<h2 id="streams"><span class="sec">4.1</span>What gets written down</h2>
+
+<p>An ad system doesn't keep one tidy diary. It writes several separate <em>streams</em> of records, at different times, from different machines:</p>
+
+<ul>
+  <li><strong>The impression log</strong>, written by the ad server <em>at serve time</em>: request id, timestamp, user and context, which ad was shown in which slot, the bid, the <strong>prediction</strong> the model made, the price, the model version, and a snapshot of the <strong>feature values</strong> the model used.</li>
+  <li><strong>The click log</strong>, written seconds or minutes later, when the user taps. It records the request id and ad id, so it can be matched back to its impression.</li>
+  <li><strong>The conversion log</strong>, written hours or even <em>days</em> later, usually reported by the advertiser's website or app through a pixel or a server-to-server API. It's often late, sometimes duplicated, and occasionally lost forever, like a sock in the dryer.</li>
+</ul>
+
+<p>Training data gets made by <strong>joining</strong> these streams. Each impression becomes one training row, and its label answers one question: "was there a matching click (or conversion) inside the allowed window?"</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 200" role="img" aria-label="Impressions, clicks and conversions arrive at different times and are joined into labeled rows">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <line x1="40" y1="170" x2="720" y2="170" stroke="var(--ink-3)"/>
+  <text x="40" y="190" class="t-sm">t = 0 (serve)</text><text x="200" y="190" class="t-sm">+30 s</text><text x="420" y="190" class="t-sm">+2 days</text><text x="640" y="190" class="t-sm">training job runs</text>
+  <rect x="40" y="30" width="150" height="46" rx="8" class="box b"/><text x="115" y="50" text-anchor="middle" class="t-md t-b">Impression log</text><text x="115" y="66" text-anchor="middle" class="t-sm">features, pCTR, price</text>
+  <rect x="200" y="90" width="120" height="40" rx="8" class="box a"/><text x="260" y="114" text-anchor="middle" class="t-md t-b">Click</text>
+  <rect x="420" y="90" width="140" height="40" rx="8" class="box g"/><text x="490" y="114" text-anchor="middle" class="t-md t-b">Conversion</text>
+  <rect x="600" y="30" width="140" height="46" rx="8" class="box v"/><text x="670" y="50" text-anchor="middle" class="t-md t-b">Join</text><text x="670" y="66" text-anchor="middle" class="t-sm">row + labels</text>
+  <path class="arrow" d="M190,53 H598"/><path class="arrow" d="M320,110 C480,110 560,90 612,78"/><path class="arrow" d="M560,110 C590,110 610,95 640,78"/>
+  <line x1="640" y1="80" x2="640" y2="170" stroke="var(--violet)" stroke-dasharray="4 4"/>
+</svg>
+<figcaption>Three streams, three clocks. Anything that hasn't arrived by the time the training job runs gets labeled 0, even if it's about to happen.</figcaption>
+</figure>
+
+<p>Enough theory. Let's collect ten days of production traffic from your own stack and look at the raw records.</p>
+
+<div class="widget" id="w-logs">
+  <div class="w-title">Your production logs</div>
+  <div class="w-sub">Ten simulated days, 6,000 requests a day, served by your stack. The impression and event streams are written separately.</div>
+</div>
+
+<h2 id="join"><span class="sec">4.2</span>Build: the label join</h2>
+
+<p>The join quietly decides what a positive example <em>is</em>, which makes it a much bigger deal than it looks. Three rules matter:</p>
+<ol>
+  <li><strong>Match on the right key.</strong> One request shows three ads, so the key is (request id, ad id), not just the request id.</li>
+  <li><strong>Windows.</strong> A click counts if it happens within the <em>click window</em> after the impression (say, one hour). A conversion counts if it happens within the <em>attribution window</em> (say, 7 days) and follows a click.</li>
+  <li><strong>Now.</strong> An event that hasn't happened by the time the join runs doesn't exist yet. Your function gets <code>nowT</code> and has to ignore anything after it. That's exactly how the real pipeline behaves, and it's going to matter a lot in Chapter 12.</li>
+</ol>
+
+<div class="code-cell" data-slot="joinLabels"></div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Joining on request id alone. With three ads per request, one click on the slot-2 ad also labels slots 1 and 3 as clicked, tripling your "positives" with pure noise. And here's the evil part: this kind of bug doesn't crash anything. Metrics just get a little bit worse, and nobody figures out why for a whole quarter. Label pipelines deserve unit tests, just like the ones you just passed.</p>
+</div>
+
+<h2 id="windows"><span class="sec">4.3</span>Windows and "now"</h2>
+
+<p>Conversions take their sweet time. For a mobile game, they show up in minutes. For a bank account, they can take days. So if the training job runs right at the end of day 9, the impressions from day 9 haven't had any time to convert, and they get labeled 0, even though some of them are going to convert tomorrow. Drag the "now" slider and watch the <em>labeled</em> conversion rate change depending on when you look.</p>
+
+<div class="widget" id="w-windows">
+  <div class="w-title">When you join changes what you learn</div>
+  <div class="w-sub">Labeled post-click conversion rate by the day the impression was served, using your join, with the attribution window and "now" you choose.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Every label is a statement made <em>at a particular moment in time</em>. "Didn't convert" really means "hadn't converted yet when we checked." And here's the cruel irony: fresh data is the most valuable data for a model, because it's closest to today's world. It's also the data with the most wrong labels. Chapter 12 is all about living with that.</p>
+</div>
+
+<div class="quiz" data-id="ch4-q1">
+  <p class="q">Your pCVR model trains every morning on the last 14 days of impressions, joined at 6 am. Nimbus (a bank, where conversions take days) complains that the model systematically under-predicts its conversions. Gaming advertisers don't see this. What's the most likely cause?</p>
+  <ul>
+    <li data-why="Possibly, but it wouldn't explain the bank vs. gaming split.">Nimbus's creatives are low quality</li>
+    <li data-correct>Recent Nimbus impressions haven't had time to convert when the join runs, so they're labeled as negatives</li>
+    <li data-why="Click windows are minutes; the issue is conversions, which take days.">The click window is too short</li>
+    <li data-why="Hashing affects all advertisers similarly.">Feature hashing collisions</li>
+  </ul>
+  <div class="explain"><p>With slow conversions, a big chunk of the last few days' eventual conversions hasn't arrived when the join runs. Those rows become false negatives, and the model learns that Nimbus converts less than it really does. Gaming conversions show up within hours, so they barely notice. This is called <dfn>delayed feedback</dfn>. The fixes: wait longer before using data (and lose freshness), reweight, or model the delay explicitly (Chapter 12).</p></div>
+</div>
+
+<h2 id="servetime"><span class="sec">4.4</span>Log features at serve time</h2>
+
+<p>Here's a question you'll definitely hear in a meeting someday: why bother storing feature values in the impression log at all? Why not just recompute them at training time from the raw data? It's cheaper!</p>
+
+<p>Because <strong>features change</strong>. Take your stack's counting feature from Chapter 6: an ad's historical CTR. At serve time on day 3, the model saw that ad's CTR <em>as of day 3</em>. Recompute it at training time on day 10 and you get the CTR as of day 10, which includes clicks that happened <em>after</em> the impression. That's information from the future. Your model is basically reading tomorrow's newspaper.</p>
+
+<p>Training on recomputed features creates <dfn>train/serve skew</dfn>: the model learns from feature values it'll never see in production. Worse, because those recomputed values include the outcome period, they <dfn>leak</dfn> the label. The model looks amazing offline and disappoints online. Let's see how big the difference is in your logs.</p>
+
+<div class="widget" id="w-skew">
+  <div class="w-title">Serve-time vs. recomputed features</div>
+  <div class="w-sub">For every impression, the ad's smoothed-CTR feature as logged at serve time vs. as recomputed after the fact from all 10 days.</div>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Serve-time feature logging is expensive, because it multiplies log volume. So there's constant pressure to cut it ("we can just recompute, it's fine"). Push back with the skew argument, or at the very least insist on measuring the skew before anyone flips a switch. The same logic applies to <em>everything else</em> you log: the model version (so you can tell which model did what), the <em>candidates that lost</em> (so you can study what you didn't show), and exploration flags and probabilities (Chapter 5). Data you didn't log is data you can never, ever learn from.</p>
+</div>
+
+<h2 id="sampling"><span class="sec">4.5</span>Downsampling, and undoing it</h2>
+
+<p>Real impression logs are enormous, and most of the rows are negatives: people scrolling right past. So training pipelines usually keep every positive but only a fraction \(w\) of the negatives. It's way cheaper, and it barely hurts ranking.</p>
+
+<p>But there's a catch (there's always a catch). A model trained on downsampled data predicts on the downsampled scale, so its probabilities come out too high. You undo it with a correction that every ads engineer knows by heart, and that you should recognize when it pops up in a design doc:</p>
+
+\[ q = \frac{p}{p + (1-p)/w} \]
+
+<p>where \(p\) is the model's raw prediction and \(q\) is the corrected probability on real traffic.</p>
+
+<div class="exercise" data-id="ch4-e1" data-answer="0.0244" data-tol="0.0006">
+  <p class="q">Your pCTR model was trained keeping all clicks but only 10% of non-clicks (\(w = 0.1\)). For some impression it outputs \(p = 0.2\). What's the calibrated CTR \(q\)? (Answer as a probability, e.g. 0.05.)</p>
+  <details class="hint"><summary>Hint</summary><p>(1 − p)/w = 0.8 / 0.1 = 8.</p></details>
+  <div class="explain"><p>q = 0.2 / (0.2 + 8) ≈ <strong>0.0244</strong>, or 2.4%. Forget this correction and your model looks 8× over-calibrated. It's a surprisingly common launch bug, and it's exactly why calibration gets checked on unsampled evaluation data.</p></div>
+</div>
+
+<div class="quiz" data-id="ch4-q2">
+  <p class="q">Which of these does <em>not</em> need to be in the impression log for your stack to learn well?</p>
+  <ul>
+    <li data-why="Without the prediction you can't measure calibration or debug pricing.">The pCTR the model predicted at serve time</li>
+    <li data-why="You need the slot to handle position bias (Chapter 5).">The slot the ad was shown in</li>
+    <li data-correct>The user's click, if any</li>
+    <li data-why="Without the serve-time features, you invite train/serve skew.">The feature values used by the model</li>
+  </ul>
+  <div class="explain"><p>Trick question, sort of. The click hasn't happened yet at serve time! It lives in its own event stream and gets <em>joined</em> later. Everything else on the list has to be captured at serve time, because you can't faithfully reconstruct it afterwards.</p></div>
+</div>
+
+<div class="reflect" data-id="ch4-r1">
+  <p class="q">Infra proposes cutting storage costs 40% by (a) no longer logging feature values and recomputing them at training time, and (b) keeping only 5% of non-click impressions. How do you evaluate the proposal?</p>
+  <div class="model">
+    <ul>
+      <li><strong>(a) is risky, and it's measurable.</strong> Ask for a skew analysis: for a sample of logged impressions, compare logged and recomputed values feature by feature. Which ones drift (counting features, anything time-windowed, anything mutable like account status)? Then train on recomputed features and evaluate on logged ones. That AUC gap is your skew cost. A middle ground: only log the features that can't be faithfully recomputed.</li>
+      <li><strong>(b) is usually fine for ranking, if done right.</strong> Check that the correction \(q = p/(p+(1-p)/w)\) is applied in serving, that evaluation uses unsampled data, and that rare segments (new advertisers, small countries) keep enough negatives to stay calibrated. Consider segment-aware sampling rates.</li>
+      <li><strong>Don't lose the ability to learn later.</strong> Keep a small, unsampled, fully logged holdout stream for audits, research, and future models.</li>
+      <li><strong>Put numbers on both sides:</strong> the storage savings vs. the expected metric loss, converted to revenue.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>Your stack finally has a memory. It keeps <strong>logs</strong>: impression records with serve-time features and predictions, plus separate click and conversion streams. And <strong>your join</strong> turns them into labeled training rows.</p>
+  <p>So we're done, right? We've got labels, let's train! Well… not so fast. Those labels are honest about what happened, but they're keeping a few secrets about <em>why</em> it happened. Next time, we interrogate them.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Impression log</b>What was shown, when, to whom, at what prediction and price, with which features.</div>
+    <div><b>Join</b>Matching events to impressions on (request, ad) within windows, as of "now".</div>
+    <div><b>Attribution window</b>How long after a click a conversion still counts.</div>
+    <div><b>Delayed feedback</b>Late events make recent labels wrong until they mature.</div>
+    <div><b>Train/serve skew</b>Features differ between training and serving; recomputation is a common cause.</div>
+    <div><b>Negative downsampling</b>Keep a fraction w of negatives; correct with q = p/(p+(1−p)/w).</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el;
+  var w = Stack.world();
+  var logPromise = null;
+  function getLog(progress) {
+    if (!logPromise) logPromise = Stack.trainingLog({ onProgress: progress });
+    return logPromise;
+  }
+  function fmtT(t) { var d = Math.floor(t / 24), h = t - d * 24, hh = Math.floor(h), mm = Math.floor((h - hh) * 60); return 'day ' + d + ' ' + String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
+  document.addEventListener('stackchange', function () { logPromise = null; });
+
+  /* ---------------- log explorer ---------------- */
+  (function () {
+    var host = document.getElementById('w-logs');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Collect 10 days of logs', async function (progress) {
+      var log = await getLog(function (p) { progress(p, 'Serving traffic…'); });
+      out.innerHTML = '';
+      var s = log.summary, nClick = log.events.filter(function (e) { return e.type === 'click'; }).length, nConv = log.events.length - nClick;
+      var st = Book.stats(out, [{ key: 'r', label: 'Requests' }, { key: 'i', label: 'Impression rows' }, { key: 'c', label: 'Click events' }, { key: 'v', label: 'Conversion events' }]);
+      st({ r: s.requests.toLocaleString(), i: log.impressions.length.toLocaleString(), c: nClick.toLocaleString(), v: nConv.toLocaleString() });
+      out.appendChild(el('h3', { text: 'impressions (first 8 rows)', style: 'font-family:var(--mono);font-size:13px;margin:14px 0 0' }));
+      StackUI.table(out, [
+        { label: 'rid', key: 'rid' }, { label: 'time', get: function (r) { return fmtT(r.t); } }, { label: 'user', key: 'user' },
+        { label: 'ad', get: function (r) { return r.ad + ' <span class="muted">' + StackUI.adLabel(r.ad) + '</span>'; } }, { label: 'slot', key: 'slot' },
+        { label: 'bid', num: true, get: function (r) { return r.bid.toFixed(2); } }, { label: 'pctr', num: true, get: function (r) { return r.pctr.toFixed(4); } },
+        { label: 'price', num: true, get: function (r) { return r.price.toFixed(2); } },
+        { label: 'features', get: function (r) { return '<span class="muted" title="' + r.feats.join('\n') + '">' + r.feats.length + ' logged ▸</span>'; } }
+      ], log.impressions.slice(0, 8));
+      out.appendChild(el('h3', { text: 'events (first 8 rows)', style: 'font-family:var(--mono);font-size:13px;margin:14px 0 0' }));
+      StackUI.table(out, [
+        { label: 'type', get: function (r) { return r.type === 'click' ? '<span class="tag a">click</span>' : '<span class="tag g">conv</span>'; } },
+        { label: 'rid', key: 'rid' }, { label: 'ad', key: 'ad' }, { label: 'time', get: function (r) { return fmtT(r.t); } }
+      ], log.events.slice(0, 8));
+      out.appendChild(el('p', { class: 'small muted', text: 'Hover "features" to see what your stack logged for that impression. Events carry no labels or features, only keys and timestamps. The join does the rest.' }));
+    });
+  })();
+
+  /* ---------------- windows & now ---------------- */
+  (function () {
+    var host = document.getElementById('w-windows');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var body = el('div', { style: 'display:none' }); host.appendChild(body);
+    var grid = el('div', { class: 'w-grid side' }), L = el('div'), R = el('div'); grid.appendChild(L); grid.appendChild(R); body.appendChild(grid);
+    var nowOpts = [0, 24, 72, 168, 720];
+    var ctl = Book.controls(L, [
+      { key: 'now', label: '"Now" (join time)', min: 0, max: 4, step: 1, value: 0, fmt: function (v) { return ['end of day 9', '+1 day', '+3 days', '+7 days', '+30 days'][v]; } },
+      { key: 'win', label: 'Attribution window', min: 0, max: 2, step: 1, value: 1, fmt: function (v) { return ['1 day', '7 days', '28 days'][v]; } }
+    ], draw);
+    var st = Book.stats(L, [{ key: 'all', label: 'Labeled CVR, all days' }, { key: 'last', label: 'Day 9 only' }]);
+    var c = Book.chart(R, { w: 520, h: 250, x: [-0.5, 9.5], y: [0, 0.12], xlabel: 'Day the impression was served', ylabel: 'Labeled post-click CVR', xticks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+    Book.legend(R, [{ label: 'Labeled with your settings', color: 'var(--s2)' }, { label: 'Eventually (fully matured, 7-day window)', color: 'var(--ink-3)', dash: true }]);
+    var log = null;
+    StackUI.asyncButton(btnHost, 'Load logs and join', async function (progress) {
+      log = await getLog(function (p) { progress(p, 'Serving traffic…'); });
+      body.style.display = '';
+      draw();
+    });
+    function cvrByDay(nowT, winH) {
+      var rows = Stack.impl('joinLabels')(log.impressions, log.events, { clickWindowH: 1, convWindowH: winH, nowT: nowT });
+      var clicks = new Array(10).fill(0), convs = new Array(10).fill(0);
+      rows.forEach(function (r) { if (r.click) { clicks[r.day]++; convs[r.day] += r.conv; } });
+      return { byDay: clicks.map(function (c, d) { return c ? convs[d] / c : 0; }), all: Stack.sum(convs) / Stack.sum(clicks) };
+    }
+    function draw() {
+      if (!log) return;
+      var end = 240, v = ctl.values, win = [24, 168, 672][v.win];
+      var a = cvrByDay(end + nowOpts[v.now], win), full = cvrByDay(end + 2000, 168);
+      c.clear();
+      c.line(full.byDay.map(function (y, d) { return [d, y]; }), { color: 'var(--ink-3)', dash: '5 4' });
+      c.line(a.byDay.map(function (y, d) { return [d, y]; }), { color: 'var(--s2)' });
+      c.dots(a.byDay.map(function (y, d) { return [d, y, 4, 'var(--s2)']; }));
+      st({ all: Book.pct(a.all, 2), last: { v: Book.pct(a.byDay[9], 2), tone: a.byDay[9] < full.byDay[9] * 0.8 ? 'bad' : '' } });
+    }
+  })();
+
+  /* ---------------- serve-time vs recomputed ---------------- */
+  (function () {
+    var host = document.getElementById('w-skew');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Compare', async function (progress) {
+      var log = await getLog(function (p) { progress(p, 'Serving traffic…'); });
+      var sm = Stack.impl('smoothedCTR'), final = log.stats, g = final.globalCTR;
+      var diffs = [], changed = 0, byDay = new Array(10).fill(0).map(function () { return [0, 0]; });
+      log.impressions.forEach(function (imp) {
+        var logged = imp.feats.filter(function (f) { return f.indexOf('adCTR=') === 0; })[0];
+        var s = final.ad[imp.ad] || { imps: 0, clicks: 0 };
+        var re = 'adCTR=' + Math.round(Math.log2(sm(s.clicks, s.imps, g, 200)) * 2);
+        var same = logged === re;
+        if (!same) changed++;
+        byDay[imp.day][0]++; if (!same) byDay[imp.day][1]++;
+      });
+      out.innerHTML = '';
+      var st = Book.stats(out, [{ key: 'c', label: 'Rows whose feature changes', sub: 'serve-time vs. recomputed' }, { key: 'd0', label: 'Day 0 impressions', sub: 'changed' }, { key: 'd9', label: 'Day 9 impressions', sub: 'changed' }]);
+      st({ c: { v: Book.pct(changed / log.impressions.length, 0), tone: 'bad' }, d0: Book.pct(byDay[0][1] / byDay[0][0], 0), d9: Book.pct(byDay[9][1] / byDay[9][0], 0) });
+      out.appendChild(el('p', { class: 'small', html: 'On day 0 no ad has any history yet, so the logged feature is the prior for every ad. The recomputed version "knows" each ad\'s CTR over the following ten days, including the clicks this very row is trying to predict. A model trained on recomputed features learns to lean on a signal that is weaker and different at serve time. Chapter 6 measures the damage.' }));
+    });
+  })();
+
+  /* ---------------- mark built when the join passes and logs exist ---------------- */
+  document.addEventListener('slotchange', function (e) {
+    if (e.detail.slot === 'joinLabels' && e.detail.ok) { Stack.markBuilt(4, 'you'); document.dispatchEvent(new CustomEvent('stackchange')); }
+  });
+})();
+</script>
+</body>
+</html>

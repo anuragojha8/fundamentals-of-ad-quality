@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quality Beyond the Click — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="14-beyond-the-click">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 14 · Part V · The Job</div>
+  <h1>Quality Beyond the Click</h1>
+  <p class="dek">In which I remember that nobody opened Pebble to see ads. (Shocking, I know.)</p>
+</header>
+
+<div class="stack-panel" data-chapter="14"></div>
+
+<p class="lead">Let's take stock. For thirteen chapters, we've optimized clicks, conversions, and revenue. Those are what advertisers pay for, and you can measure them within a day. Very satisfying.</p>
+
+<p>But here's the part nobody puts on the dashboard: ads have a cost that never shows up in the auction. Every irrelevant or annoying ad makes Pebble a tiny bit worse. People hide ads. They scroll faster. They open the app a little less often. Those effects are slow, spread thin, and super easy to ignore, right up until the day they aren't. Pebble's users didn't open the app to see ads. Every ad spends a little of their patience. The real job of a quality PM is to spend it wisely. So in this chapter we finally put users into your stack's objective.</p>
+
+<h2 id="objective"><span class="sec">14.1</span>The objective you actually own</h2>
+
+<p>A healthy ads marketplace keeps three parties reasonably happy: <strong>advertisers</strong> (value for their money), <strong>users</strong> (a good experience), and <strong>the platform</strong> (revenue, both now and later). Lots of large platforms rank ads by some version of <dfn>total value</dfn>:</p>
+
+\[ \text{score} = \underbrace{\text{bid} \times \text{pCTR} \,(\times \text{pCVR})}_{\text{advertiser value}} \;+\; \underbrace{\text{quality}}_{\text{user value}} \;-\; \underbrace{\lambda \cdot \text{pHide} \cdot c}_{\text{user cost}} \]
+
+<p>Now look closely, because two numbers in that formula aren't predictions at all. They're <strong>policy</strong>: the weight \(\lambda\) on user cost, and how many ad slots to show in the first place (<dfn>ad load</dfn>). No model can learn those from clicks. They encode how much short-term revenue Pebble is willing to trade for long-term user health. Setting them well is one of the most consequential things you'll ever do as an ads quality PM. No pressure. (Okay, a lot of pressure.)</p>
+
+<h2 id="phide"><span class="sec">14.2</span>Predicting annoyance</h2>
+
+<p>Pebble lets users hide an ad ("not interested"). Hides are the clearest negative signal you'll ever get: a user literally telling you "please stop." They're also rare, about one per 180 impressions in your logs. In Pebble's world, hides come mostly from ads that don't match the user's interests, and from "annoying" creatives, which some advertisers are just really, really good at making.</p>
+
+<p>The good news is you already know how to build this. Train a pHide model with exactly the same recipe as your pCTR model: same features, same trainer, different label. Look at you, reusing infrastructure like a pro.</p>
+
+<div class="widget" id="w-phide">
+  <div class="w-title">Train a hide model</div>
+  <div class="w-sub">Logistic regression on your logs with label = hide. Graded against the true hide probabilities on day 10.</div>
+</div>
+
+<h2 id="lambda"><span class="sec">14.3</span>Pricing annoyance into the auction</h2>
+
+<p>Now let's add the penalty. Each ad's score becomes bid × pCTR − λ · pHide. Your stack does this by handing the auction a quality-adjusted pCTR, so the penalty affects both who wins and what they pay. Sweep λ and take a look at the frontier.</p>
+
+<div class="widget" id="w-lambda">
+  <div class="w-title">The quality frontier</div>
+  <div class="w-sub">One simulated day per λ, with your production stack plus the hide penalty. Expected values from the truth.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Wait, revenue went <em>up</em>? Yep. The first bit of quality penalty is often <strong>free, or even better than free</strong>. Ads that people hide are usually ads they wouldn't have clicked anyway, so pushing them down makes room for ads that actually earn more. Turn λ up far enough, though, and the penalty starts kicking out ads that make real money and are only mildly annoying. That's where the genuine tradeoff begins, and where you, the PM, have to make a call.</p>
+</div>
+
+<h2 id="load"><span class="sec">14.4</span>Ad load and the long run</h2>
+
+<p>And now, the biggest lever of all: how many ads to show. More slots means more revenue <em>today</em>, almost linearly. It's so tempting. The cost shows up later: users who see more ads (and more hideable ones) come back a little less often. And a little less often, compounded over a year, is a lot.</p>
+
+<p>Measuring that in real life takes long-running <dfn>holdout</dfn> experiments: a small group of users kept on lower ad load for months, compared with everyone else. Pebble's simulator doesn't model user churn, so the widget below uses a simple toy model where all the assumptions are right there on the label. You pick how sensitive users are, which is exactly the number a long-term holdout would be trying to estimate.</p>
+
+<div class="widget" id="w-load">
+  <div class="w-title">Short-term revenue vs. a year</div>
+  <div class="w-sub">Revenue and hides per request come from your stack (one simulated day per ad load). User retention is a toy model: weekly user loss = sensitivity × (0.8% × ad slots + 60% × hides per request), against 1% weekly organic growth.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Deciding ad load with a two-week A/B test. Revenue reacts instantly. User behaviour takes months to shift, and both test arms are swimming in the same app-wide trends anyway. So short tests will <em>always</em> tell you to show more ads. Mature platforms keep long-term holdouts, model the long-term effects of short-term metrics (often called <em>surrogate</em> or <em>proxy</em> metrics), and set explicit guardrails on user-experience metrics before anything that adds ads gets launched.</p>
+</div>
+
+<!-- ANURAG: if you've lived through an ad-load debate (finance vs. product vs. quality), a sentence or two here would make this very real. -->
+
+<div class="quiz" data-id="ch14-q1">
+  <p class="q">Adding a hide penalty (λ = 1) raised revenue <em>and</em> reduced hides in your simulation. Why can that happen?</p>
+  <ul>
+    <li data-why="The penalty changes rankings, not just prices.">The penalty only changes prices</li>
+    <li data-correct>Ads likely to be hidden are often also unlikely to be clicked, so demoting them promotes ads that earn more</li>
+    <li data-why="Advertisers' bids don't change in the simulation.">Advertisers raised their bids</li>
+    <li data-why="Ad load was held constant.">Pebble showed more ads</li>
+  </ul>
+  <div class="explain"><p>When pCTR isn't perfect (and it never is), pHide carries extra information about relevance. So the first bit of quality penalty partly fixes ranking mistakes. The real tradeoff only shows up once the penalty starts removing ads that are genuinely profitable.</p></div>
+</div>
+
+<div class="reflect" data-id="ch14-r1">
+  <p class="q">Finance proposes raising Pebble's ad load from 1 ad in 8 posts to 1 in 6, projecting +18% revenue. Write your response: what you'd need to see, how you'd test it, and what guardrails you'd set.</p>
+  <div class="model">
+    <ul>
+      <li><strong>Expected vs. measured:</strong> +18% assumes the ads in the new slots make as much as the existing ones. They usually don't. Marginal slots sit lower in the feed, get less attention, and dilute advertiser value. Expect less.</li>
+      <li><strong>The long-term cost:</strong> ask for evidence from past ad-load changes or existing long-term holdouts. What happened to sessions per user, retention, and time spent 8–12 weeks later? Translate that into revenue lost over a year, because fewer sessions means fewer ads, too.</li>
+      <li><strong>Test design:</strong> a long-running holdout (months) at the higher load, plus a smaller first step (1 in 7). Measure user metrics weekly, not just revenue.</li>
+      <li><strong>Guardrails:</strong> agree on stop conditions ahead of time, e.g. hide rate +X%, sessions −Y%, retention −Z%. Also consider quality-aware load: show extra ads only where high-quality candidates exist (and to users who tolerate them), rather than a flat increase for everyone.</li>
+      <li><strong>Advertiser side:</strong> more inventory can push prices down (more supply, same demand), so revenue per ad falls. One more reason that +18% is optimistic.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>A <strong>pHide model</strong>, a <strong>quality penalty</strong> in your auction with a λ you picked, and an <strong>ad-load decision</strong> made with an explicit long-term assumption. You now own the objective, not just the models.</p>
+  <p>And that's it. That's everything. You've built every piece of an ad system, from a hand-written heuristic all the way to a retrained, calibrated, quality-aware, two-stage ranking stack with retrieval and conversion bidding. There's only one thing left: running it. For a whole quarter. With advertisers, users, and a finance team all watching. See you in the capstone.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Total value</b>Ranking on advertiser value plus user value minus user cost.</div>
+    <div><b>pHide</b>Predicted probability the user hides or reports the ad.</div>
+    <div><b>Quality penalty (λ)</b>The exchange rate between user annoyance and revenue.</div>
+    <div><b>Ad load</b>How many ads per feed; the biggest short-vs-long-term lever.</div>
+    <div><b>Long-term holdout</b>Users kept on the old policy for months, to measure slow effects.</div>
+    <div><b>Guardrail metric</b>A metric that must not degrade for a launch to proceed.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world();
+  var tlP = null;
+  function tlog(progress) { if (!tlP) tlP = Stack.trainingLog({ onProgress: function (p) { progress(p * 0.5, 'Collecting logs…'); } }); return tlP; }
+
+  /* ---------------- pHide ---------------- */
+  (function () {
+    var host = document.getElementById('w-phide');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Train pHide', async function (progress) {
+      var tl = await tlog(progress), rows = Stack.labeledRows(tl);
+      var ev = await Stack.evalLog({ onProgress: function (p) { progress(0.5 + 0.1 * p, 'Collecting day 10…'); } }), er = Stack.labeledRows(ev);
+      var m = await Stack.trainLR({ rows: rows, epochs: 2, label: 'hide', onProgress: function (p) { progress(0.6 + 0.4 * p, 'Training…'); } });
+      var e = Stack.evaluate(Stack.lrPredictRows(m, er), er.map(function (r) { return r.hide; }), ev.truth.map(function (t) { return t.phide; }));
+      out.innerHTML = '';
+      var st = Book.stats(out, [{ key: 'n', label: 'Hides in your logs' }, { key: 'a', label: 'AUC', sub: 'truth ceiling: ' + e.oracleAuc.toFixed(3) }, { key: 'c', label: 'Calibration vs. truth' }]);
+      st({ n: rows.filter(function (r) { return r.hide; }).length.toLocaleString(), a: e.auc.toFixed(3), c: e.calibrationVsTruth.toFixed(2) });
+      Stack.putModel('phide', m, { source: 'you' });
+      out.appendChild(el('p', { class: 'small', text: 'Saved to your stack as the pHide model. Rare labels make it noisier than your pCTR model, a common situation for negative-feedback models.' }));
+      document.dispatchEvent(new CustomEvent('stackchange'));
+    });
+  })();
+
+  /* ---------------- lambda sweep ---------------- */
+  (function () {
+    var host = document.getElementById('w-lambda');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var lams = [0, 0.5, 1, 2, 4, 8];
+    StackUI.asyncButton(btnHost, 'Sweep λ (6 days)', async function (progress) {
+      out.innerHTML = '';
+      if (!Stack.getModel('phide')) { out.appendChild(el('p', { class: 'note warn', text: 'Train the pHide model above first.' })); return; }
+      var tl = await tlog(progress), res = [];
+      for (var i = 0; i < lams.length; i++) {
+        var l = await Stack.simulate({ days: [11], requestsPerDay: 3000, logFeatures: false, stats: tl.stats, policy: Stack.policy({ hideLambda: lams[i], epsilon: 0, shuffle: 0 }), onProgress: function (p) { progress(0.5 + 0.5 * (i + p) / lams.length, 'λ = ' + lams[i]); } });
+        res.push({ lam: lams[i], s: l.summary });
+      }
+      var b = res[0].s;
+      var g = el('div', { class: 'w-grid two' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); out.appendChild(g);
+      var xs = res.map(function (r) { return r.s.expHides / b.expHides; }), ys = res.map(function (r) { return r.s.expRevenue / b.expRevenue; });
+      var c = Book.chart(L, { w: 420, h: 260, x: [Math.min.apply(null, xs) - 0.03, 1.03], y: [Math.min.apply(null, ys) - 0.02, Math.max.apply(null, ys) + 0.02], xlabel: 'Hides (vs. λ = 0)', ylabel: 'Revenue (vs. λ = 0)', xfmt: function (v) { return Math.round(v * 100) + '%'; }, yfmt: function (v) { return Math.round(v * 100) + '%'; } });
+      c.line(res.map(function (r, i) { return [xs[i], ys[i]]; }), { color: 'var(--s1)' });
+      res.forEach(function (r, i) { c.dots([[xs[i], ys[i], 4.5, 'var(--s1)']]); c.text(xs[i], ys[i], 'λ=' + r.lam, { dx: 6, dy: -6, size: 11 }); });
+      StackUI.table(R, [
+        { label: 'λ', key: 'lam' },
+        { label: 'Revenue', num: true, get: function (r) { return Book.signed(100 * (r.s.expRevenue / b.expRevenue - 1), 1, '%'); } },
+        { label: 'Hides', num: true, get: function (r) { return Book.signed(100 * (r.s.expHides / b.expHides - 1), 1, '%'); } },
+        { label: 'Clicks', num: true, get: function (r) { return Book.signed(100 * (r.s.expClicks / b.expClicks - 1), 1, '%'); } },
+        { label: 'Adv. value', num: true, get: function (r) { return Book.signed(100 * (r.s.expValue / b.expValue - 1), 1, '%'); } }
+      ], res);
+      var row = el('div', { class: 'btn-row', style: 'margin-top:8px' });
+      row.appendChild(el('span', { class: 'small', text: 'Production λ:' }));
+      lams.forEach(function (lam) {
+        var btn = el('button', { type: 'button', class: 'btn ' + ((Stack.state.settings.hideLambda || 0) === lam ? '' : 'secondary'), text: String(lam) });
+        btn.onclick = function () { Stack.state.settings.hideLambda = lam; Stack.save(); Stack.clearLogCache(); row.querySelectorAll('button').forEach(function (x) { x.className = 'btn secondary'; }); btn.className = 'btn'; document.dispatchEvent(new CustomEvent('stackchange')); };
+        row.appendChild(btn);
+      });
+      out.appendChild(row);
+    });
+  })();
+
+  /* ---------------- ad load & long run ---------------- */
+  (function () {
+    var host = document.getElementById('w-load');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var body = el('div', { style: 'display:none' }); host.appendChild(body);
+    var g = el('div', { class: 'w-grid side' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); body.appendChild(g);
+    var ctl = Book.controls(L, [{ key: 's', label: 'User sensitivity to ads', min: 0, max: 3, step: 0.25, value: 1, fmt: function (v) { return v.toFixed(2) + '×'; } }], draw);
+    var st = Book.stats(L, [{ key: 'w1', label: 'Best for week 1' }, { key: 'w12', label: 'Best over a year' }]);
+    var c = Book.chart(R, { w: 520, h: 260, x: [1, 52], y: [0, 1], xlabel: 'Week', ylabel: 'Weekly revenue (vs. 1 slot, week 1)', yfmt: function (v) { return Math.round(v * 100) + '%'; } });
+    var colors = ['var(--s3)', 'var(--s1)', 'var(--s2)'];
+    Book.legend(R, [{ label: '1 ad slot', color: colors[0] }, { label: '2 ad slots', color: colors[1] }, { label: '3 ad slots', color: colors[2] }]);
+    var tableHost = el('div'); body.appendChild(tableHost);
+    var per = null;
+    StackUI.asyncButton(btnHost, 'Measure ad loads 1–3 on your stack', async function (progress) {
+      var tl = await tlog(progress); per = [];
+      for (var S = 1; S <= 3; S++) {
+        var l = await Stack.simulate({ days: [11], requestsPerDay: 3000, logFeatures: false, stats: tl.stats, policy: Stack.policy({ adLoad: S, epsilon: 0, shuffle: 0 }), onProgress: function (p) { progress(0.5 + 0.5 * (S - 1 + p) / 3, S + ' slot(s)'); } });
+        per.push({ S: S, R: l.summary.expRevenue / l.summary.requests, H: l.summary.expHides / l.summary.requests });
+      }
+      body.style.display = '';
+      draw();
+    });
+    function draw() {
+      if (!per) return;
+      var sens = ctl.values.s, base = per[0].R, curves = [], totals = [];
+      per.forEach(function (p) {
+        var users = 1, pts = [], tot = 0;
+        for (var wk = 1; wk <= 52; wk++) { var rev = users * p.R / base; pts.push([wk, rev]); tot += rev; users *= 1.01 - sens * (0.008 * p.S + 0.6 * p.H); }
+        curves.push(pts); totals.push(tot);
+      });
+      var ymax = Math.max.apply(null, curves.map(function (cv) { return Math.max.apply(null, cv.map(function (q) { return q[1]; })); })) * 1.08;
+      c.setDomain(null, [0, ymax]); c.clear();
+      curves.forEach(function (cv, i) { c.line(cv, { color: colors[i] }); });
+      var w1 = per.reduce(function (a, b) { return b.R > a.R ? b : a; }).S, best = totals.indexOf(Math.max.apply(null, totals)) + 1;
+      st({ w1: w1 + ' slot' + (w1 > 1 ? 's' : ''), w12: { v: best + ' slot' + (best > 1 ? 's' : ''), tone: best !== w1 ? 'bad' : 'good' } });
+      tableHost.innerHTML = '';
+      StackUI.table(tableHost, [
+        { label: 'Ad slots', key: 'S' },
+        { label: 'Revenue / request', num: true, get: function (p) { return '$' + p.R.toFixed(3); } },
+        { label: 'Hides / 1,000 requests', num: true, get: function (p) { return (1000 * p.H).toFixed(1); } },
+        { label: 'Revenue over a year (relative)', num: true, get: function (p) { return (totals[p.S - 1] / totals[0]).toFixed(2) + '×'; } }
+      ], per);
+      if (!tableHost.querySelector('.btn-row')) {
+        var row = el('div', { class: 'btn-row' });
+        row.appendChild(el('span', { class: 'small', text: 'Production ad load:' }));
+        [1, 2, 3].forEach(function (S) {
+          var btn = el('button', { type: 'button', class: 'btn ' + ((Stack.state.settings.adLoad || 3) === S ? '' : 'secondary'), text: S + ' slot' + (S > 1 ? 's' : '') });
+          btn.onclick = function () { Stack.state.settings.adLoad = S; Stack.markBuilt(14, 'you'); Stack.clearLogCache(); row.querySelectorAll('button').forEach(function (x) { x.className = 'btn secondary'; }); btn.className = 'btn'; document.dispatchEvent(new CustomEvent('stackchange')); };
+          row.appendChild(btn);
+        });
+        tableHost.appendChild(row);
+      }
+    }
+  })();
+})();
+</script>
+</body>
+</html>

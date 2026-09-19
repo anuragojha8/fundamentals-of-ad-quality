@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pre-training, Fine-tuning, and Freshness — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="13-pretrain-train-refresh">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 13 · Part IV · The Models</div>
+  <h1>Pre-training, Fine-tuning, and Freshness</h1>
+  <p class="dek">A model is a snapshot of a world that keeps moving. How you keep it current matters as much as how you built it.</p>
+</header>
+
+<div class="stack-panel" data-chapter="13"></div>
+
+<p class="lead">Every model in your stack was trained on days 0–9. Pebble didn't stop at day 9. Users' interests wander, seasons shift what people click, and advertisers launch new creatives every day that your model has never seen. This chapter measures how fast your model goes stale, lets you design a retraining schedule, and introduces the ideas modern systems use to learn faster from less: <strong>warm starts, pre-training, and distillation</strong>.</p>
+
+<h2 id="drift"><span class="sec">13.1</span>Drift: watching a model go stale</h2>
+
+<p>Pebble's simulated world drifts in three ways, just like the real one. Each user's interests <strong>slowly shift</strong> toward a different set of favourite categories over the 90-day horizon. Categories have <strong>seasonal trends</strong> (Travel rises and falls over weeks). And about 40% of ads <strong>launch after day 0</strong>, so their IDs are unknown to a model trained earlier. Compare your day-0–9 model with a freshly trained one, on the same later days:</p>
+
+<div class="widget" id="w-drift">
+  <div class="w-title">Stale vs. fresh</div>
+  <div class="w-sub">On each evaluation day: your model trained on days 0–9 vs. the same recipe trained on the 10 days just before. Same traffic, same features.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Staleness hurts in two ways. <strong>Ranking decays</strong> as learned patterns become less true: a user ID's weight describes who that user <em>was</em>, and new ads have no ID weight at all. <strong>Calibration wanders</strong> as the mix of users, ads, and seasons moves, sometimes up and sometimes down, which makes it easy to miss on an aggregate dashboard. That's why production systems pair a periodic full retrain with a frequently refreshed calibration layer (Chapter 3).</p>
+</div>
+
+<h2 id="cadence"><span class="sec">13.2</span>Designing a retraining schedule</h2>
+
+<p>Retraining every hour keeps the model fresh, and costs compute, pipeline complexity, and risk (every retrain is a new model that can break). Retraining monthly is cheap and stale. Two more choices matter:</p>
+<ul>
+  <li><dfn>Cold start</dfn> retraining: train from scratch on a recent window (say, the last 10 days) each time.</li>
+  <li><dfn>Warm start</dfn> (incremental) training: start from the previous model's weights and train only on the data that arrived since. It's much cheaper per update, and it carries forward what the model knew. The risk is accumulating stale knowledge or bugs.</li>
+</ul>
+<p>Many large systems train <em>continuously</em>: a warm-started model consumes new logs as they arrive (online learning), with a periodic cold rebuild to reset accumulated drift.</p>
+
+<div class="widget" id="w-cadence">
+  <div class="w-title">Simulate a season of retraining</div>
+  <div class="w-sub">Days 10–45 of Pebble. Your logistic regression recipe, retrained on the schedule you pick. Each point is that day's AUC and calibration (vs. the truth) for the model in production that day.</div>
+</div>
+
+<div class="quiz" data-id="ch13-q1">
+  <p class="q">Your model's AUC is stable week over week, but its calibration ratio drifts from 1.00 to 1.18 over three weeks. What's the cheapest effective fix?</p>
+  <ul>
+    <li data-why="A full retrain would fix it but isn't the cheapest option.">Retrain the full model daily</li>
+    <li data-correct>Refit the calibration layer frequently (e.g., hourly or daily) on recent outcomes</li>
+    <li data-why="Architecture isn't the problem; ranking is stable.">Switch to a deep model</li>
+    <li data-why="More features won't fix a moving base rate.">Add more features</li>
+  </ul>
+  <div class="explain"><p>Stable AUC means the ordering is still good; only the scale moved. A calibration layer is a handful of parameters, cheap to refit on recent data. This is exactly the job it exists for.</p></div>
+</div>
+
+<h2 id="pretrain"><span class="sec">13.3</span>Pre-training and fine-tuning</h2>
+
+<p>Ad clicks are a thin, biased signal: rare, and only for what was shown (Chapters 5 and 10). But Pebble knows far more about its users than their ad clicks. Every like, comment, follow, and search is a signal of interest. <dfn>Pre-training</dfn> means learning general representations from those abundant signals first, then <dfn>fine-tuning</dfn> on the scarce task you care about:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 200" role="img" aria-label="Pre-train on organic engagement to learn user and item embeddings, then fine-tune on ad clicks and conversions">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <rect x="20" y="30" width="200" height="70" rx="10" class="box b"/><text x="120" y="58" text-anchor="middle" class="t-md t-b">Pre-train</text><text x="120" y="76" text-anchor="middle" class="t-sm">billions of organic events:</text><text x="120" y="90" text-anchor="middle" class="t-sm">likes, follows, views, searches</text>
+  <rect x="280" y="30" width="200" height="70" rx="10" class="box v"/><text x="380" y="58" text-anchor="middle" class="t-md t-b">General representations</text><text x="380" y="76" text-anchor="middle" class="t-sm">user & content embeddings,</text><text x="380" y="90" text-anchor="middle" class="t-sm">sequence encoders</text>
+  <rect x="540" y="30" width="200" height="70" rx="10" class="box a"/><text x="640" y="58" text-anchor="middle" class="t-md t-b">Fine-tune</text><text x="640" y="76" text-anchor="middle" class="t-sm">millions of ad clicks,</text><text x="640" y="90" text-anchor="middle" class="t-sm">thousands of conversions</text>
+  <path class="arrow" d="M220,65 H278"/><path class="arrow" d="M480,65 H538"/>
+  <rect x="280" y="130" width="200" height="50" rx="10" class="box g"/><text x="380" y="152" text-anchor="middle" class="t-md t-b">Distill</text><text x="380" y="168" text-anchor="middle" class="t-sm">big teacher → small, fast student</text>
+  <path class="arrow" d="M640,100 C640,150 540,155 482,155"/>
+</svg>
+<figcaption>The modern recipe. The representations carry knowledge from abundant signals into sparse tasks, and help cold-start users and ads most.</figcaption>
+</figure>
+
+<p>This is the same idea as large language models, which are pre-trained on the web and fine-tuned for tasks. In ads, "foundation" user models pre-trained on engagement sequences, and content embeddings from image and text encoders, are increasingly shared across many ranking models. A new ad has no click history, but its image and text have an embedding on day one. A new user has no ad clicks, but has engaged with posts. The main benefits are for exactly the cases that hurt most: <strong>cold start and sparse labels</strong>.</p>
+
+<h2 id="distill"><span class="sec">13.4</span>Distillation</h2>
+
+<p>The best model is often too expensive to serve at every stage of the funnel. <dfn>Knowledge distillation</dfn> trains a small "student" model to imitate a large "teacher": instead of learning from 0/1 labels, the student learns from the teacher's predicted probabilities, which carry much richer information per example ("this one was a 7% case, not a 0.1% case"). Typical uses in ads: a heavy late-stage ranker teaches the early-stage ranker, so the early stage agrees more with the late one and recall of the eventual winners improves (Chapter 1's funnel). It also lets a slow offline model teach a fast online one.</p>
+
+<div class="quiz" data-id="ch13-q2">
+  <p class="q">Why do soft labels from a teacher help a student more than the original 0/1 click labels?</p>
+  <ul>
+    <li data-why="Distillation usually uses the same examples, just different targets.">The teacher sees more examples</li>
+    <li data-correct>A probability like 0.07 tells the student how likely a click was; a 0 only says it didn't happen this time</li>
+    <li data-why="Soft labels aren't about calibration of the teacher per se.">The teacher is always perfectly calibrated</li>
+    <li data-why="Students can be any architecture.">The student must have the same architecture</li>
+  </ul>
+  <div class="explain"><p>Clicks are noisy draws from probabilities. The teacher's estimate removes much of that noise, the same way "expected clicks" did throughout this book. The student learns the teacher's knowledge at a fraction of the data cost.</p></div>
+</div>
+
+<div class="reflect" data-id="ch13-r1">
+  <p class="q">Infra says moving your ranking model from daily to hourly retraining will cost an extra 30% in training compute. How would you decide whether it's worth it?</p>
+  <div class="model">
+    <ul>
+      <li><strong>Measure the freshness value directly:</strong> evaluate models of different ages on the same recent traffic (like the widget above). How much AUC and calibration does a 23-hour-older model lose? Is the loss concentrated where freshness matters most: new ads, trending events, launch days of big campaigns?</li>
+      <li><strong>Cheaper alternatives first:</strong> hourly calibration refits, faster counting features (real-time ad CTR), and warm-start incremental updates instead of full retrains.</li>
+      <li><strong>Translate to money:</strong> use the NE-to-revenue relationship from past launches, and compare the expected gain with 30% of the training bill.</li>
+      <li><strong>Risk:</strong> more frequent deployments need automated validation gates (calibration, NE, slice checks) before each model goes live. Otherwise an hourly pipeline can ship an hourly bug.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>A <strong>retraining policy</strong> for your stack, cadence and warm or cold start, chosen from a simulation of a season of drift. It's saved, and the capstone will run your stack with it.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Drift</b>The world changes: interests, seasons, new ads. Models go stale.</div>
+    <div><b>Retraining cadence</b>How often a model is rebuilt; freshness vs. cost and risk.</div>
+    <div><b>Warm start</b>Continue from previous weights on new data; cheap, carries history.</div>
+    <div><b>Pre-training</b>Learn representations from abundant signals, then fine-tune.</div>
+    <div><b>Distillation</b>A small student learns from a big teacher's probabilities.</div>
+    <div><b>Validation gate</b>Automated checks a new model must pass before it serves.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world();
+  function range(a, b) { var r = []; for (var i = a; i < b; i++) r.push(i); return r; }
+  var basePol = function () { return Stack.policy({ ranker: 'heuristic', calibrate: false, retrieval: 'eligible', pricing: 'cpc' }); };
+
+  /* ---------------- stale vs fresh ---------------- */
+  (function () {
+    var host = document.getElementById('w-drift');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Run (4 evaluation days)', async function (progress) {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.15, 'Collecting days 0–9…'); } });
+      var stale = Stack.getModel('lr') || await Stack.trainLR({ rows: Stack.labeledRows(tl), epochs: 2 });
+      var days = [11, 25, 40, 60], res = [];
+      for (var k = 0; k < days.length; k++) {
+        var d = days[k];
+        var prev = await Stack.simulate({ days: range(d - 10, d), requestsPerDay: 4000, policy: basePol(), onProgress: function (p) { progress(0.15 + 0.85 * (k + p * 0.7) / days.length, 'Day ' + d + ': collecting the previous 10 days…'); } });
+        var fresh = await Stack.trainLR({ rows: Stack.labeledRows(prev), epochs: 2 });
+        var ev = await Stack.simulate({ days: [d], requestsPerDay: 4000, stream: 2, policy: basePol(), stats: prev.stats, onProgress: function (p) { progress(0.15 + 0.85 * (k + 0.7 + 0.3 * p) / days.length, 'Day ' + d + ': evaluating…'); } });
+        var r = Stack.labeledRows(ev), y = r.map(function (x) { return x.click; }), t = ev.truth.map(function (x) { return x.pctr; });
+        var eS = Stack.evaluate(Stack.lrPredictRows(stale, r), y, t), eF = Stack.evaluate(Stack.lrPredictRows(fresh, r), y, t);
+        var newAds = r.filter(function (x) { return w.ads[x.ad].startDay >= 10; }).length / r.length;
+        res.push({ d: d, s: eS, f: eF, newAds: newAds });
+      }
+      out.innerHTML = '';
+      StackUI.table(out, [
+        { label: 'Eval day', key: 'd' },
+        { label: 'Impressions on ads launched after day 9', num: true, get: function (x) { return Book.pct(x.newAds, 0); } },
+        { label: 'AUC: stale → fresh', num: true, get: function (x) { return x.s.auc.toFixed(3) + ' → <b>' + x.f.auc.toFixed(3) + '</b>'; } },
+        { label: 'Calibration vs. truth: stale → fresh', num: true, get: function (x) { return '<span class="' + (Math.abs(x.s.calibrationVsTruth - 1) > 0.1 ? 'neg' : '') + '">' + x.s.calibrationVsTruth.toFixed(2) + '</span> → <b>' + x.f.calibrationVsTruth.toFixed(2) + '</b>'; } }
+      ], res);
+      var gap = Stack.mean(res.map(function (x) { return x.f.auc - x.s.auc; }));
+      out.appendChild(el('p', { class: 'small', html: 'On average a fresh model beats the stale one by <b>' + gap.toFixed(3) + '</b> AUC here. The gap grows as users\' tastes move and more traffic goes to ads the stale model has never seen.' }));
+    });
+  })();
+
+  /* ---------------- cadence simulation ---------------- */
+  (function () {
+    var host = document.getElementById('w-cadence');
+    var sched = [{ k: 'never', label: 'Never (days 0–9 model)', every: 0 }, { k: 'w21', label: 'Every 21 days, cold', every: 21, warm: false }, { k: 'w7c', label: 'Weekly, cold (last 10 days)', every: 7, warm: false }, { k: 'w7w', label: 'Weekly, warm start', every: 7, warm: true }, { k: 'd1w', label: 'Daily, warm start', every: 1, warm: true }];
+    var colors = ['var(--s2)', 'var(--s6)', 'var(--s4)', 'var(--s1)', 'var(--s3)'];
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Simulate days 10–45 under 5 schedules', async function (progress) {
+      var D0 = 10, D1 = 46, dayLogs = [], stats = null, rpd = 2500;
+      for (var d = 0; d < D1; d++) {
+        var l = await Stack.simulate({ days: [d], requestsPerDay: rpd, policy: basePol(), stats: stats, onProgress: function (p) { progress(0.5 * (d + p) / D1, 'Simulating day ' + d + '…'); } });
+        stats = l.stats;
+        dayLogs.push({ rows: Stack.labeledRows(l), truth: l.truth.map(function (x) { return x.pctr; }) });
+      }
+      function rowsOf(a, b) { var r = []; for (var i = a; i < b; i++) r = r.concat(dayLogs[i].rows); return r; }
+      var res = [];
+      for (var si = 0; si < sched.length; si++) {
+        var S = sched[si], model = await Stack.trainLR({ rows: rowsOf(0, 10), epochs: 2 }), cost = rowsOf(0, 10).length * 2, lastTrain = 10, curve = [];
+        for (d = D0; d < D1; d++) {
+          if (S.every && d > D0 && (d - D0) % S.every === 0) {
+            if (S.warm) { var nr = rowsOf(lastTrain, d); model = await Stack.trainLR({ rows: nr, epochs: 1, lr: 0.03, init: model.w, decay: false }); cost += nr.length; }
+            else { var cr = rowsOf(d - 10, d); model = await Stack.trainLR({ rows: cr, epochs: 2 }); cost += cr.length * 2; }
+            lastTrain = d;
+          }
+          var R = dayLogs[d].rows, e = Stack.evaluate(Stack.lrPredictRows(model, R), R.map(function (x) { return x.click; }), dayLogs[d].truth);
+          curve.push({ d: d, auc: e.pairAccVsTruth, cal: e.calibrationVsTruth });
+          if (d % 5 === 0) progress(0.5 + 0.5 * (si + (d - D0) / (D1 - D0)) / sched.length, S.label + '…');
+        }
+        res.push({ S: S, curve: curve, cost: cost });
+      }
+      out.innerHTML = '';
+      var g = el('div', { class: 'w-grid two' }), L = el('div'), R2 = el('div'); g.appendChild(L); g.appendChild(R2); out.appendChild(g);
+      var all = []; res.forEach(function (r) { r.curve.forEach(function (c) { all.push(c.auc); }); });
+      var c1 = Book.chart(L, { w: 420, h: 240, x: [D0, D1 - 1], y: [Math.min.apply(null, all) - 0.01, Math.max.apply(null, all) + 0.01], xlabel: 'Day', ylabel: 'Ranking accuracy vs. truth', yfmt: function (v) { return v.toFixed(2); } });
+      var allC = []; res.forEach(function (r) { r.curve.forEach(function (c) { allC.push(c.cal); }); });
+      var c2 = Book.chart(R2, { w: 420, h: 240, x: [D0, D1 - 1], y: [Math.min(0.8, Math.min.apply(null, allC)), Math.max(1.2, Math.max.apply(null, allC))], xlabel: 'Day', ylabel: 'Calibration vs. truth', yfmt: function (v) { return v.toFixed(2); } });
+      c2.hline(1, {});
+      res.forEach(function (r, i) { c1.line(r.curve.map(function (c) { return [c.d, c.auc]; }), { color: colors[i], width: 1.8 }); c2.line(r.curve.map(function (c) { return [c.d, c.cal]; }), { color: colors[i], width: 1.8 }); });
+      Book.legend(out, res.map(function (r, i) { return { label: r.S.label, color: colors[i] }; }));
+      StackUI.table(out, [
+        { label: 'Schedule', get: function (r) { return r.S.label; } },
+        { label: 'Avg. ranking accuracy', num: true, get: function (r) { return Stack.mean(r.curve.map(function (c) { return c.auc; })).toFixed(3); } },
+        { label: 'Avg. |calibration − 1|', num: true, get: function (r) { return Book.pct(Stack.mean(r.curve.map(function (c) { return Math.abs(c.cal - 1); })), 1); } },
+        { label: 'Training cost (rows processed)', num: true, get: function (r) { return (r.cost / 1000).toFixed(0) + 'k'; } }
+      ], res);
+      out.appendChild(el('p', { class: 'small', text: '"Ranking accuracy" is the share of impression pairs ordered the same way as the true probabilities. Choose your stack\'s policy; the capstone uses it.' }));
+      var row = el('div', { class: 'btn-row' });
+      [[0, false, 'Never retrain'], [7, false, 'Weekly, cold'], [7, true, 'Weekly, warm'], [1, true, 'Daily, warm']].forEach(function (o) {
+        var cur = Stack.state.settings.retrainEvery === o[0] && Stack.state.settings.warmStart === o[1];
+        var b = el('button', { type: 'button', class: 'btn ' + (cur ? '' : 'secondary'), text: o[2] });
+        b.onclick = function () { Stack.state.settings.retrainEvery = o[0]; Stack.state.settings.warmStart = o[1]; Stack.markBuilt(13, 'you'); row.querySelectorAll('button').forEach(function (x) { x.className = 'btn secondary'; }); b.className = 'btn'; document.dispatchEvent(new CustomEvent('stackchange')); };
+        row.appendChild(b);
+      });
+      out.appendChild(row);
+    });
+  })();
+})();
+</script>
+</body>
+</html>

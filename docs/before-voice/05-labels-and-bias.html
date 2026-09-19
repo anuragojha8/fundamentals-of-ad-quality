@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Labels and the Biases Hiding in Them — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="05-labels-and-bias">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 5 · Part II · Data</div>
+  <h1>Labels and the Biases Hiding in Them</h1>
+  <p class="dek">Your logs only record what happened to the ads you chose to show, in the slots you chose to show them in. A model trained on them learns your choices along with your users' preferences.</p>
+</header>
+
+<div class="stack-panel" data-chapter="5"></div>
+
+<p class="lead">In Chapter 4 you turned events into labels: 1 if clicked, 0 if not. It's tempting to treat those labels as ground truth about what users like. They aren't. A click is the product of what the user wanted <em>and</em> what the system did: which ad it picked, where it put it, and what it never showed at all. This chapter separates the two.</p>
+
+<h2 id="label"><span class="sec">5.1</span>Choosing the label is a product decision</h2>
+
+<p>Before any bias, there's the choice of what to predict. "Click" is only one option, and every option makes the system optimize for something different:</p>
+
+<div class="table-wrap"><table class="data">
+<thead><tr><th>Label</th><th>What it rewards</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td>Click</td><td>Attention-grabbing ads</td><td>Clickbait and accidental taps</td></tr>
+<tr><td>Long click (stays on the landing page 10 s or more)</td><td>Ads that deliver on their promise</td><td>Fewer positives; a slower signal</td></tr>
+<tr><td>Conversion</td><td>What most advertisers actually pay for</td><td>Rare, delayed, reported by third parties (Ch. 12)</td></tr>
+<tr><td>Hide / report</td><td>Avoiding ads users dislike (as a negative label)</td><td>Very rare; the right weight is a judgement call (Ch. 14)</td></tr>
+</tbody></table></div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Label definitions are where product intent becomes math. "Should an accidental tap that bounces in one second count as a click?" sounds like a data-engineering detail. It's actually a decision about which advertisers win. Ask for the label definition in every model review, and ask who signed off on it.</p>
+</div>
+
+<h2 id="position"><span class="sec">5.2</span>Position bias</h2>
+
+<p>Users don't look at every slot. An ad in the third slot is often scrolled past before anyone reads it. The standard model of this is the <dfn>examination hypothesis</dfn>: a click needs the user to <em>look</em> at the ad, then <em>want</em> it:</p>
+
+\[ P(\text{click} \mid \text{ad}, \text{slot}) = \underbrace{P(\text{examine} \mid \text{slot})}_{\text{position bias}} \times \underbrace{P(\text{click} \mid \text{examined}, \text{ad})}_{\text{relevance}} \]
+
+<p>The model's job is to estimate relevance. The logs, though, mix it with position. Here's the trap: in your production logs, slot 1's CTR is much higher than slot 3's. How much of that is <em>position</em>, and how much is that your stack <em>put its best ads</em> in slot 1? From observational logs alone, you can't tell. The widget below shows the true decomposition, which only the simulator knows.</p>
+
+<div class="widget" id="w-slots">
+  <div class="w-title">Why is slot 1's CTR higher?</div>
+  <div class="w-sub">Your production logs (10 days). Observed CTR by slot, split into the two factors using the simulator's truth.</div>
+</div>
+
+<h2 id="randomize"><span class="sec">5.3</span>Randomize to measure</h2>
+
+<p>The clean way to separate position from relevance is an experiment: on a small share of requests, keep the same three winners but <strong>shuffle their order</strong>. In shuffled traffic, every ad is equally likely to land in any slot, so relevance is the same across slots <em>on average</em>. Any remaining CTR difference is pure position effect:</p>
+
+\[ \widehat{\text{examine}}(s) = \frac{\text{CTR of slot } s \text{ in shuffled traffic}}{\text{CTR of slot 1 in shuffled traffic}} \]
+
+<div class="widget" id="w-shuffle">
+  <div class="w-title">Measure position bias with a shuffle experiment</div>
+  <div class="w-sub">Five days with 20% of requests shuffled. Compare the estimate from shuffled traffic with the naive one from normal traffic, and with the truth.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Observational logs answer "what happened when we did what we always do." To learn what <em>would</em> happen otherwise, you have to occasionally do otherwise, on purpose and in a way you can measure. That's the idea behind every randomized experiment, every exploration budget, and every A/B test in this book.</p>
+</div>
+
+<h2 id="ipw"><span class="sec">5.4</span>Build: inverse propensity weighting</h2>
+
+<p>Once you know the examination probabilities, you can correct an ad's historical CTR for where it was shown. A click in slot 3, where only 41% of users look, is stronger evidence than a click in slot 1. So weight each click by \(1/\text{examine}(s)\). This is <dfn>inverse propensity weighting</dfn> (IPW), and the same idea corrects many biases: weight each observation by one over the probability that the system made it observable.</p>
+
+\[ \widehat{\text{CTR}}_{\text{IPW}} = \frac{1}{n} \sum_{i=1}^{n} \frac{y_i}{\text{examine}(s_i)} \]
+
+<div class="code-cell" data-slot="ipwCTR"></div>
+
+<p>Now apply your function to real ads. Below are ads whose impressions were spread unevenly across slots. For each, compare the naive CTR, your IPW estimate using the examination curve you measured, and the ad's true relevance.</p>
+
+<div class="widget" id="w-ipw">
+  <div class="w-title">Naive vs. IPW, per ad</div>
+  <div class="w-sub">Ads with at least 300 impressions in your logs, most "demoted" first. Truth = the average true P(click | examined) over the ad's impressions.</div>
+</div>
+
+<div class="exercise" data-id="ch5-e1" data-answer="0.05" data-tol="0.0005">
+  <p class="q">Orbit's ad was shown 100 times, all in slot 3, where users examine the slot 40% of the time. It got 2 clicks. What's its IPW-corrected CTR? (Answer as a probability.)</p>
+  <details class="hint"><summary>Hint</summary><p>Each click counts as 1 / 0.4 = 2.5 clicks.</p></details>
+  <div class="explain"><p>(2 × 2.5) / 100 = <strong>0.05</strong>. The naive estimate, 2%, would undersell Orbit by 2.5×. If your ranking used the naive number, Orbit would stay stuck in low slots, collecting low CTRs that "confirm" it deserves low slots.</p></div>
+</div>
+
+<details class="callout deep"><summary><div class="label">Going deeper: position in the model itself</div></summary>
+<p>Production rankers usually handle position inside the model rather than through IPW. The slot is a feature during training, and it's set to a fixed value (slot 1) at serving time, so the model outputs relevance. Your Chapter 7 model does exactly this. A refinement is a separate <em>shallow tower</em> for position-like features whose output is added to the main model's logit and dropped at serving. This keeps the main tower from confusing "shown high" with "good" (see the PAL paper from Huawei, 2019, and YouTube's multitask ranking paper, 2019). IPW remains the standard tool for unbiased <em>evaluation</em> and for learning-to-rank losses.</p>
+</details>
+
+<h2 id="loop"><span class="sec">5.5</span>Selection bias and the feedback loop</h2>
+
+<p>Position bias distorts what you learn about ads you <em>showed</em>. The deeper problem is ads you <em>didn't</em> show: you have no labels for them at all. If the model underrates an ad, the ad isn't shown, so no clicks come in, so the model never corrects itself. This is a <dfn>feedback loop</dfn>, and it's why ad systems keep an <dfn>exploration</dfn> budget: a small share of traffic where the system deliberately shows ads it isn't sure about.</p>
+
+<p>Watch the loop on your stack. The ranker below knows nothing but each ad's running click count, updated daily (a smoothed CTR times the bid). Run two weeks at different exploration rates, ε, where ε is the share of requests given to randomly chosen eligible ads, for free.</p>
+
+<div class="widget" id="w-explore">
+  <div class="w-title">Explore or exploit?</div>
+  <div class="w-sub">14 simulated days per setting, 3,000 requests a day. The ranker learns only from its own logs.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Judging exploration by this quarter's revenue. Exploration usually <em>costs</em> short-term revenue: you're deliberately showing ads you think are worse. The payoff is <strong>information</strong>, and it shows up later, when models are trained on logs that contain it. Short tests systematically favour "no exploration." You'll see the payoff for your own stack in Chapter 9.</p>
+</div>
+
+<h2 id="decide"><span class="sec">5.6</span>Your decision: exploration in production</h2>
+
+<p>Your stack's logs are about to become training data (Chapters 6 and 7). How much of Pebble's traffic should go to exploration from now on? This setting is saved and shapes every log your stack collects from here on, including the ones your models learn from. There's no free option.</p>
+
+<div class="widget" id="w-decide">
+  <div class="w-title">Set production exploration</div>
+  <div class="w-sub">Explored requests show random eligible ads for free. They're flagged in the logs.</div>
+</div>
+
+<div class="quiz" data-id="ch5-q1">
+  <p class="q">In your normal logs, slot 1's CTR is 2.8× slot 3's. A shuffle experiment shows users examine slot 3 about 41% as often as slot 1. What explains the rest of the gap?</p>
+  <ul>
+    <li data-why="The shuffle experiment already measured pure position effect at about 2.4×.">Position bias is larger than the experiment suggests</li>
+    <li data-correct>Selection: the ranker puts more relevant ads in slot 1, so slot 1's ads are better on average</li>
+    <li data-why="Nothing in the setup points to a logging bug; this gap is expected.">A logging bug in slot 3</li>
+    <li data-why="Users do differ, but every slot in a request is shown to the same user.">Slot 3 is shown to different users</li>
+  </ul>
+  <div class="explain"><p>Observed CTR ratio ≈ examination ratio × relevance ratio. The shuffle gives examination ≈ 1/0.41 ≈ 2.4×, so the remaining ≈ 1.15× is <strong>selection</strong>: the auction put stronger ads on top. If you read the naive 2.8× as "position bias," you'd over-correct and inflate low-slot ads.</p></div>
+</div>
+
+<div class="quiz" data-id="ch5-q2">
+  <p class="q">A newly launched ad is genuinely excellent, but the model's initial prediction for it is low. There's no exploration. What most likely happens?</p>
+  <ul>
+    <li data-why="The model has no data to update from; the ad gets few or no impressions.">The model quickly learns it's excellent from its first clicks</li>
+    <li data-correct>It rarely wins, collects almost no data, and the low prediction persists</li>
+    <li data-why="Advertisers can raise bids, but the question is about the model's learning.">The advertiser's bid automatically rises until it wins</li>
+    <li data-why="Calibration fixes averages across many ads, not one ad the system never shows.">The calibration layer corrects it</li>
+  </ul>
+  <div class="explain"><p>That's the feedback loop. Without impressions there are no labels, and without labels the prediction never changes. Remedies: an exploration budget, optimistic priors for new ads, or new-ad boosts with their own measurement.</p></div>
+</div>
+
+<div class="reflect" data-id="ch5-r1">
+  <p class="q">It's the last month of the quarter and revenue is 2% short of target. A leader suggests turning Pebble's 5% exploration traffic off "just until the quarter closes." What do you say?</p>
+  <div class="model">
+    <ul>
+      <li><strong>Quantify the ask.</strong> What does exploration actually cost? Measure it directly: explored requests vs. a matched sample of non-explored ones. It's often much less than the traffic share suggests, because explored impressions still earn some revenue and often get a floor price.</li>
+      <li><strong>Name the delayed cost.</strong> Models retrained over the next weeks will learn from logs with no exploration. New ads and advertisers get less data (cold start worsens), and the feedback loop tightens. The cost lands next quarter and is hard to attribute. It's a withdrawal from a savings account.</li>
+      <li><strong>Offer alternatives.</strong> Reduce exploration instead of removing it, target it where information is most valuable (new ads, uncertain segments), or use cheaper forms such as slot shuffling, which costs little but keeps position-bias estimates alive.</li>
+      <li><strong>Make it explicit.</strong> If the decision is to pause, write down an end date and an owner, and track new-ad performance and model calibration so the cost is visible.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>Your stack can now <strong>measure position bias</strong> with a randomized experiment, <strong>correct for it with IPW</strong>, and <strong>explore</strong> at a rate you chose. Every log it collects from here on carries the consequences of that choice.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Examination hypothesis</b>P(click) = P(examine | slot) × P(click | examined).</div>
+    <div><b>Position bias</b>Lower slots get fewer clicks regardless of the ad.</div>
+    <div><b>Selection bias</b>Labels exist only for what the system chose to show.</div>
+    <div><b>IPW</b>Weight observations by 1 / probability of being observed.</div>
+    <div><b>Feedback loop</b>Predictions decide the data, and the data decides the predictions.</div>
+    <div><b>Exploration (ε)</b>Traffic spent on uncertain choices to buy information.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world(), EX = w.cfg.examine;
+
+  // Examination curve measured by the reader (falls back to naive until measured).
+  function measured() { return Stack.state.settings.examineEst || null; }
+
+  /* ---------------- slot decomposition ---------------- */
+  (function () {
+    var host = document.getElementById('w-slots');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Analyze your logs', async function (progress) {
+      var log = await Stack.trainingLog({ onProgress: function (p) { progress(p, 'Serving traffic…'); } });
+      var rows = Stack.labeledRows(log);
+      var n = [0, 0, 0], c = [0, 0, 0], rel = [0, 0, 0];
+      rows.forEach(function (r, i) { if (r.explore) return; n[r.slot]++; c[r.slot] += r.click; rel[r.slot] += log.truth[i].rel; });
+      var ctr = c.map(function (x, s) { return x / n[s]; }), rl = rel.map(function (x, s) { return x / n[s]; });
+      out.innerHTML = '';
+      StackUI.table(out, [
+        { label: 'Slot', get: function (r) { return r.s + 1; } },
+        { label: 'Observed CTR', num: true, get: function (r) { return Book.pct(ctr[r.s], 2); } },
+        { label: 'vs. slot 1', num: true, get: function (r) { return (ctr[r.s] / ctr[0]).toFixed(2) + '×'; } },
+        { label: 'True examination', num: true, get: function (r) { return (EX[r.s]).toFixed(2) + '×'; } },
+        { label: 'True avg. relevance of ads placed here', num: true, get: function (r) { return Book.pct(rl[r.s], 2) + ' <span class="muted">(' + (rl[r.s] / rl[0]).toFixed(2) + '×)</span>'; } }
+      ], [{ s: 0 }, { s: 1 }, { s: 2 }]);
+      out.appendChild(el('p', { class: 'small', html: 'Observed slot 3 vs. slot 1: <b>' + (ctr[2] / ctr[0]).toFixed(2) + '×</b> ≈ examination ' + EX[2].toFixed(2) + '× × relevance ' + (rl[2] / rl[0]).toFixed(2) + '×. Part of the gap is position; part is that your auction put weaker ads lower. From the logs alone, the two are tangled together.' }));
+    });
+  })();
+
+  /* ---------------- shuffle experiment ---------------- */
+  (function () {
+    var host = document.getElementById('w-shuffle');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Run the experiment (5 days)', async function (progress) {
+      var log = await Stack.simulate({ days: [0, 1, 2, 3, 4], requestsPerDay: 6000, stream: 4, logFeatures: false,
+        policy: Stack.policy({ shuffle: 0.2, epsilon: 0 }), onProgress: function (p) { progress(p, 'Serving with 20% shuffled…'); } });
+      var rows = Stack.labeledRows(log);
+      var sh = [[0, 0], [0, 0], [0, 0]], nm = [[0, 0], [0, 0], [0, 0]];
+      rows.forEach(function (r) { var b = r.explore === 2 ? sh : nm; b[r.slot][0]++; b[r.slot][1] += r.click; });
+      var shC = sh.map(function (x) { return x[1] / x[0]; }), nmC = nm.map(function (x) { return x[1] / x[0]; });
+      var est = shC.map(function (x) { return x / shC[0]; }), naive = nmC.map(function (x) { return x / nmC[0]; });
+      out.innerHTML = '';
+      var c = Book.chart(out, { w: 560, h: 240, x: [0.5, 3.5], y: [0, 1.1], xticks: [1, 2, 3], xlabel: 'Slot', ylabel: 'Examination vs. slot 1', xfmt: function (v) { return 'slot ' + v; }, yfmt: function (v) { return Math.round(v * 100) + '%'; } });
+      c.line([[1, EX[0]], [2, EX[1]], [3, EX[2]]], { color: 'var(--ink-3)', dash: '5 4' });
+      c.line(naive.map(function (v, i) { return [i + 1, v]; }), { color: 'var(--s2)' });
+      c.line(est.map(function (v, i) { return [i + 1, v]; }), { color: 'var(--s1)' });
+      c.dots(est.map(function (v, i) { return [i + 1, v, 4.5, 'var(--s1)']; }));
+      Book.legend(out, [{ label: 'Shuffle estimate', color: 'var(--s1)' }, { label: 'Naive (normal traffic)', color: 'var(--s2)' }, { label: 'Truth', color: 'var(--ink-3)', dash: true }]);
+      out.appendChild(el('p', { class: 'small', html: 'Shuffled requests: ' + (sh[0][0]).toLocaleString() + ' per slot. Slot 3 estimate <b>' + est[2].toFixed(2) + '</b> vs. truth ' + EX[2] + '; the naive estimate says ' + naive[2].toFixed(2) + '. The shuffle estimate is noisy but unbiased. More traffic tightens it.' }));
+      Stack.state.settings.examineEst = est.map(function (v) { return +v.toFixed(3); });
+      Stack.save();
+      out.appendChild(el('p', { class: 'small muted', text: 'Saved to your stack: examine ≈ [' + Stack.state.settings.examineEst.join(', ') + ']. The IPW widget below uses it.' }));
+    });
+  })();
+
+  /* ---------------- per-ad IPW ---------------- */
+  (function () {
+    var host = document.getElementById('w-ipw');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Compare estimates', async function (progress) {
+      var log = await Stack.trainingLog({ onProgress: function (p) { progress(p, 'Serving traffic…'); } });
+      var rows = Stack.labeledRows(log), ex = measured() || EX, ipw = Stack.impl('ipwCTR');
+      var by = {};
+      rows.forEach(function (r, i) { if (r.explore) return; var b = by[r.ad] || (by[r.ad] = { rows: [], rel: 0 }); b.rows.push({ slot: r.slot, click: r.click }); b.rel += log.truth[i].rel; });
+      var list = Object.keys(by).map(function (a) {
+        var b = by[a], n = b.rows.length, low = b.rows.filter(function (x) { return x.slot > 0; }).length / n;
+        var naive = b.rows.reduce(function (s, x) { return s + x.click; }, 0) / n;
+        return { a: +a, n: n, low: low, naive: naive, ipw: ipw(b.rows, ex), truth: b.rel / n };
+      }).filter(function (x) { return x.n >= 300; }).sort(function (x, y) { return y.low - x.low; }).slice(0, 10);
+      out.innerHTML = '';
+      StackUI.table(out, [
+        { label: 'Ad', get: function (r) { return StackUI.adLabel(r.a); } },
+        { label: 'Impr.', num: true, get: function (r) { return r.n.toLocaleString(); } },
+        { label: 'In slots 2–3', num: true, get: function (r) { return Book.pct(r.low, 0); } },
+        { label: 'Naive CTR', num: true, get: function (r) { return Book.pct(r.naive, 2); } },
+        { label: 'IPW CTR', num: true, get: function (r) { return '<b>' + Book.pct(r.ipw, 2) + '</b>'; } },
+        { label: 'Truth', num: true, get: function (r) { return '<span class="muted">' + Book.pct(r.truth, 2) + '</span>'; } }
+      ], list);
+      var eN = Stack.mean(list.map(function (r) { return Math.abs(r.naive / r.truth - 1); })), eI = Stack.mean(list.map(function (r) { return Math.abs(r.ipw / r.truth - 1); }));
+      out.appendChild(el('p', { class: 'small', html: 'Average error vs. truth: naive <b>' + Book.pct(eN, 0) + '</b>, IPW <b>' + Book.pct(eI, 0) + '</b>. Using ' + (measured() ? 'the examination curve you measured' : 'the true examination curve (run the shuffle experiment above to use your own estimate)') + ' and ' + (Stack.implSource('ipwCTR') === 'you' ? 'your ipwCTR().' : 'the reference ipwCTR().') }));
+    });
+  })();
+
+  /* ---------------- explore / exploit ---------------- */
+  (function () {
+    var host = document.getElementById('w-explore');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var eps = [0, 0.03, 0.1, 0.25], colors = ['var(--s2)', 'var(--s4)', 'var(--s1)', 'var(--s3)'];
+    StackUI.asyncButton(btnHost, 'Run 4 × 14 days', async function (progress) {
+      var res = [];
+      for (var k = 0; k < eps.length; k++) {
+        var stats = null, cum = 0, curve = [[0, 0]];
+        for (var d = 0; d < 14; d++) {
+          var pol = Stack.policy({ epsilon: eps[k], shuffle: 0, reserveEcpm: 0, calibrate: false, retrieval: 'eligible', pricing: 'cpc' });
+          pol.ranker = { name: 'counting', predict: function (req, uv, ids, snap) { return ids.map(function (a) { var s = snap.ad[a] || { imps: 0, clicks: 0 }; return (s.clicks + 0.03 * 50) / (s.imps + 50); }); } };
+          var l = await Stack.simulate({ days: [d], requestsPerDay: 3000, policy: pol, stats: stats, logFeatures: false, onProgress: function (p) { progress((k + (d + p) / 14) / eps.length, 'ε = ' + Math.round(eps[k] * 100) + '%, day ' + (d + 1)); } });
+          stats = l.stats; cum += l.summary.expRevenue; curve.push([d + 1, cum]);
+        }
+        var act = w.activeAds(13), est = [], q = [], known = 0;
+        act.forEach(function (a) { var s = stats.ad[a] || { imps: 0, clicks: 0 }; if (s.imps >= 30) known++; est.push(Math.log((s.clicks + 1.5) / (s.imps + 50))); q.push(w.truth.ads[a].quality); });
+        res.push({ eps: eps[k], cum: cum, curve: curve, known: known, total: act.length, corr: Stack.pearson(est, q) });
+      }
+      out.innerHTML = '';
+      var g = el('div', { class: 'w-grid two' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); out.appendChild(g);
+      var ymax = Math.max.apply(null, res.map(function (r) { return r.cum; })) * 1.05;
+      var c = Book.chart(L, { w: 420, h: 260, x: [0, 14], y: [0, ymax], xlabel: 'Day', ylabel: 'Cumulative revenue', yfmt: function (v) { return '$' + Math.round(v / 1000) + 'k'; } });
+      res.forEach(function (r, i) { c.line(r.curve, { color: colors[i] }); });
+      Book.legend(L, res.map(function (r, i) { return { label: 'ε = ' + Math.round(r.eps * 100) + '%', color: colors[i] }; }));
+      StackUI.table(R, [
+        { label: 'ε', get: function (r) { return Math.round(r.eps * 100) + '%'; } },
+        { label: '14-day revenue', num: true, get: function (r) { return Book.signed(100 * (r.cum / res[0].cum - 1), 1, '%'); } },
+        { label: 'Ads it knows', num: true, get: function (r) { return r.known + ' / ' + r.total; } },
+        { label: 'Knowledge quality', num: true, get: function (r) { return r.corr.toFixed(2); } }
+      ], res);
+      R.appendChild(el('p', { class: 'small', html: '"Ads it knows" = live ads with at least 30 impressions. "Knowledge quality" = correlation between the ranker\'s learned CTR and each ad\'s true creative quality. More exploration buys knowledge. Whether it pays for itself in two weeks depends on luck and on how bad your guesses were. That\'s exactly why the decision is hard.' }));
+    });
+  })();
+
+  /* ---------------- decision ---------------- */
+  (function () {
+    var host = document.getElementById('w-decide');
+    var body = el('div'); host.appendChild(body);
+    function render() {
+      body.innerHTML = '';
+      var cur = Stack.state.settings.epsilon || 0;
+      var row = el('div', { class: 'btn-row' });
+      [[0, 'None'], [0.02, '2%'], [0.05, '5%'], [0.1, '10%'], [0.2, '20%']].forEach(function (o) {
+        var b = el('button', { type: 'button', class: 'btn ' + (Math.abs(cur - o[0]) < 1e-9 ? '' : 'secondary'), text: o[1] });
+        b.onclick = function () {
+          Stack.state.settings.epsilon = o[0];
+          Stack.state.settings.shuffle = o[0] ? 0.02 : 0;
+          var c = Stack.state.code.ipwCTR;
+          if (c && c.passed) Stack.markBuilt(5, 'you'); else Stack.save();
+          Stack.clearLogCache();
+          render();
+          document.dispatchEvent(new CustomEvent('stackchange'));
+        };
+        row.appendChild(b);
+      });
+      body.appendChild(row);
+      body.appendChild(el('p', { class: 'small', style: 'margin-top:8px', html: cur
+        ? 'Production now explores on <b>' + Math.round(cur * 100) + '%</b> of requests (plus 2% slot shuffling). That costs some revenue every day and gives your future models data about ads they would never have chosen.'
+        : 'Production does <b>no exploration</b>. Every future log contains only ads your current ranker liked. Keep an eye on what that does in Chapter 9.' }));
+      if (!(Stack.state.code.ipwCTR && Stack.state.code.ipwCTR.passed)) body.appendChild(el('p', { class: 'small muted', text: 'Pass the ipwCTR tests above to mark this chapter as built by you.' }));
+    }
+    render();
+    document.addEventListener('stackchange', render);
+  })();
+})();
+</script>
+</body>
+</html>

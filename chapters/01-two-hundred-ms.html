@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two Hundred Milliseconds — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="01-two-hundred-ms">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 1 · Part I · The Marketplace</div>
+  <h1>Two Hundred Milliseconds</h1>
+  <p class="dek">In which I accidentally run three thousand auctions before breakfast.</p>
+</header>
+
+<div class="stack-panel" data-chapter="1"></div>
+
+<p class="lead">Okay, so here's a fun fact that ruins scrolling forever: every time someone opens Pebble and starts thumbing through photos, a whole marketplace spins up, holds an auction, picks a winner, sets a price, writes everything down for posterity, and packs up. In about 200 milliseconds. You blink slower than that.</p>
+
+<p>Three feed slots ahead of our scroller are reserved for ads. Those slots need to be filled with ads that are allowed to be there, that this person might actually care about, and that are priced correctly. And the whole decision has to be written down so the system can get smarter tomorrow. No pressure.</p>
+
+<p>In this chapter we'll follow one of those requests from start to finish. We'll also start the project that runs through the entire book: <strong>your very own ad stack</strong>. It's a small but real ad system that runs right here in your browser, against a simulated Pebble with 4,000 users, 60 advertisers, and about 340 ads. By the end of the chapter, it'll be serving (simulated) traffic. Pretty cool, right?</p>
+
+<!-- ANURAG: optional one-liner about the first time you looked under the hood of an ad request at work, and what surprised you. -->
+
+<h2 id="journey"><span class="sec">1.1</span>The journey of one ad request</h2>
+
+<p>Here's what happens between the scroll and the ad, in order. Every production ad system I've seen has some version of these stages. The names change from company to company, because naming things is hard.</p>
+
+<ol>
+  <li><strong>Request.</strong> The app asks the ad server for ads, and sends along who the user is and the <em>context</em>: device, time, which surface, how many slots.</li>
+  <li><strong>Eligibility.</strong> Most ads can't be shown to this person right now. The campaign might not be running today, or it's targeting another country or age group, or its budget is spent, or the user has already seen it five times this morning (that's a <dfn>frequency cap</dfn>, and it's why you don't see the same car ad twelve times in a row). Filtering is cheap, exact, and happens first.</li>
+  <li><strong>Retrieval</strong> (a.k.a. <em>candidate generation</em>). A real Pebble would have millions of ads. Retrieval uses cheap, fast models to cut that down to a few hundred or a few thousand plausible candidates. Chapter 10.</li>
+  <li><strong>Ranking.</strong> Models predict, for each candidate, the probability of whatever the advertiser cares about: a click (<dfn>pCTR</dfn>), a conversion (<dfn>pCVR</dfn>), or something bad, like the user hiding the ad. Big systems do this twice: a light model over many candidates, then a heavy one over the survivors.</li>
+  <li><strong>Auction.</strong> Predictions get combined with bids into a score, winners get picked, and each winner gets a <em>price</em>. Chapter 2.</li>
+  <li><strong>Serve.</strong> The winners go back to the app and show up in the feed.</li>
+  <li><strong>Log.</strong> Everything gets written down: which ads were candidates, what we predicted, what we showed, and later, what the user actually did. This is the raw material for every model in this book. Chapter 4.</li>
+</ol>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 210" role="img" aria-label="Ad funnel: 340 ads, about 155 eligible, all scored, 3 shown">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <polygon points="20,20 200,20 200,190 20,190" class="box" />
+  <polygon points="220,40 380,50 380,160 220,170" class="box b" />
+  <polygon points="400,60 540,75 540,135 400,150" class="box b" />
+  <polygon points="560,85 660,92 660,118 560,125" class="box a" />
+  <rect x="680" y="95" width="70" height="20" rx="4" class="box g"/>
+  <text x="110" y="95" text-anchor="middle" class="t-md t-b">All ads</text>
+  <text x="110" y="115" text-anchor="middle" class="t-sm">millions (real)</text>
+  <text x="110" y="131" text-anchor="middle" class="t-sm">~340 (your stack)</text>
+  <text x="300" y="100" text-anchor="middle" class="t-md t-b">Eligible</text>
+  <text x="300" y="118" text-anchor="middle" class="t-sm">targeting, dates, caps</text>
+  <text x="470" y="102" text-anchor="middle" class="t-md t-b">Ranked</text>
+  <text x="470" y="118" text-anchor="middle" class="t-sm">pCTR × bid</text>
+  <text x="610" y="109" text-anchor="middle" class="t-sm t-b">Auction</text>
+  <text x="715" y="109" text-anchor="middle" class="t-sm t-b">3 shown</text>
+</svg>
+<figcaption>The ad funnel. Each stage handles fewer candidates and can afford to spend more computation on each one. Your stack is small enough to score every eligible ad, so it skips retrieval until Chapter 10.</figcaption>
+</figure>
+
+<h2 id="budget"><span class="sec">1.2</span>Why a funnel? The latency budget</h2>
+
+<p>Let's start with the dumbest possible design. You have one great model. Why not just score every ad with it and pick the best?</p>
+
+<p>Because the feed won't wait for you. The ad server gets something like 100 milliseconds end to end, and ranking gets a slice of that. A heavy ranking model might need half a millisecond per candidate. That sounds like nothing, until you do the math: two thousand candidates at 0.5 ms each is a full second. Your user has scrolled past, closed the app, and started a new hobby.</p>
+
+<p>So we do the next best thing: a funnel. Cheap models go over lots of candidates, expensive models go over a few. Problem solved?</p>
+
+<p>Not quite. Here's the catch, and it's the single most important idea in this chapter: <strong>every stage can only lose good ads, never find them</strong>. If retrieval throws away the best ad, no ranking model downstream, however fancy, can bring it back.</p>
+
+<p>Play with the tradeoff below. The simulation draws 20,000 eligible ads, each with a hidden true value. Each stage estimates those values with some noise (cheaper models are noisier) and keeps its top K. Try to find the sweet spot without blowing the budget.</p>
+
+<div class="widget" id="w-funnel">
+  <div class="w-title">The funnel under a deadline</div>
+  <div class="w-sub">Keep more candidates at each stage and the best ad survives more often, but latency grows. Requests that blow the budget time out and show no ad at all.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>There's a sweet spot. Make the funnel too narrow and you throw away good ads early. Make it too wide and you blow the latency budget. Timeouts become blank slots, and blank slots make exactly zero dollars. Also, notice something sneaky: a better model in an <em>early</em> stage often beats a bigger model in the last one. The late model can only choose from what it's handed.</p>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Here's a secret: almost every ads-ranking proposal is secretly a latency proposal. "Let's use a bigger model" really means "let's spend more milliseconds per candidate." So I always ask three things. <em>What's the p99 latency impact?</em> (The slowest 1% of requests are the ones that time out.) <em>What's the compute cost?</em> And <em>which stage are we improving?</em> A shiny win in late ranking can't fix a recall problem in retrieval.</p>
+</div>
+
+<div class="quiz" data-id="ch1-q1">
+  <p class="q">Your retrieval stage keeps 500 of 2 million eligible ads. The late-stage ranking team ships a model that's way better at ordering its 50 inputs. Which problem can this model <em>not</em> fix?</p>
+  <ul>
+    <li data-why="Ordering among the 50 candidates is exactly what a better late ranker improves.">Showing the second-best of the 50 finalists instead of the best</li>
+    <li data-correct>The best ad for this user was never among the 500 retrieved</li>
+    <li data-why="Better predictions do feed better prices; the auction uses them directly.">Prices being set with inaccurate predictions</li>
+    <li data-why="A better late model can fix this if the good ads reach it.">Showing irrelevant ads that made it through retrieval</li>
+  </ul>
+  <div class="explain"><p>A downstream stage only sees what the upstream stages pass along. Losing a good candidate early is a <dfn>recall</dfn> problem, and here's the annoying part: it's invisible to late-stage metrics. The late ranker's offline numbers look great on the candidates it actually sees. That's why retrieval teams measure recall against a stronger reference model (Chapter 10).</p></div>
+</div>
+
+<div class="exercise" data-id="ch1-e1" data-answer="80" data-tol="0.5" data-unit="candidates">
+  <p class="q">Your late-stage ranker costs 0.5 ms of compute per candidate, and the ranking budget is 40 ms. Ignoring parallelism and overheads, what's the most candidates it can score?</p>
+  <details class="hint"><summary>Hint</summary><p>Budget ÷ cost per candidate. Yes, it's that simple.</p></details>
+  <div class="explain"><p>40 ms ÷ 0.5 ms = <strong>80 candidates</strong>. Real systems batch candidates on GPUs, so cost isn't perfectly linear, but the principle holds. The late ranker's candidate count is set by its cost per candidate. Double the model size and you roughly halve how many candidates it gets to look at.</p></div>
+</div>
+
+<h2 id="eligibility"><span class="sec">1.3</span>Build: the eligibility filter</h2>
+
+<p>Alright, enough talking. Time to build.</p>
+
+<p>Your stack's very first job is deciding which ads are allowed to show up at all. In our simulated Pebble, each ad has <strong>flight dates</strong> (it runs from <code>startDay</code> up to, but not including, <code>endDay</code>) and optional <strong>targeting</strong>: a list of allowed countries and a list of allowed age buckets. <code>null</code> means "anyone's fine."</p>
+
+<p>Countries are numbered 0 = US, 1 = UK, 2 = BR. Age buckets are 0 = 18–24, 1 = 25–34, 2 = 35–49, 3 = 50+. Write the filter below and hit <strong>Run tests</strong>. The tests check your function against the real ad server on 400 (ad, user, day) combinations, so no pressure. Well, a little pressure.</p>
+
+<div class="code-cell" data-slot="isEligible"></div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Eligibility looks boring. Honestly, it's where a lot of the scariest bugs live. An eligibility bug that shows alcohol ads to teenagers, or keeps a campaign running past its end date, isn't a "quality regression." It's a policy incident, or a very awkward conversation with an advertiser's finance team. Eligibility code is usually owned by a different team than ranking, and it deserves its own tests and its own monitoring.</p>
+</div>
+
+<h2 id="heuristic"><span class="sec">1.4</span>Build: your first pCTR, no model required</h2>
+
+<p>The auction needs, for every candidate, a guess at the <dfn>click-through rate</dfn>: the probability that this user clicks this ad if we put it in the top slot. Now, you don't have a model yet. You don't even have logs (those come in Chapter 4). What you do have is last month's dashboard, and some good old common sense.</p>
+
+<div class="widget" id="w-prior">
+  <div class="w-title">Last month's dashboard</div>
+  <div class="w-sub">Top-slot CTR by ad category, from a month when ads were served at random. This is the <code>prior.catCTR</code> array your function receives.</div>
+</div>
+
+<p>You also have each user's <strong>engagement history</strong>: the categories of the 12 organic posts they most recently liked or commented on, most recent first. This is a really strong signal. Someone who's been double-tapping hiking photos all week is probably more into Trailhead's boots right now than into a mortgage.</p>
+
+<p>So here's the challenge. If I asked you to predict clicks with just these two things, how would you do it? Write a heuristic that starts from the category's CTR and nudges it using the history. There's no single right answer here. The tests only require that you return valid probabilities and that you order ads better than a coin flip, measured against the <em>true</em> click probabilities (which only a simulator gets to know). See how high you can push that score. I'm competitive about this, and you should be too.</p>
+
+<div class="code-cell" data-slot="heuristicPCTR"></div>
+
+<details class="callout deep"><summary><div class="label">Going deeper: why not just use each ad's own CTR?</div></summary>
+<p>You totally could, and Chapter 6 turns it into a <em>counting feature</em>. But on its own it has two problems. New ads have no history (the <dfn>cold-start</dfn> problem, which is as fun as it sounds). And an ad's CTR averages over everyone it was shown to, so it can't tell you whether <em>this</em> person will click. Personalization needs signals about the user–ad pair, like the history match in your heuristic.</p>
+</details>
+
+<h2 id="run"><span class="sec">1.5</span>Run your request loop</h2>
+
+<p>Now let's wire it all together. The widget below replays real requests from Pebble's day 0 through <em>your</em> stack: your eligibility filter, then your heuristic pCTR, then an auction. The auction is my reference version for now; you'll write your own in Chapter 2.</p>
+
+<p>See that grey column? That's what only the simulator knows: the <em>true</em> probability that this user clicks each ad. In the real world you never, ever get to see that column. Enjoy it while it lasts.</p>
+
+<div class="widget" id="w-trace">
+  <div class="w-title">One request through your stack</div>
+  <div class="w-sub">Step through requests. Compare your heuristic's ranking with the truth.</div>
+</div>
+
+<p>One request is an anecdote. Let's get some data. Serve a whole day, 3,000 requests with three ad slots each, with clicks drawn from the true probabilities. Then run the exact same day with <strong>perfect predictions</strong> (the simulator's truth) and see how much your heuristic leaves on the table.</p>
+
+<div class="widget" id="w-day">
+  <div class="w-title">Serve a day of traffic</div>
+  <div class="w-sub">Your stack vs. an oracle that knows the true click probabilities. Same users, same requests, same bids.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>"Our CTR is 3.4%, that's great!" Great compared to what? A CTR on its own tells you almost nothing. It depends on ad load, slot position, category mix, and which users got the traffic. What actually matters is the <em>gap to a better system</em>, and in real life you only ever see that gap through an experiment (Chapter 9). The oracle here is a luxury of simulation. It tells us how much headroom better predictions could unlock. And that headroom is basically the business case for the rest of this book.</p>
+</div>
+
+<div class="quiz" data-id="ch1-q2">
+  <p class="q">In the day simulation, the oracle serves the same requests with perfect click predictions and gets more clicks <em>and</em> more revenue. Where does the extra revenue come from?</p>
+  <ul>
+    <li data-why="Bids are identical in both runs; advertisers didn't change anything.">Advertisers bid more for better predictions</li>
+    <li data-correct>Better predictions put ads that users actually want to click in the slots, so more impressions turn into billable clicks</li>
+    <li data-why="Both runs serve the same number of slots.">The oracle shows more ads</li>
+    <li data-why="The oracle uses the same auction rules.">The oracle charges higher prices per click</li>
+  </ul>
+  <div class="explain"><p>With CPC bidding, Pebble gets paid per click. The auction ranks by <em>bid × pCTR</em>, so when pCTR is wrong, the auction hands slots to ads nobody clicks. That's lost revenue for Pebble, wasted attention for users, and missed customers for advertisers. Better prediction is that rare lever that helps all three at once. (Per-click prices can actually move either way. Chapter 3 explains why.)</p></div>
+</div>
+
+<h2 id="owners"><span class="sec">1.6</span>Who owns what</h2>
+
+<p>One last thing before we wrap up. At a real company, the stages you just wired together in a few minutes are owned by different teams, and each team has its own favorite metric. Knowing who owns what, and what can quietly break in each place, is half the job.</p>
+
+<div class="table-wrap"><table class="data">
+<thead><tr><th>Stage</th><th>Typical owner</th><th>Their headline metric</th><th>What can go wrong silently</th></tr></thead>
+<tbody>
+<tr><td>Eligibility & targeting</td><td>Advertiser products / delivery</td><td>Delivery correctness</td><td>Ads shown outside targeting; campaigns not spending</td></tr>
+<tr><td>Retrieval</td><td>Retrieval / candidate generation</td><td>Recall@K vs. a reference</td><td>Good ads never reach ranking</td></tr>
+<tr><td>Ranking</td><td>Ads quality / ranking</td><td>AUC, normalized entropy, calibration</td><td>Offline gains that don't move online metrics</td></tr>
+<tr><td>Auction</td><td>Marketplace / monetization</td><td>Revenue, advertiser ROI, price stability</td><td>Miscalibrated predictions becoming mispricing</td></tr>
+<tr><td>Logging & data</td><td>Data infra</td><td>Freshness, completeness</td><td>Label bugs that corrupt every model at once</td></tr>
+</tbody></table></div>
+
+<!-- ANURAG: a real (anonymized) story of a cross-team bug fits well here, e.g. a metric that looked fine for one team while another team's stage was quietly broken. -->
+
+<div class="reflect" data-id="ch1-r1">
+  <p class="q">The retrieval team wants to double the number of candidates passed to ranking. Their offline analysis says recall of the eventual winners goes from 91% to 96%. Infra estimates p99 ad-server latency goes from 140 ms to 175 ms. The budget is 200 ms. What do you want to know before you say yes?</p>
+  <div class="model">
+    <p>Here's what I'd want covered:</p>
+    <ul>
+      <li><strong>Tails, not averages.</strong> What's the p99.9, and what's the timeout rate today versus projected? Timeouts are blank slots, and blank slots are zero revenue. Are the slow requests piling up in certain markets or on older phones?</li>
+      <li><strong>Where does the recall gain turn into money?</strong> Recall of <em>winners</em> is nice, but what's the expected revenue or advertiser-value gain? Five points of recall on low-value requests is worth less than two points on high-value ones.</li>
+      <li><strong>Cost.</strong> Twice the candidates means roughly twice the ranking compute. What does that cost per day? And is there a cheaper way to get the same recall, like a better retrieval model instead of a wider funnel?</li>
+      <li><strong>Headroom for everyone else.</strong> If retrieval eats 35 ms of the budget, what's left for the next ranking-model launch? Latency is a shared budget, and somebody needs to own it.</li>
+      <li><strong>How will we know?</strong> An A/B test measuring revenue, advertiser value, and timeout rate, with latency guardrails.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>Look at you. Your stack now has a <strong>request loop</strong>: eligibility → heuristic pCTR → auction → serve. It runs on a simulated Pebble whose true click probabilities we can peek at, and we'll use that to grade every model you build from here on.</p>
+  <p>Remember that auction house that opens and shuts in 200 milliseconds? You just built one. It's a little rough around the edges (your heuristic leaves a <em>lot</em> of clicks on the table), and the auction isn't even yours yet. We'll fix that next time, when we figure out who wins and how much they pay. See ya in Chapter 2!</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Eligibility</b>Hard filters (dates, targeting, budgets, caps) applied before any model.</div>
+    <div><b>Retrieval</b>Cheap stage that cuts millions of ads down to hundreds of candidates.</div>
+    <div><b>pCTR</b>Predicted probability of a click, if the ad is shown.</div>
+    <div><b>Latency budget</b>The time the ad server has to respond; it caps model size × candidate count.</div>
+    <div><b>Recall</b>Share of the ads that should win which survive a stage.</div>
+    <div><b>Oracle</b>A simulator-only system with perfect predictions; it measures headroom.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el;
+
+  /* ---------------- funnel under a deadline (conceptual) ---------------- */
+  (function () {
+    var host = document.getElementById('w-funnel');
+    var grid = el('div', { class: 'w-grid side' }), left = el('div'), right = el('div');
+    grid.appendChild(left); grid.appendChild(right); host.appendChild(grid);
+    var sizes = ['S', 'M', 'L', 'XL', 'XXL'], lateNoise = [0.35, 0.25, 0.18, 0.13, 0.1], lateCost = [0.1, 0.2, 0.4, 0.8, 1.6];
+    var ctl = Book.controls(left, [
+      { key: 'k1', label: 'Retrieval keeps (of 20,000)', min: 100, max: 4000, step: 100, value: 1000, fmt: function (v) { return v.toLocaleString(); } },
+      { key: 'k2', label: 'Early ranker keeps', min: 10, max: 400, step: 10, value: 100 },
+      { key: 'rq', label: 'Retrieval model quality', min: 0, max: 1, step: 0.1, value: 0.5, fmt: function (v) { return Math.round(v * 100) + '%'; } },
+      { key: 'late', label: 'Late ranker size', min: 0, max: 4, step: 1, value: 1, fmt: function (v) { return sizes[v] + ' · ' + lateCost[v] + ' ms/cand'; } }
+    ], schedule);
+    var bar = el('div', { style: 'margin:6px 0 4px' });
+    right.appendChild(bar);
+    var st = Book.stats(right, [
+      { key: 'lat', label: 'Median latency', sub: 'budget 100 ms' },
+      { key: 'to', label: 'Timeouts', sub: 'no ad shown' },
+      { key: 'best', label: 'Best ad survives', sub: 'to the auction' },
+      { key: 'val', label: 'Value captured', sub: 'vs. perfect ranking, net of timeouts' }
+    ]);
+    var M = 20000, TRIALS = 10, rng = Book.rng(11);
+    var truth = [], noiseR = [], noiseE = [], noiseL = [];
+    for (var t = 0; t < TRIALS; t++) {
+      var tv = new Float64Array(M), a = new Float64Array(M), b = new Float64Array(M), c = new Float64Array(M);
+      for (var i = 0; i < M; i++) { tv[i] = rng.normal(); a[i] = rng.normal(); b[i] = rng.normal(); c[i] = rng.normal(); }
+      truth.push(tv); noiseR.push(a); noiseE.push(b); noiseL.push(c);
+    }
+    function topK(idx, score, k) {
+      if (idx.length <= k) return idx;
+      var s = idx.map(function (i) { return score(i); });
+      var sorted = Float64Array.from(s).sort();
+      var th = sorted[s.length - k];
+      var out = [];
+      for (var j = 0; j < idx.length && out.length < k; j++) if (s[j] >= th) out.push(idx[j]);
+      return out;
+    }
+    function erf(x) { var s = x < 0 ? -1 : 1; x = Math.abs(x); var t = 1 / (1 + 0.3275911 * x); var y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
+    var pending = false;
+    function schedule() { if (!pending) { pending = true; requestAnimationFrame(function () { pending = false; compute(); }); } }
+    function compute() {
+      var v = ctl.values, k1 = v.k1, k2 = Math.min(v.k2, v.k1), sR = 1.2 - 0.9 * v.rq, sE = 0.5, sL = lateNoise[v.late];
+      var all = []; for (var i = 0; i < M; i++) all.push(i);
+      var survive = 0, cap = 0;
+      for (var t = 0; t < TRIALS; t++) {
+        var tv = truth[t], nr = noiseR[t], ne = noiseE[t], nl = noiseL[t];
+        var r1 = topK(all, function (i) { return tv[i] + sR * nr[i]; }, k1);
+        var r2 = topK(r1, function (i) { return tv[i] + sE * ne[i]; }, k2);
+        var best = -1, bi = -1;
+        r2.forEach(function (i) { var s = tv[i] + sL * nl[i]; if (s > best) { best = s; bi = i; } });
+        var trueBest = -Infinity, tb = -1;
+        for (var j = 0; j < M; j++) if (tv[j] > trueBest) { trueBest = tv[j]; tb = j; }
+        if (r2.indexOf(tb) >= 0) survive++;
+        cap += Math.exp(tv[bi]) / Math.exp(trueBest);
+      }
+      var latR = 8 + 6 * v.rq + v.k1 * 0.002, latE = v.k1 * 0.012, latL = k2 * lateCost[v.late], fixed = 15;
+      var lat = latR + latE + latL + fixed;
+      var timeout = 1 - 0.5 * (1 + erf((Math.log(100) - Math.log(lat)) / (0.18 * Math.SQRT2)));
+      var captured = (cap / TRIALS) * (1 - timeout);
+      bar.innerHTML = '';
+      var W = 100 / Math.max(160, lat);
+      var segs = [['Fixed overhead', fixed, 'var(--ink-3)'], ['Retrieval', latR, 'var(--s5)'], ['Early ranking', latE, 'var(--s1)'], ['Late ranking', latL, 'var(--s4)']];
+      var track = el('div', { style: 'position:relative;height:26px;background:var(--paper-2);border-radius:6px;overflow:hidden;display:flex' });
+      segs.forEach(function (s) { track.appendChild(el('div', { title: s[0] + ': ' + s[1].toFixed(1) + ' ms', style: 'width:' + (s[1] * W) + '%;background:' + s[2] + ';opacity:.85' })); });
+      track.appendChild(el('div', { style: 'position:absolute;top:0;bottom:0;left:' + (100 * W) + '%;border-left:2px dashed var(--red)' }));
+      bar.appendChild(track);
+      var lg = el('div', { class: 'legend' });
+      segs.forEach(function (s) { lg.appendChild(el('span', null, [el('i', { style: 'background:' + s[2] }), s[0] + ' ' + s[1].toFixed(0) + ' ms'])); });
+      lg.appendChild(el('span', { style: 'color:var(--red)' }, ['┆ 100 ms budget']));
+      bar.appendChild(lg);
+      st({
+        lat: { v: lat.toFixed(0) + ' ms', tone: lat > 100 ? 'bad' : '' },
+        to: { v: Book.pct(timeout, 1), tone: timeout > 0.05 ? 'bad' : timeout < 0.01 ? 'good' : '' },
+        best: Book.pct(survive / TRIALS, 0),
+        val: { v: Book.pct(captured, 1), tone: captured > 0.85 ? 'good' : '' }
+      });
+    }
+    compute();
+  })();
+
+  /* ---------------- last month's dashboard ---------------- */
+  (function () {
+    var host = document.getElementById('w-prior');
+    var w = Stack.world(), pr = Stack.prior();
+    var c = Book.chart(host, { w: 640, h: 220, x: [-0.5, 11.5], y: [0, Math.max.apply(null, pr.catCTR) * 1.15], xticks: [], yfmt: function (v) { return (v * 100).toFixed(1) + '%'; }, ylabel: 'Top-slot CTR', margin: { b: 44 } });
+    pr.catCTR.forEach(function (v, i) {
+      c.rect(i - 0.35, 0, i + 0.35, v, { fill: StackUI.CAT_COLORS[i] });
+      Book.sv('text', { x: c.sx(i), y: c.H - 30, 'text-anchor': 'middle', text: w.categories[i].name, style: 'font-size:10.5px' }, c.top);
+      c.text(i, v, (v * 100).toFixed(1) + '%', { anchor: 'middle', dy: -5, size: 10.5 });
+    });
+    host.appendChild(el('p', { class: 'small muted', style: 'margin-top:6px', text: 'Overall: ' + Book.pct(pr.globalCTR, 2) + '. Notice how much categories differ. Gaming and Food ads get clicked far more than Finance.' }));
+  })();
+
+  /* ---------------- one request trace ---------------- */
+  (function () {
+    var host = document.getElementById('w-trace');
+    var w = Stack.world(), reqs = w.requestsForDay(0, 400, 0), i = 0, mode = 'yours';
+    var top = el('div', { class: 'btn-row' });
+    var prev = el('button', { class: 'btn secondary', type: 'button', text: '← Previous' });
+    var next = el('button', { class: 'btn', type: 'button', text: 'Next request →' });
+    top.appendChild(prev); top.appendChild(next);
+    var segHost = el('span', { style: 'margin-left:auto' }); top.appendChild(segHost);
+    Book.seg(segHost, [{ label: 'Rank by your heuristic', value: 'yours' }, { label: 'Rank by the truth', value: 'truth' }], 'yours', function (v) { mode = v; render(); });
+    host.appendChild(top);
+    var body = el('div', { style: 'margin-top:12px' });
+    host.appendChild(body);
+    prev.onclick = function () { i = (i + reqs.length - 1) % reqs.length; render(); };
+    next.onclick = function () { i = (i + 1) % reqs.length; render(); };
+    function chip(c) { return '<span class="tag" style="background:' + StackUI.CAT_COLORS[c] + '22;color:' + StackUI.CAT_COLORS[c] + '">' + w.categories[c].name + '</span>'; }
+    function render() {
+      var q = reqs[i], uv = Stack.userView(w, q), elig = Stack.impl('isEligible'), H = Stack.impl('heuristicPCTR'), pr = Stack.prior(), auction = Stack.impl('runAuction');
+      var live = w.activeAds(0), cands = live.filter(function (a) { return elig(w.ads[a], uv, 0); });
+      var rows = cands.map(function (a) {
+        var p = Math.min(1, Math.max(0, +H(w.ads[a], uv, pr) || 0)), tr = w.truth.relevance(q.user, a, q);
+        return { a: a, p: p, tr: tr, bid: w.ads[a].cpcBid };
+      });
+      var key = mode === 'yours' ? 'p' : 'tr';
+      var winners = auction(rows.map(function (r) { return { ad: r.a, bid: r.bid, pctr: r[key] }; }), 3, 0) || [];
+      var winSlot = {}; winners.forEach(function (x) { winSlot[x.ad] = x; });
+      rows.sort(function (a, b) { return b.bid * b[key] - a.bid * a[key]; });
+      var hist = uv.history.map(chip).join(' ');
+      body.innerHTML = '<div class="trace"><span class="k">request</span> #' + (i + 1) + ' · day 0, ' + String(q.hour).padStart(2, '0') + ':00 · ' + w.devices[q.device] +
+        '<br><span class="k">user</span> ' + q.user + ' · age ' + w.ages[uv.age] + ' · ' + w.countries[uv.country] +
+        '<br><span class="k">history</span> ' + hist + ' <span class="k">(most recent first)</span>' +
+        '<br><span class="k">eligible</span> ' + cands.length + ' of ' + live.length + ' live ads (' + (live.length - cands.length) + ' removed by your filter)</div>';
+      StackUI.table(body, [
+        { label: '#', get: function (r, k) { return k + 1; } },
+        { label: 'Ad', get: function (r) { return StackUI.adLabel(r.a); } },
+        { label: 'Category', get: function (r) { return chip(w.ads[r.a].category); } },
+        { label: 'Bid (CPC)', num: true, get: function (r) { return '$' + r.bid.toFixed(2); } },
+        { label: 'Your pCTR', num: true, get: function (r) { return Book.pct(r.p, 2); } },
+        { label: 'eCPM', num: true, get: function (r) { return '$' + (r.bid * r[key] * 1000).toFixed(0); } },
+        { label: 'True P(click)', num: true, get: function (r) { return '<span class="muted">' + Book.pct(r.tr, 2) + '</span>'; } },
+        { label: 'Result', get: function (r) { var x = winSlot[r.a]; return x ? '<span class="tag g">slot ' + (x.slot + 1) + ' · $' + x.price.toFixed(2) + '/click</span>' : ''; } }
+      ], rows.slice(0, 8), { rowClass: function (r) { return winSlot[r.a] ? 'win' : ''; } });
+      var bestTrue = rows.slice().sort(function (a, b) { return b.tr * b.bid - a.tr * a.bid; })[0];
+      var yourTop = rows[0];
+      body.appendChild(el('p', { class: 'small', style: 'margin-top:6px', html: mode === 'yours'
+        ? 'Sorted by <b>eCPM = bid × your pCTR</b>. The ad with the highest <em>true</em> expected value here is <b>' + StackUI.adLabel(bestTrue.a) + '</b>' + (winSlot[bestTrue.a] ? ', and your stack showed it.' : ', and your stack <b>didn\'t show it</b>.')
+        : 'Sorted by <b>bid × true P(click)</b>: what a perfect model would do.' }));
+    }
+    render();
+    document.addEventListener('stackchange', render);
+  })();
+
+  /* ---------------- serve a day ---------------- */
+  (function () {
+    var host = document.getElementById('w-day');
+    var out = el('div');
+    var btnHost = el('div');
+    host.appendChild(btnHost); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Serve day 0 (3,000 requests)', async function (progress) {
+      var mine = await Stack.simulate({ days: [0], requestsPerDay: 3000, policy: Stack.policy({ ranker: 'heuristic', calibrate: false, reserveEcpm: 0, epsilon: 0, shuffle: 0, retrieval: 'eligible', pricing: 'cpc' }), onProgress: function (p) { progress(p / 2, 'Your stack…'); }, trackOracle: true });
+      var orc = await Stack.simulate({ days: [0], requestsPerDay: 3000, policy: Stack.policy({ ranker: 'oracle', calibrate: false, reserveEcpm: 0, epsilon: 0, shuffle: 0, retrieval: 'eligible', pricing: 'cpc' }), onProgress: function (p) { progress(0.5 + p / 2, 'Oracle…'); } });
+      render(mine.summary, orc.summary);
+      var c1 = Stack.state.code.isEligible, c2 = Stack.state.code.heuristicPCTR;
+      if (c1 && c1.passed && c2 && c2.passed) { Stack.markBuilt(1, 'you'); document.dispatchEvent(new CustomEvent('stackchange')); }
+    });
+    function render(a, b) {
+      out.innerHTML = '';
+      StackUI.table(out, [
+        { label: '', key: 'k' }, { label: 'Your stack', num: true, key: 'a' }, { label: 'Oracle', num: true, key: 'b' }, { label: 'Gap', num: true, key: 'g' }
+      ], [
+        { k: 'Impressions', a: a.impressions.toLocaleString(), b: b.impressions.toLocaleString(), g: '' },
+        { k: 'Clicks', a: a.clicks.toLocaleString(), b: b.clicks.toLocaleString(), g: Book.pct(a.clicks / b.clicks - 1, 0) },
+        { k: 'CTR', a: Book.pct(a.ctr, 2), b: Book.pct(b.ctr, 2), g: '' },
+        { k: 'Revenue', a: Book.money(a.revenue, 0), b: Book.money(b.revenue, 0), g: Book.pct(a.revenue / b.revenue - 1, 0) },
+        { k: 'Expected clicks (truth)', a: a.expClicks.toFixed(0), b: b.expClicks.toFixed(0), g: Book.pct(a.expClicks / b.expClicks - 1, 0) },
+        { k: 'Conversions for advertisers', a: a.convs, b: b.convs, g: '' },
+        { k: 'Avg. eligible candidates / request', a: (a.candidates / a.requests).toFixed(0), b: (b.candidates / b.requests).toFixed(0), g: '' }
+      ]);
+      out.appendChild(el('p', { class: 'small', html: 'Your heuristic captures <b>' + Book.pct(a.expClicks / b.expClicks, 0) + '</b> of the clicks perfect predictions would get. "Expected clicks" sums the true click probabilities of what was shown, which removes the luck of the draw. You\'ll keep coming back to that gap.' }));
+    }
+  })();
+})();
+</script>
+</body>
+</html>

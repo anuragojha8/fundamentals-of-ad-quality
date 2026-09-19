@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capstone: Run the Marketplace — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+<style>
+  .game { font-family: var(--sans); }
+  .levers { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  @media (min-width: 720px) { .levers { grid-template-columns: 1fr 1fr; } }
+  .lever { background: var(--paper-2); border-radius: 10px; padding: 10px 12px; }
+  .lever .lname { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 6px; display: flex; justify-content: space-between; gap: 8px; }
+  .lever .hint { font-size: 12px; color: var(--ink-3); margin-top: 5px; }
+  .seg button:disabled { opacity: .35; cursor: not-allowed; }
+  .feed { max-height: 260px; overflow-y: auto; font-size: 13.5px; background: var(--paper-2); border-radius: 10px; padding: 8px 12px; }
+  .feed div { padding: 4px 0; border-bottom: 1px solid var(--grid); }
+  .feed .wk { font-family: var(--mono); color: var(--ink-3); margin-right: 6px; }
+  .goal { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 14px; }
+  .goal .gm { font-size: 18px; width: 1.4em; }
+  .grade { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+</style>
+</head>
+<body data-chapter="15-capstone">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 15 · Part V · The Job · Capstone</div>
+  <h1>Run the Marketplace</h1>
+  <p class="dek">In which I get the keys to the whole marketplace and try very hard not to crash it.</p>
+</header>
+
+<div class="stack-panel" data-chapter="15"></div>
+
+<p class="lead">Okay. Deep breath. You're the Ads Quality PM at Pebble, and the next quarter is yours.</p>
+
+<p>Everything you built in this book is now live: your eligibility filter, your auction, your features, your models, your retrieval, your quality penalty. All of it. Each simulated week, Pebble's world keeps moving: interests drift, new ads launch, budgets get spent, users get a little happier or a little more annoyed. You make the calls a real quality PM makes, and then you live with the results. Advertisers, users, and a finance team are all watching. No pressure. (Lots of pressure.)</p>
+
+<h2 id="rules"><span class="sec">15.1</span>How the quarter works</h2>
+
+<ul>
+  <li><strong>Each week</strong> is one simulated day of Pebble traffic, served by your stack with whatever levers you've set. The world jumps forward five days per week, so drift is very real.</li>
+  <li><strong>Advertisers have budgets.</strong> They're sized from a pre-season week, so the bigger spenders will run into them. Once an advertiser's budget runs out, it stops bidding for the rest of the day, unless <strong>pacing</strong> spreads its spend out.</li>
+  <li><strong>Advertisers leave</strong> if their return on ad spend (conversion value ÷ spend) stays below 0.85 for three weeks in a row. Overcharge people and they walk. Just like real life.</li>
+  <li><strong>Users react slowly.</strong> Pebble's active users grow about 1% a week on their own, and shrink with ad load and hides (the Chapter 14 toy model, with Pebble's estimated sensitivity: weekly loss = 0.4% × ad slots + 40% × hides per request). Fewer users next week means less traffic to monetize.</li>
+  <li><strong>You're graded against autopilot.</strong> A shadow Pebble runs the exact same weeks with the default levers (heuristic ranker, 3 ad slots, no pacing, no penalties). Your job: beat it on revenue, users, and advertiser value, without losing more advertisers than it does. It's the same logic as a long-term holdout, which you now know all about.</li>
+  <li><strong>Everything is measured against the truth</strong>: expected revenue, conversions, and hides, not noisy coin flips. Real life will not be this kind to you. Enjoy it.</li>
+</ul>
+
+<div class="widget game" id="game">
+  <div class="w-title">Pebble · Q3 · Ads Quality</div>
+  <div class="w-sub">Set your levers, then run the week. You can change levers between weeks.</div>
+</div>
+
+<h2 id="debrief"><span class="sec">15.2</span>After the quarter</h2>
+
+<p>How'd it go? However it went, every lever in that game is one you've studied, and almost all of them trade something now for something later. Here are some patterns strong players tend to find:</p>
+<ul>
+  <li><strong>Calibration is an advertiser-retention problem.</strong> Switching to oCPM with a miscalibrated pCVR can juice revenue early and quietly lose you advertisers a few weeks later (Chapters 3 and 12).</li>
+  <li><strong>Budgets cap revenue.</strong> Once advertisers hit their budgets, a better ranker shows up more as advertiser value than as revenue. Pacing rarely hurts, and it helps most when budgets really bind (Chapter 2's thin evening markets).</li>
+  <li><strong>Stale models decay quietly.</strong> Warm-start retraining on recent weeks keeps your model honest as the world drifts (Chapter 13).</li>
+  <li><strong>Ad load is a slow-motion tradeoff.</strong> An extra slot wins every single week-one revenue comparison, and sends the bill to user health (Chapter 14).</li>
+  <li><strong>The first bit of quality penalty is often free</strong> (Chapter 14). And exploration is an investment whose returns only land if something learns from it (Chapter 5).</li>
+</ul>
+
+<p>If you didn't win on your first try, good. That means the game is doing its job. Change one lever at a time, and watch which metric actually moves. That habit, more than any model, is the job.</p>
+
+<div class="reflect" data-id="ch15-r1">
+  <p class="q">Write your end-of-quarter review for Pebble's leadership, in five bullet points: what you changed, what happened to revenue, advertisers, and users, what you'd do differently, and what you'd put on next quarter's roadmap.</p>
+  <div class="model">
+    <p>A strong review is short, quantified, and honest about tradeoffs. Something like:</p>
+    <ul>
+      <li><strong>What we did:</strong> shipped the LR ranker with weekly warm-start retraining, turned on budget pacing in week 2, and set a λ = 1 hide penalty.</li>
+      <li><strong>Revenue:</strong> +X% vs. the autopilot holdout over the quarter; most of the gain came after retraining kicked in (weeks 3–12).</li>
+      <li><strong>Advertisers:</strong> N of M retained, vs. M′ on autopilot. Two churned in weeks 4–5 after we tested oCPM; we rolled back in week 6. Root cause: pCVR miscalibration for slow-converting verticals (delayed feedback).</li>
+      <li><strong>Users:</strong> active-user index +Y% vs. autopilot. Hides −10% after the quality penalty; ad load held at 3.</li>
+      <li><strong>Next quarter:</strong> delay-corrected pCVR before retrying oCPM; a long-term holdout for ad load; more exploration budget to feed the deep ranker's data needs.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>You built an ad system</h3>
+  <p>Remember Chapter 1? A tiny auction house that opened and closed in 200 milliseconds, running on a hand-written guess. Look at it now: a retrained, calibrated, quality-aware, two-stage ranking stack with retrieval and conversion bidding. And you built every piece of it.</p>
+  <p>More importantly, you know where each piece breaks, and how to tell. That's the actual job. Next time you're in a model review and someone says "calibration went up," you won't just write it down and hope nobody asks a follow-up question. You'll be the one asking it.</p>
+  <p>Appendix B collects every question from along the way, so you can bring them to your next review. Thanks for building this with me. Now go vibe with your marketplace. See ya!</p>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world(), host = document.getElementById('game');
+  var WEEKS = 12, RPD = 2500;
+  var AUTOPILOT = { ranker: 'heuristic', retrieval: 'eligible', pricing: 'cpc', epsilon: 0, reserve: 0, lambda: 0, adLoad: 3, pacing: false, retrain: false };
+  var G = null;
+
+  function has(name) { return Stack.hasModel(name); }
+  // One simulated "Pebble": the player's, or the autopilot shadow.
+  function newPebble() { return { userIndex: 1, churned: new Set(), lowRoi: {}, throttle: {}, stats: null, lr: Stack.getModel('lr') || null, history: [] }; }
+  function fresh() {
+    var s = Stack.state.settings;
+    return {
+      week: 0, you: newPebble(), auto: newPebble(), limit: null, events: [], startAdvertisers: 0, over: false,
+      lev: {
+        ranker: s.ranker === 'deep' && has('deep') ? 'deep' : s.ranker === 'lr' && has('lr') ? 'lr' : 'heuristic',
+        retrieval: s.retrieval === 'twotower' && has('twotower') ? 'twotower' : 'eligible',
+        pricing: s.pricing === 'ocpm' && has('esmm') ? 'ocpm' : 'cpc',
+        epsilon: s.epsilon || 0, reserve: s.reserveEcpm || 0, lambda: has('phide') ? (s.hideLambda || 0) : 0,
+        adLoad: s.adLoad || 3, pacing: false, retrain: s.retrainEvery > 0 && s.retrainEvery <= 7
+      }
+    };
+  }
+
+  /* ---------------- layout ---------------- */
+  var top = el('div'), levHost = el('div', { class: 'levers', style: 'margin:12px 0' }), runRow = el('div'), charts = el('div', { class: 'w-grid two', style: 'margin-top:14px' }), feedHost = el('div'), endHost = el('div');
+  host.appendChild(top); host.appendChild(levHost); host.appendChild(runRow); host.appendChild(charts); host.appendChild(feedHost); host.appendChild(endHost);
+  var stats = Book.stats(top, [
+    { key: 'wk', label: 'Week' }, { key: 'rev', label: 'Revenue vs. autopilot', sub: 'quarter to date' },
+    { key: 'users', label: 'Users vs. autopilot', sub: 'active-user index' }, { key: 'val', label: 'Advertiser value vs. autopilot', sub: 'conversion value' },
+    { key: 'adv', label: 'Advertisers active' }
+  ]);
+  var cL = el('div'), cR = el('div'); charts.appendChild(cL); charts.appendChild(cR);
+  var ch1 = Book.chart(cL, { w: 420, h: 220, x: [0.5, WEEKS + 0.5], y: [0, 1], xticks: [1, 3, 5, 7, 9, 11], xlabel: 'Week', ylabel: 'Weekly revenue', yfmt: function (v) { return '$' + Math.round(v); } });
+  Book.legend(cL, [{ label: 'You', color: 'var(--s1)' }, { label: 'Autopilot', color: 'var(--ink-3)', dash: true }]);
+  var ch2 = Book.chart(cR, { w: 420, h: 220, x: [0.5, WEEKS + 0.5], y: [0.8, 1.15], xticks: [1, 3, 5, 7, 9, 11], xlabel: 'Week', ylabel: 'Active users (start = 1)', yfmt: function (v) { return v.toFixed(2); } });
+  Book.legend(cR, [{ label: 'You', color: 'var(--s1)' }, { label: 'Autopilot', color: 'var(--ink-3)', dash: true }]);
+
+  function lever(title, options, key, hint) {
+    var box = el('div', { class: 'lever' });
+    box.appendChild(el('div', { class: 'lname' }, [title]));
+    var segEl = Book.seg(box, options.map(function (o) { return { label: o[1], value: o[0] }; }), G.lev[key], function (v) { G.lev[key] = v; });
+    options.forEach(function (o, i) { if (o[2] === false) { segEl.children[i].disabled = true; segEl.children[i].title = o[3] || 'Not built yet'; } });
+    if (hint) box.appendChild(el('div', { class: 'hint', html: hint }));
+    levHost.appendChild(box);
+  }
+  function renderLevers() {
+    levHost.innerHTML = '';
+    lever('Ranker', [['heuristic', 'Heuristic'], ['lr', 'Your LR', has('lr'), 'Train in Ch. 7'], ['deep', 'Wide & deep', has('deep'), 'Train in Ch. 11']], 'ranker');
+    lever('Retrieval', [['eligible', 'All eligible'], ['twotower', 'Two-tower top-40', has('twotower'), 'Train in Ch. 10']], 'retrieval');
+    lever('Bidding', [['cpc', 'CPC'], ['ocpm', 'oCPM (your pCVR)', has('esmm'), 'Train in Ch. 12']], 'pricing', 'oCPM prices with CPA × pCTR × pCVR.');
+    lever('Exploration', [[0, '0%'], [0.02, '2%'], [0.05, '5%'], [0.1, '10%']], 'epsilon', 'Explored impressions are served free.');
+    lever('Reserve (eCPM)', [[0, 'None'], [5, '$5'], [10, '$10'], [20, '$20']], 'reserve');
+    lever('Hide penalty λ', [[0, '0'], [1, '1', has('phide'), 'Train pHide in Ch. 14'], [2, '2', has('phide')], [4, '4', has('phide')]], 'lambda');
+    lever('Ad load', [[1, '1 slot'], [2, '2 slots'], [3, '3 slots']], 'adLoad');
+    lever('Budget pacing', [[false, 'Off'], [true, 'On']], 'pacing', 'Throttles each advertiser so its budget lasts the day.');
+    lever('Retrain your LR weekly', [[false, 'No'], [true, 'Yes (warm start)', has('lr')]], 'retrain', 'Fine-tunes your Ch. 7 model on the last 4 weeks of logs.');
+  }
+
+  function log(msg, tone) { G.events.push({ w: G.week, msg: msg, tone: tone }); renderFeed(); }
+  function renderFeed() {
+    feedHost.innerHTML = '';
+    if (!G.events.length) return;
+    feedHost.appendChild(el('h3', { text: 'What happened (your Pebble)', style: 'font-size:14px;margin:16px 0 6px' }));
+    var f = el('div', { class: 'feed' });
+    G.events.slice().reverse().forEach(function (e) { f.appendChild(el('div', { html: '<span class="wk">W' + e.w + '</span><span class="' + (e.tone === 'bad' ? 'neg' : e.tone === 'good' ? 'pos' : '') + '">' + e.msg + '</span>' })); });
+    feedHost.appendChild(f);
+  }
+  function tot(P, k) { return P.history.reduce(function (a, h) { return a + h[k]; }, 0); }
+  function rel(a, b) { return b ? a / b - 1 : 0; }
+  function renderCharts() {
+    var A = G.you.history, B = G.auto.history;
+    ch1.clear(); ch2.clear();
+    if (!A.length) return;
+    var mx = Math.max.apply(null, A.concat(B).map(function (h) { return h.rev; })) * 1.15;
+    ch1.setDomain(null, [0, mx]);
+    A.forEach(function (h) { ch1.rect(h.week - 0.35, 0, h.week + 0.35, h.rev, { fill: 'var(--s1)' }); });
+    ch1.line(B.map(function (h) { return [h.week, h.rev]; }), { color: 'var(--ink-3)', dash: '5 4', top: true });
+    var lo = Math.min.apply(null, A.concat(B).map(function (h) { return h.users; }).concat([0.95])) - 0.03;
+    ch2.setDomain(null, [lo, Math.max(1.1, Math.max.apply(null, A.map(function (h) { return h.users; })) + 0.03)]);
+    ch2.line([[0.5, 1]].concat(A.map(function (h) { return [h.week, h.users]; })), { color: 'var(--s1)' });
+    ch2.line([[0.5, 1]].concat(B.map(function (h) { return [h.week, h.users]; })), { color: 'var(--ink-3)', dash: '5 4' });
+  }
+  function renderStats() {
+    var Y = G.you, A = G.auto, fmt = function (x) { return { v: Book.signed(100 * x, 1, '%'), tone: x > 0.002 ? 'good' : x < -0.002 ? 'bad' : '' }; };
+    stats({
+      wk: G.week + ' / ' + WEEKS,
+      rev: Y.history.length ? fmt(rel(tot(Y, 'rev'), tot(A, 'rev'))) : '—',
+      users: Y.history.length ? fmt(rel(Y.userIndex, A.userIndex)) : '—',
+      val: Y.history.length ? fmt(rel(tot(Y, 'value'), tot(A, 'value'))) : '—',
+      adv: { v: (G.startAdvertisers - Y.churned.size) + ' / ' + G.startAdvertisers, tone: Y.churned.size > A.churned.size ? 'bad' : '' }
+    });
+  }
+
+  /* ---------------- simulation ---------------- */
+  function policyFor(lev, P) {
+    var over = { ranker: lev.ranker, retrieval: lev.retrieval, retrievalK: 40, pricing: lev.pricing, cvrModel: 'esmm', epsilon: lev.epsilon, shuffle: 0, reserveEcpm: lev.reserve, hideLambda: lev.lambda, adLoad: lev.adLoad, calibrate: false };
+    var pol = Stack.policy(over);
+    if (lev.ranker === 'lr' && P && P.lr && P.lr !== Stack.getModel('lr')) pol.ranker = Stack.lrRanker(P.lr);
+    return pol;
+  }
+  // Advance one Pebble by one week. `say` logs events (only for the player's Pebble).
+  async function step(P, lev, day, progress, say) {
+    var budgets = { limit: G.limit, churned: P.churned, throttle: lev.pacing ? P.throttle : null, spend: {} };
+    if (lev.pacing) Object.keys(G.limit).forEach(function (a) { if (P.throttle[a] == null) P.throttle[a] = 1; });
+    var rpd = Math.round(RPD * P.userIndex);
+    var l = await Stack.simulate({ days: [day], requestsPerDay: rpd, stream: 7, policy: policyFor(lev, P), stats: P.stats, budgets: budgets, logFeatures: lev.retrain, onProgress: progress });
+    P.stats = l.stats;
+    var s = l.summary, exhausted = 0;
+    Object.keys(l.advStats).forEach(function (a) {
+      a = +a; var st = l.advStats[a];
+      if (budgets.spend[a] >= G.limit[a] * 0.98) exhausted++;
+      if (lev.pacing) { var sp = budgets.spend[a] || 0; P.throttle[a] = Math.max(0.05, Math.min(1, P.throttle[a] * (sp > 0 ? Math.min(1.5, G.limit[a] / sp) : 1.2))); }
+      if (st.expSpend < 0.5) return;
+      var roi = st.expValue / st.expSpend;
+      if (roi < 0.85) { P.lowRoi[a] = (P.lowRoi[a] || 0) + 1; if (say && P.lowRoi[a] === 1) say(w.advertisers[a].name + ' (' + w.categories[w.advertisers[a].category].name + ') got only ' + roi.toFixed(2) + '× return on spend this week.', 'bad'); }
+      else P.lowRoi[a] = 0;
+      if (P.lowRoi[a] >= 3 && !P.churned.has(a)) { P.churned.add(a); if (say) say(w.advertisers[a].name + ' paused all campaigns after three weeks losing money on Pebble.', 'bad'); }
+    });
+    var hpr = s.expHides / Math.max(1, s.requests), prev = P.userIndex;
+    P.userIndex *= 1.01 - (0.004 * lev.adLoad + 0.4 * hpr);
+    if (say && exhausted >= 3 && !lev.pacing) say(exhausted + ' advertisers ran out of budget before the day ended. Evening auctions ran thin.');
+    // Warm-start retraining (Ch. 13): fine-tune your Ch. 7 model on a rolling window of the last 4 weeks.
+    if (lev.retrain && lev.ranker === 'lr' && P.lr) {
+      P.window = (P.window || []).concat([Stack.labeledRows(l)]).slice(-4);
+      P.lr = await Stack.trainLR({ rows: [].concat.apply([], P.window), epochs: 1, lr: 0.02, init: Stack.getModel('lr').w, decay: true });
+    }
+    P.history.push({ week: G.week, rev: s.expRevenue, value: s.expValue, users: P.userIndex, hides: s.expHides, exhausted: exhausted, calib: s.calibration, lev: lev });
+    return { s: s, prevUsers: prev };
+  }
+
+  async function setup(progress) {
+    G = fresh();
+    renderLevers();
+    progress(0.1, 'Pre-season week: sizing advertiser budgets…');
+    var pre = await Stack.simulate({ days: [11], requestsPerDay: RPD, stream: 7, policy: policyFor(AUTOPILOT, null), logFeatures: false, onProgress: function (p) { progress(0.1 + 0.85 * p, 'Pre-season week…'); } });
+    var spenders = Object.keys(pre.advStats).map(Number).filter(function (a) { return pre.advStats[a].spend > 0.5; });
+    var ranked = spenders.slice().sort(function (a, b) { return w.advertisers[a].dailyBudget - w.advertisers[b].dailyBudget; });
+    G.limit = {};
+    // Budgets: each spender gets 0.9×–1.9× its pre-season spend, ranked by its nominal budget.
+    ranked.forEach(function (a, i) { G.limit[a] = pre.advStats[a].spend * (0.9 + 1.0 * i / Math.max(1, ranked.length - 1)); });
+    w.advertisers.forEach(function (x) { if (G.limit[x.id] == null) G.limit[x.id] = 20; });
+    G.you.stats = pre.stats; G.auto.stats = pre.stats;
+    G.startAdvertisers = spenders.length;
+    log('Pre-season: ' + spenders.length + ' advertisers spending. A shadow Pebble on autopilot (heuristic ranker, 3 slots, no pacing, no penalties) will run the same weeks beside you.');
+    renderStats(); renderCharts();
+  }
+
+  async function runWeek(progress) {
+    var lev = Object.assign({}, G.lev), day = 12 + 5 * G.week;
+    G.week++;
+    var r = await step(G.you, lev, day, function (p) { progress(0.05 + 0.55 * p, 'Week ' + G.week + ': your Pebble…'); }, log);
+    await step(G.auto, AUTOPILOT, day, function (p) { progress(0.6 + 0.4 * p, 'Week ' + G.week + ': autopilot…'); }, null);
+    var Y = G.you.history[G.you.history.length - 1], A = G.auto.history[G.auto.history.length - 1];
+    if (G.you.userIndex < r.prevUsers - 0.005) log('Active users fell ' + Book.pct(1 - G.you.userIndex / r.prevUsers, 1) + ' this week (ad load ' + lev.adLoad + ', ' + (1000 * Y.hides / r.s.requests).toFixed(1) + ' hides per 1,000 requests).', 'bad');
+    log('Revenue ' + Book.signed(100 * rel(Y.rev, A.rev), 1, '%') + ' vs. autopilot this week; advertiser value ' + Book.signed(100 * rel(Y.value, A.value), 1, '%') + '.', Y.rev >= A.rev ? 'good' : '');
+    renderStats(); renderCharts();
+    if (G.week >= WEEKS) finish();
+  }
+
+  function finish() {
+    G.over = true;
+    var Y = G.you, A = G.auto, H = Y.history;
+    var dRev = rel(tot(Y, 'rev'), tot(A, 'rev')), dUsers = rel(Y.userIndex, A.userIndex), dVal = rel(tot(Y, 'value'), tot(A, 'value'));
+    var ret = (G.startAdvertisers - Y.churned.size) / G.startAdvertisers;
+    var goals = [
+      { ok: dRev > 0, t: 'Beat autopilot on quarter revenue', v: Book.signed(100 * dRev, 1, '%') },
+      { ok: dUsers > 0, t: 'Beat autopilot on active users at quarter end', v: Book.signed(100 * dUsers, 1, '%') },
+      { ok: dVal > 0, t: 'Beat autopilot on advertiser conversion value', v: Book.signed(100 * dVal, 1, '%') },
+      { ok: Y.churned.size <= A.churned.size, t: 'Lose no more advertisers than autopilot', v: Y.churned.size + ' vs. ' + A.churned.size }
+    ];
+    var n = goals.filter(function (g) { return g.ok; }).length;
+    var titles = ['Intern, again', 'Associate PM', 'Ads Quality PM', 'Senior PM, Marketplace', 'Head of Ads Quality'];
+    endHost.innerHTML = '';
+    var box = el('div', { style: 'margin-top:18px;border-top:1px solid var(--rule);padding-top:14px' });
+    box.appendChild(el('div', { class: 'grade', text: n + ' / 4 goals: ' + titles[n] }));
+    goals.forEach(function (g) { box.appendChild(el('div', { class: 'goal' }, [el('span', { class: 'gm ' + (g.ok ? 'pos' : 'neg'), text: g.ok ? '✓' : '✗' }), el('span', { style: 'flex:1', text: g.t }), el('b', { class: 'sans', text: String(g.v) })])); });
+    var tips = [], used = function (k, v) { return H.some(function (h) { return h.lev[k] === v; }); };
+    if (Y.churned.size > A.churned.size && used('pricing', 'ocpm')) tips.push('You lost advertisers while oCPM was on. Your pCVR likely overcharged some verticals (Ch. 12: calibration and delayed feedback).');
+    if (Y.churned.size > A.churned.size && H.some(function (h) { return h.lev.reserve >= 20; })) tips.push('High reserves priced some advertisers out (Ch. 2).');
+    if (H.some(function (h) { return !h.lev.pacing && h.exhausted >= 3; })) tips.push('Budgets ran out mid-day in weeks without pacing (Ch. 2).');
+    if (dUsers < 0) tips.push('Your users fell behind autopilot. Ad load and hides compound week over week (Ch. 14).');
+    if (dRev < 0 && H.some(function (h) { return h.lev.adLoad < 3; })) tips.push('Fewer ad slots cost revenue now, and users only recover slowly. Within one quarter it rarely pays back in revenue alone. That\'s the short-vs-long-term tension from Ch. 14. A hide penalty often buys user health more cheaply.');
+    if (H.some(function (h) { return h.lev.ranker === 'lr' && !h.lev.retrain; }) && H.length > 6) tips.push('Your LR ran unretrained while the world drifted (Ch. 13).');
+    if (!H.some(function (h) { return h.lev.lambda > 0; }) && has('phide')) tips.push('You never used the hide penalty. Its first units are usually free (Ch. 14).');
+    var avgEps = Stack.mean(H.map(function (h) { return h.lev.epsilon; }));
+    if (avgEps >= 0.05) tips.push('Exploration averaged ' + Math.round(100 * avgEps) + '% of traffic, served free: a direct revenue cost this quarter, repaid only when models learn from it (weekly retraining ' + (used('retrain', true) ? 'was on' : 'was off') + ').');
+    if (H.some(function (h) { return h.exhausted >= 5; })) tips.push('Several advertisers hit their budgets. When budgets bind, better ranking shows up more in advertiser value than in revenue.');
+    if (!tips.length) tips.push('A clean quarter. Try a harder run: change one lever at a time, and see which ones actually moved each metric.');
+    box.appendChild(el('h3', { text: 'Debrief', style: 'font-size:15px;margin:14px 0 6px' }));
+    var ul = el('ul', { class: 'small' }); tips.forEach(function (t) { ul.appendChild(el('li', { text: t })); }); box.appendChild(ul);
+    endHost.appendChild(box);
+    if (n >= 3) Book.solve('capstone-3goals');
+    runRow.querySelector('button').textContent = 'Play another quarter';
+  }
+
+  /* ---------------- controls ---------------- */
+  Book.requireCheck('capstone-3goals');
+  var started = false;
+  StackUI.asyncButton(runRow, 'Start the quarter', async function (progress) {
+    if (!started || G.over) {
+      endHost.innerHTML = ''; await setup(progress); started = true;
+      runRow.querySelector('button').textContent = 'Run week 1 →';
+      return;
+    }
+    await runWeek(progress);
+    if (!G.over) runRow.querySelector('button').textContent = 'Run week ' + (G.week + 1) + ' →';
+  }, { busy: 'Simulating…' });
+  runRow.appendChild(el('p', { class: 'small muted', style: 'margin-top:6px', text: 'Goal: beat the autopilot Pebble on at least 3 of 4 goals to complete the book.' }));
+  G = fresh(); renderLevers(); renderStats();
+})();
+</script>
+</body>
+</html>

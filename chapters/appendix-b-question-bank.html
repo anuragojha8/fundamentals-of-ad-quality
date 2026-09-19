@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Model Review Question Bank — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<style>
+  .qb h2 { font-size: 24px; }
+  .qb ol { font-size: 17.5px; }
+  .qb li { margin: .5em 0; }
+  .qb li .why { display: block; font-family: var(--sans); font-size: 13.5px; color: var(--ink-3); margin-top: 2px; }
+</style>
+</head>
+<body data-chapter="appendix-b-question-bank">
+<main class="chapter qb">
+<header class="chapter-head">
+  <div class="kicker">Appendix B</div>
+  <h1>The Model Review Question Bank</h1>
+  <p class="dek">In which I hand you a cheat sheet for every model review you'll ever sit in.</p>
+</header>
+
+<p class="lead">Here's the secret to looking smart in a model review: you don't need to know all the answers. You just need to ask the right two or three questions. These are those questions, organized by the meeting you'll be in when you need them. Each one names the chapter where you watched the failure it guards against happen in your own stack. Please don't ask all of them at once. People will stop inviting you to meetings.</p>
+
+<h2 id="labels">Labels and data</h2>
+<ol>
+  <li>What exactly is the label, and who signed off on its definition? <span class="why">Label choice is a product decision (Ch. 5).</span></li>
+  <li>How is the label joined: on what key, with what click and attribution windows, and as of when? <span class="why">Join bugs and immature labels (Ch. 4).</span></li>
+  <li>How much of the training data comes from exploration, and how much from the current model's own choices? <span class="why">Exposure bias caps what a model can learn (Ch. 5, 9, 10).</span></li>
+  <li>Are features logged at serve time, or recomputed? If recomputed, what's the measured skew? <span class="why">Train/serve skew and leakage (Ch. 4, 6).</span></li>
+  <li>Are negatives downsampled? Is the correction applied in serving, and is evaluation done on unsampled data? <span class="why">q = p / (p + (1−p)/w) (Ch. 4).</span></li>
+  <li>For conversions: what's the delay distribution, and how are immature labels handled? <span class="why">Delayed feedback under-predicts slow verticals (Ch. 12).</span></li>
+</ol>
+
+<h2 id="features">Features</h2>
+<ol>
+  <li>Can every feature be computed at serve time, within the latency budget, with the same freshness it had in training? <span class="why">Ch. 1, 4, 6.</span></li>
+  <li>Does any feature aggregate over a window that overlaps the label? <span class="why">The classic leak (Ch. 6).</span></li>
+  <li>What does the ablation table say, and what does each feature cost to own? <span class="why">Diminishing returns (Ch. 6).</span></li>
+  <li>How do new ads, advertisers, and users look to this model: which features are empty for them? <span class="why">Cold start (Ch. 6, 10, 13).</span></li>
+</ol>
+
+<h2 id="offline">Offline evaluation</h2>
+<ol>
+  <li>Is evaluation on data from <em>after</em> the training window? <span class="why">Random splits flatter models (Ch. 9).</span></li>
+  <li>What's the change in NE and calibration, not just AUC? <span class="why">AUC ignores calibration, and the auction prices with calibration (Ch. 3, 9).</span></li>
+  <li>What's within-request (GAUC) performance? <span class="why">Global AUC includes comparisons the auction never makes (Ch. 8, 11).</span></li>
+  <li>Show me calibration by advertiser size, vertical, bid type, country, and ad age. <span class="why">Non-uniform miscalibration is a transfer of money (Ch. 3).</span></li>
+  <li>How does the model behave on candidates the current system rarely shows? <span class="why">The offline–online gap (Ch. 9).</span></li>
+  <li>Is the gain "too good to be true"? <span class="why">Offline wins above expectation are leaks until proven otherwise (Ch. 6).</span></li>
+</ol>
+
+<h2 id="online">Online experiments</h2>
+<ol>
+  <li>What's the minimum detectable effect, and have you run an A/A test at this size? <span class="why">Noise floors (Ch. 9).</span></li>
+  <li>What are the guardrails (advertiser value, hides, latency, timeouts), and what are the stop conditions? <span class="why">Ch. 9, 14.</span></li>
+  <li>Did CTR and conversions move in the same direction? If not, why? <span class="why">Click-optimized models can trade conversions for clicks (Ch. 9, 12).</span></li>
+  <li>How long is the test, and which effects are too slow for it to see (advertiser budgets, user retention)? <span class="why">Ch. 2, 14.</span></li>
+  <li>Is there a long-term holdout for anything that changes ad load or quality thresholds? <span class="why">Ch. 14.</span></li>
+</ol>
+
+<h2 id="auction">Auction and pricing</h2>
+<ol>
+  <li>How does this change affect prices, per advertiser? <span class="why">Predictions are prices (Ch. 3).</span></li>
+  <li>Are CPC, CPM, and oCPM advertisers affected differently? <span class="why">Uniform miscalibration still shifts delivery between bid types (Ch. 3).</span></li>
+  <li>For conversion bidding: what's CPA adherence, actual vs. target, by vertical? <span class="why">Ch. 12.</span></li>
+  <li>Does a reserve change consider thin segments separately from thick ones? <span class="why">Ch. 2.</span></li>
+</ol>
+
+<h2 id="systems">Architecture, cost, and operations</h2>
+<ol>
+  <li>Which stage of the funnel does this improve, and how many candidates will it see? <span class="why">Late-stage wins can't fix retrieval recall (Ch. 1, 10).</span></li>
+  <li>What's the p99 latency impact and the serving cost per 1,000 requests? <span class="why">Ch. 1, 11.</span></li>
+  <li>Does a bigger model have the data to beat the current one? <span class="why">Ch. 11.</span></li>
+  <li>What's the retraining cadence, is it warm or cold, and what validation gates run before each deploy? <span class="why">Ch. 13.</span></li>
+  <li>How fast does calibration drift between retrains, and is there a frequently refreshed calibration layer? <span class="why">Ch. 3, 13.</span></li>
+  <li>If this model retrains on its own logs, what keeps the feedback loop from narrowing it? <span class="why">Exploration (Ch. 5).</span></li>
+</ol>
+
+<h2 id="strategy">Strategy and roadmap</h2>
+<ol>
+  <li>What does this do to users over a year, not a week? <span class="why">Ch. 14.</span></li>
+  <li>Who pays for exploration, and how do we know it's paying back? <span class="why">Ch. 5.</span></li>
+  <li>Which stakeholder loses if this ships: advertisers, users, or Pebble? Have we said so explicitly? <span class="why">Ch. 14.</span></li>
+  <li>What would we need to believe for this to be the most valuable thing on the roadmap? <span class="why">Every chapter.</span></li>
+</ol>
+
+</main>
+</body>
+</html>

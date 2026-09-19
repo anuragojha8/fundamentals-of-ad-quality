@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retrieval — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="10-retrieval">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 10 · Part IV · The Models</div>
+  <h1>Retrieval</h1>
+  <p class="dek">In which I find a handful of needles in a haystack of three million ads, in two milliseconds, blindfolded.</p>
+</header>
+
+<div class="stack-panel" data-chapter="10"></div>
+
+<p class="lead">Let me point out something slightly embarrassing about your stack. For every single request, it scores <em>every</em> eligible ad. About 150 of them. That only works because simulated Pebble is small and cozy.</p>
+
+<p>Real inventory is millions of ads. And that logistic regression you shipped in Chapter 9 costs microseconds per candidate, which sounds tiny until you multiply it by three million. Remember Chapter 1's funnel, the one I said you'd need someday? Someday is today. In this chapter we build the stage that picks a short list: a <dfn>two-tower</dfn> retrieval model, the workhorse of basically every modern recommendation and ads system.</p>
+
+<h2 id="towers"><span class="sec">10.1</span>Two towers and a dot product</h2>
+
+<p>Here's the constraint that shapes everything about retrieval: you cannot run a model over every (user, ad) pair on every request. You just can't. So how would you design around that? Give it a second.</p>
+
+<p>The two-tower trick is beautifully simple: <strong>split the model so the user side and the ad side never meet until the very last step</strong>.</p>
+
+<ul>
+  <li>A <strong>user tower</strong> turns everything about the user and context into a vector \(u\): history, demographics, and so on.</li>
+  <li>An <strong>ad tower</strong> turns everything about the ad into a vector \(a\): its ID, category, and advertiser.</li>
+  <li>The score is just their <strong>dot product</strong>, \(s = u \cdot a\).</li>
+</ul>
+
+<p>Here's why that's so clever. Since the ad tower never looks at the user, you can compute every ad's vector <em>ahead of time</em> and stash them all in an index. Then at request time, you compute one user vector and ask the index, "which ads have the biggest dot product with this?" That's called <dfn>maximum inner product search</dfn>, and <dfn>approximate nearest neighbour</dfn> (ANN) libraries like FAISS, ScaNN, and HNSW can answer it over millions of vectors in a millisecond or two. Pretty neat, right?</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 240" role="img" aria-label="Two-tower model: user features to user tower to user vector; ad features to ad tower to ad vectors stored in an index; dot product top-K">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <rect x="20" y="30" width="150" height="50" rx="10" class="box"/><text x="95" y="52" text-anchor="middle" class="t-md t-b">User + context</text><text x="95" y="68" text-anchor="middle" class="t-sm">history, age, device</text>
+  <rect x="210" y="30" width="130" height="50" rx="10" class="box b"/><text x="275" y="60" text-anchor="middle" class="t-md t-b">User tower</text>
+  <rect x="380" y="30" width="80" height="50" rx="10" class="box a"/><text x="420" y="60" text-anchor="middle" class="t-md t-b">u</text>
+  <rect x="20" y="150" width="150" height="50" rx="10" class="box"/><text x="95" y="172" text-anchor="middle" class="t-md t-b">Ad</text><text x="95" y="188" text-anchor="middle" class="t-sm">ID, category, advertiser</text>
+  <rect x="210" y="150" width="130" height="50" rx="10" class="box g"/><text x="275" y="180" text-anchor="middle" class="t-md t-b">Ad tower</text>
+  <rect x="380" y="140" width="110" height="70" rx="10" class="box v"/><text x="435" y="168" text-anchor="middle" class="t-md t-b">Ad index</text><text x="435" y="185" text-anchor="middle" class="t-sm">precomputed</text><text x="435" y="199" text-anchor="middle" class="t-sm">offline</text>
+  <rect x="540" y="85" width="200" height="70" rx="10" class="box a"/><text x="640" y="113" text-anchor="middle" class="t-md t-b">Top-K by u · a</text><text x="640" y="131" text-anchor="middle" class="t-sm">ANN search, ~1–2 ms</text><text x="640" y="145" text-anchor="middle" class="t-sm">→ ranking (Ch. 7, 11)</text>
+  <path class="arrow" d="M170,55 H208"/><path class="arrow" d="M340,55 H378"/><path class="arrow" d="M170,175 H208"/><path class="arrow" d="M340,175 H378"/>
+  <path class="arrow" d="M460,55 C500,55 510,95 538,105"/><path class="arrow" d="M490,175 C520,175 520,140 538,135"/>
+  <text x="275" y="118" text-anchor="middle" class="t-sm">the towers never see each other's inputs</text>
+</svg>
+<figcaption>The two-tower architecture. The price of the split: the model can't use any feature that combines the user and the ad, like "has this user clicked this advertiser before." Those cross features belong in ranking (Chapter 11).</figcaption>
+</figure>
+
+<div class="quiz" data-id="ch10-q1">
+  <p class="q">Why can't a two-tower retrieval model use the feature "user's past CTR on this advertiser"?</p>
+  <ul>
+    <li data-why="It's a fine feature for a ranking model.">It's leaky</li>
+    <li data-correct>It depends on both the user and the ad, so it can't be computed in either tower alone, and the ad vectors couldn't be precomputed</li>
+    <li data-why="It isn't too large; the issue is structural.">It's too big to store</li>
+    <li data-why="Dot products can represent many relationships; the problem is where the feature lives.">Dot products can't use numeric features</li>
+  </ul>
+  <div class="explain"><p>Every input has to live in exactly one tower, and a (user, ad) pair feature doesn't belong to either. That's the fundamental accuracy-for-speed deal you make with two-tower models, and it's why retrieval is always followed by a ranking model that <em>can</em> look at the pair.</p></div>
+</div>
+
+<h2 id="training"><span class="sec">10.2</span>Training a retrieval model</h2>
+
+<p>A ranking model learns from impressions: ads that were shown, clicked or not. A retrieval model has a very different job. It has to push good ads above <em>everything else in the corpus</em>, including the millions of ads nobody ever showed this user.</p>
+
+<p>So retrieval models usually get trained with a <dfn>sampled softmax</dfn>. For each click, the clicked ad goes up against a handful of randomly sampled ads (called <dfn>negatives</dfn>), and the model learns to give the clicked one the highest score. Like a lineup at a police station, except the suspect is an ad for hiking boots:</p>
+
+\[ \mathcal{L} = -\log \frac{e^{u \cdot a_{\text{clicked}}}}{e^{u \cdot a_{\text{clicked}}} + \sum_{j=1}^{k} e^{u \cdot a_{\text{neg},j}}} \]
+
+<p>Which negatives you pick matters a lot. Random negatives teach coarse lessons (a gaming fan does not want a mortgage ad). "Hard" negatives, ads that were shown but not clicked, teach subtle ones. And if you sample negatives in proportion to popularity, you need a correction (the "logQ correction," Yi et al., 2019), or the model learns to punish popular ads just for being popular.</p>
+
+<h2 id="build"><span class="sec">10.3</span>Build: top-K by dot product</h2>
+
+<p>Your stack's retrieval step: given a user vector and all the ad vectors, return the K best. Real production systems use approximate indexes for speed. Yours does it exactly, which is totally fine for 340 ads.</p>
+
+<div class="code-cell" data-slot="topK"></div>
+
+<div class="exercise" data-id="ch10-e1" data-answer="0.6" data-tol="0.001">
+  <p class="q">For one request, the 10 ads with the highest true value are known. Retrieval returned 30 candidates, and 6 of those 10 are among them. What's recall@30?</p>
+  <details class="hint"><summary>Hint</summary><p>Recall = (relevant items retrieved) / (relevant items).</p></details>
+  <div class="explain"><p>6 / 10 = <strong>0.6</strong>. Those four missing ads can never be shown, no matter how brilliant the ranker is (hello again, Chapter 1). That's why retrieval gets judged on recall, not precision. The ranker will sort out the other 24.</p></div>
+</div>
+
+<h2 id="train"><span class="sec">10.4</span>Train your two-tower</h2>
+
+<p>Let's train one on your stack's logs, then measure recall@30 against the simulator's true top-10 for held-out requests. To keep things honest, you'll compare against random retrieval, your Chapter 1 heuristic, and one extra option that only a simulator can give you: the same model trained on <strong>unbiased</strong> clicks, sampled in proportion to true relevance across <em>every</em> eligible ad, not just the ones your system happened to show.</p>
+
+<div class="widget" id="w-train">
+  <div class="w-title">Train and measure recall</div>
+  <div class="w-sub">Recall@30 of the true top-10 ads (by true click probability) among each request's ~150 eligible ads. Day 10, 300 requests.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Did your hand-written heuristic just beat your fancy neural network? Don't feel bad. It's supposed to. Your logged clicks only exist for ads your old system chose to show, so a retrieval model trained on them learns a blurry copy of the old system's taste, blind spots included. Train the exact same architecture on unbiased data and it does way better. That gap is the price of <strong>exposure bias</strong> (Chapter 5, back to haunt us), and it's why real retrieval systems train on much broader signals than their own ad clicks: organic engagement, exploration traffic, and anywhere else the user tells you what they're into.</p>
+</div>
+
+<h2 id="space"><span class="sec">10.5</span>Look inside the embedding space</h2>
+
+<p>The ad tower places every ad at a point in a 16-dimensional space. Humans are notoriously bad at picturing 16 dimensions (I've tried), so we'll squash it down to the two directions that vary the most (a PCA) and take a look. Ads that users treat as similar end up close together, often by category, but not always. Pick a user to see where they land and which ads their top-K pulls in.</p>
+
+<div class="widget" id="w-space">
+  <div class="w-title">Your ads, in embedding space</div>
+  <div class="w-sub">2-D projection of your trained ad vectors, coloured by category. The star is the user; ringed ads are their top-30.</div>
+</div>
+
+<h2 id="ship"><span class="sec">10.6</span>Ship retrieval</h2>
+
+<p>Now let's put your two-tower in production. With retrieval in front, your ranker only sees the top K candidates. That means fewer candidates to score (faster!) and a risk of missing good ads (recall!). The widget A/B tests your current production against the same stack with two-tower retrieval bolted on.</p>
+
+<div class="widget" id="w-ship">
+  <div class="w-title">A/B: all eligible ads vs. two-tower top-K</div>
+  <div class="w-sub">Same ranker in both arms. Only the candidate set differs.</div>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Retrieval work rarely shows up as a big flashy number on its own. Its value is <em>headroom</em>: a cheaper candidate set frees up latency for a bigger ranker, and better recall lets every future ranker improvement actually land. So when a retrieval team asks for resources, ask how they measure recall (against what reference?), how often ad embeddings get refreshed (new ads can't be retrieved until they're indexed), and which <em>sources</em> go into the final candidate set. Most real systems union several retrievers together: two-tower, heuristics, recency, and advertiser-specific ones.</p>
+</div>
+
+<div class="reflect" data-id="ch10-r1">
+  <p class="q">A new advertiser complains that their ads get almost no impressions in the first 48 hours, even with high bids. Using what you know about two-tower retrieval, list the likely causes and the fixes you'd ask about.</p>
+  <div class="model">
+    <ul>
+      <li><strong>Not indexed yet.</strong> Ad vectors get computed in batches. If the index only refreshes daily, a new ad literally can't be retrieved until the next build. Ask for incremental indexing.</li>
+      <li><strong>Cold embedding.</strong> The ad-ID embedding for a brand-new ad is untrained (basically zero), so its vector leans on category and advertiser embeddings. If the advertiser is also new, there's almost nothing to go on. Ask whether the ad tower uses content features (text, image embeddings) that exist from day one.</li>
+      <li><strong>Bids don't reach retrieval.</strong> Retrieval scores by predicted relevance. High bids only matter once the ad makes it to the auction. Ask whether there's a bid-aware or value-aware retrieval source.</li>
+      <li><strong>Exposure bias.</strong> No impressions means no clicks, which means no training signal, which means no impressions. Ask about a dedicated new-ad retrieval source or exploration quota (Chapter 5), with a measured cost.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>A <strong>two-tower retrieval model</strong> trained with sampled softmax, <strong>your own top-K search</strong>, and a real funnel in production: retrieval → your ranker → your auction. Chapter 1 would be proud.</p>
+  <p>Your two-tower is fast precisely because it keeps users and ads apart until the very end. But your ranker doesn't have that constraint. It only sees a few dozen candidates, so it can afford to let users and ads interact as much as it likes. Next time, we build a ranker that takes full advantage of that. It's big, it's fancy, it has attention, and it's going to humble me a little.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Two-tower model</b>Separate user and ad networks; score = dot product.</div>
+    <div><b>ANN index</b>Approximate nearest-neighbour search over precomputed ad vectors.</div>
+    <div><b>Sampled softmax</b>The clicked ad vs. k sampled negatives; the standard retrieval loss.</div>
+    <div><b>Negatives</b>Random, hard (shown but not clicked), or in-batch; they shape what's learned.</div>
+    <div><b>Recall@K</b>Share of truly best items that make the top K.</div>
+    <div><b>Exposure bias</b>Training only on what was shown caps what retrieval can learn.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world(), trainedTT = null;
+  function currentTT() { return trainedTT || Stack.getModel('twotower'); }
+  var byScore = function (f) { return function (uv, el2, K) { return el2.map(function (a) { return [a, f(uv, a)]; }).sort(function (x, y) { return y[1] - x[1]; }).slice(0, K).map(function (x) { return x[0]; }); }; };
+  function ttRetriever(m) { var topK = Stack.impl('topK'); return function (uv, el2, K) { var u = m.userVec(uv), av = m.adVecs(); return topK(u, el2.map(function (a) { return { id: a, vec: av[a] }; }), K); }; }
+
+  /* ---------------- train & recall ---------------- */
+  (function () {
+    var host = document.getElementById('w-train');
+    var opt = { objective: 'softmax', data: 'logged' };
+    var r1 = el('div', { class: 'btn-row', style: 'margin-bottom:6px' }); r1.appendChild(el('span', { class: 'small', text: 'Loss:' }));
+    Book.seg(r1, [{ label: 'Sampled softmax on clicks', value: 'softmax' }, { label: 'BCE on impressions', value: 'bce' }], 'softmax', function (v) { opt.objective = v; });
+    var r2 = el('div', { class: 'btn-row', style: 'margin-bottom:10px' }); r2.appendChild(el('span', { class: 'small', text: 'Data:' }));
+    Book.seg(r2, [{ label: 'Your logged clicks', value: 'logged' }, { label: 'Unbiased clicks (simulator only)', value: 'unbiased' }], 'logged', function (v) { opt.data = v; });
+    host.appendChild(r1); host.appendChild(r2);
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var results = [];
+    StackUI.asyncButton(btnHost, 'Train two-tower', async function (progress) {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.3, 'Collecting logs…'); } });
+      var rows = Stack.labeledRows(tl);
+      var nClicks = rows.filter(function (r) { return r.click; }).length;
+      var train = opt.data === 'unbiased' ? Stack.unbiasedClicks(nClicks, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) : rows;
+      var m = await Stack.trainTwoTower({ rows: train, objective: opt.objective, negatives: opt.objective === 'bce' ? 2 : 20, epochs: opt.objective === 'bce' ? 1 : 3,
+        onProgress: function (p) { progress(0.3 + 0.6 * p, 'Training (' + opt.objective + ', ' + opt.data + ')…'); } });
+      progress(0.95, 'Measuring recall…');
+      if (!results.length) {
+        var H = Stack.impl('heuristicPCTR'), pr = Stack.prior();
+        results.push({ name: 'Random 30', r: Stack.retrievalRecall(function (uv, el2, K) { return el2.slice(0, K); }) });
+        results.push({ name: 'Your Ch. 1 heuristic', r: Stack.retrievalRecall(byScore(function (uv, a) { return H(w.ads[a], uv, pr); })) });
+      }
+      var rec = Stack.retrievalRecall(ttRetriever(m));
+      var name = 'Two-tower · ' + (opt.objective === 'softmax' ? 'softmax' : 'BCE') + ' · ' + (opt.data === 'logged' ? 'your logs' : 'unbiased');
+      results = results.filter(function (x) { return x.name !== name; }); results.push({ name: name, r: rec, model: m, logged: opt.data === 'logged' });
+      if (opt.data === 'logged') trainedTT = m;
+      out.innerHTML = '';
+      var mx = Math.max.apply(null, results.map(function (x) { return x.r; }));
+      results.forEach(function (x) {
+        out.appendChild(el('div', { style: 'display:flex;align-items:center;gap:10px;margin:4px 0;font-size:13.5px' }, [
+          el('span', { style: 'width:260px;flex:none', text: x.name }),
+          el('div', { style: 'flex:1;background:var(--paper-2);border-radius:4px;height:16px' }, [el('div', { style: 'height:16px;border-radius:4px;background:' + (x.model ? 'var(--s1)' : 'var(--ink-3)') + ';width:' + (100 * x.r / Math.max(mx, 0.01)).toFixed(1) + '%' })]),
+          el('b', { style: 'width:50px;text-align:right;font-family:var(--mono)', text: x.r.toFixed(2) })
+        ]));
+      });
+      out.appendChild(el('p', { class: 'small', style: 'margin-top:8px', text: 'Train a few variants: softmax vs. BCE, logged vs. unbiased. Each adds a bar. The model trained on your logs is the one you can save and ship.' }));
+      if (opt.data === 'logged') {
+        var save = el('button', { type: 'button', class: 'btn accent', text: 'Save this two-tower to your stack' });
+        save.onclick = function () {
+          Stack.putModel('twotower', m, { source: Stack.implSource('topK'), recall: +rec.toFixed(3) });
+          Stack.markBuilt(10, Stack.implSource('topK') === 'you' ? 'you' : 'reference');
+          save.disabled = true; save.textContent = '✓ Saved';
+          document.dispatchEvent(new CustomEvent('stackchange'));
+          drawSpace();
+        };
+        out.appendChild(el('div', { class: 'btn-row' }, [save]));
+      }
+      drawSpace();
+    });
+  })();
+
+  /* ---------------- embedding space ---------------- */
+  var spaceHost = document.getElementById('w-space'), spaceOut = el('div'), uIdx = 0;
+  var reqs = w.requestsForDay(10, 50, 1);
+  var ctrlRow = el('div', { class: 'btn-row', style: 'margin-bottom:8px' });
+  var nextU = el('button', { type: 'button', class: 'btn secondary', text: 'Another user →' });
+  nextU.onclick = function () { uIdx = (uIdx + 1) % reqs.length; drawSpace(); };
+  ctrlRow.appendChild(nextU); spaceHost.appendChild(ctrlRow); spaceHost.appendChild(spaceOut);
+  function pca2(vecs) {
+    var n = vecs.length, d = vecs[0].length, mean = new Array(d).fill(0);
+    vecs.forEach(function (v) { for (var j = 0; j < d; j++) mean[j] += v[j] / n; });
+    var X = vecs.map(function (v) { return v.map(function (x, j) { return x - mean[j]; }); });
+    function top(exclude) {
+      var r = Book.rng(3), v = new Array(d).fill(0).map(function () { return r() - 0.5; });
+      for (var it = 0; it < 60; it++) {
+        var nv = new Array(d).fill(0);
+        X.forEach(function (x) { var s = 0; for (var j = 0; j < d; j++) s += x[j] * v[j]; for (j = 0; j < d; j++) nv[j] += s * x[j]; });
+        if (exclude) { var p = 0; for (var j = 0; j < d; j++) p += nv[j] * exclude[j]; for (j = 0; j < d; j++) nv[j] -= p * exclude[j]; }
+        var nn = Math.sqrt(nv.reduce(function (a, b) { return a + b * b; }, 0)) || 1; v = nv.map(function (x) { return x / nn; });
+      }
+      return v;
+    }
+    var p1 = top(null), p2 = top(p1);
+    return { mean: mean, proj: function (v) { var a = 0, b = 0; for (var j = 0; j < d; j++) { a += (v[j] - mean[j]) * p1[j]; b += (v[j] - mean[j]) * p2[j]; } return [a, b]; } };
+  }
+  function drawSpace() {
+    spaceOut.innerHTML = '';
+    var m = currentTT();
+    if (!m) { spaceOut.appendChild(el('p', { class: 'small muted', text: 'Train a two-tower above (on your logs) to see its embedding space.' })); return; }
+    var q = reqs[uIdx], uv = Stack.userView(w, q), elig = w.eligibleAds(q.user, 10);
+    var av = m.adVecs().map(function (v) { return v.slice(0, 16); }), P = pca2(elig.map(function (a) { return av[a]; }));
+    var pts = elig.map(function (a) { return P.proj(av[a]); });
+    var uvec = m.userVec(uv).slice(0, 16), up = P.proj(uvec.map(function (x, j) { return x * 0.35 + P.mean[j]; }));
+    var top = new Set(ttRetriever(m)(uv, elig, 30));
+    var xs = pts.map(function (p) { return p[0]; }).concat([up[0]]), ys = pts.map(function (p) { return p[1]; }).concat([up[1]]);
+    var pad = function (a) { var lo = Math.min.apply(null, a), hi = Math.max.apply(null, a), s = (hi - lo) * 0.08 || 1; return [lo - s, hi + s]; };
+    var c = Book.chart(spaceOut, { w: 640, h: 380, x: pad(xs), y: pad(ys), xticks: [], yticks: [], margin: { l: 16, b: 16 } });
+    pts.forEach(function (p, i) { var a = elig[i]; c.dots([[p[0], p[1], top.has(a) ? 6 : 4, StackUI.CAT_COLORS[w.ads[a].category]]], { stroke: top.has(a) ? 'var(--ink)' : 'none', opacity: top.has(a) ? 1 : 0.55 }); });
+    c.text(up[0], up[1], '★', { anchor: 'middle', dy: 6, size: 22, color: 'var(--ink)' });
+    var lg = el('div', { class: 'legend' });
+    w.categories.forEach(function (cat, i) { lg.appendChild(el('span', null, [el('i', { class: 'dot', style: 'background:' + StackUI.CAT_COLORS[i] }), cat.name])); });
+    spaceOut.appendChild(lg);
+    var hist = {}; uv.history.forEach(function (h) { hist[h] = (hist[h] || 0) + 1; });
+    var favs = Object.keys(hist).sort(function (a, b) { return hist[b] - hist[a]; }).slice(0, 3).map(function (k) { return w.categories[k].name + ' ×' + hist[k]; });
+    spaceOut.appendChild(el('p', { class: 'small', html: 'User ' + q.user + ' recently engaged with: <b>' + favs.join(', ') + '</b>. The star\'s position is a rough projection (only the direction matters for dot products).' }));
+  }
+  drawSpace();
+
+  /* ---------------- ship ---------------- */
+  (function () {
+    var host = document.getElementById('w-ship');
+    var K = 40;
+    var r = el('div', { class: 'btn-row', style: 'margin-bottom:10px' }); r.appendChild(el('span', { class: 'small', text: 'Candidates passed to ranking (K):' }));
+    Book.seg(r, [{ label: '20', value: 20 }, { label: '40', value: 40 }, { label: '80', value: 80 }], 40, function (v) { K = v; });
+    host.appendChild(r);
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Run the A/B', async function (progress) {
+      out.innerHTML = '';
+      if (!Stack.getModel('twotower')) { out.appendChild(el('p', { class: 'note warn', text: 'Save a two-tower model above first.' })); return; }
+      var res = await Stack.abTest({ control: { retrieval: 'eligible' }, treatment: { retrieval: 'twotower', retrievalK: K }, controlName: 'All eligible', treatmentName: 'Two-tower top-' + K, days: [11, 12], onProgress: function (p) { progress(p, 'Running both arms…'); } });
+      var a = res.arms[0].summary, b = res.arms[1].summary, d = res.diffs;
+      StackUI.table(out, [{ label: '', key: 'k' }, { label: 'All eligible', num: true, key: 'a' }, { label: 'Two-tower top-' + K, num: true, key: 'b' }], [
+        { k: 'Candidates scored per request', a: (a.candidates / a.requests).toFixed(0), b: (b.candidates / b.requests).toFixed(0) },
+        { k: 'Ranking time per 1,000 requests (this browser)', a: (1000 * a.rankMs / a.requests).toFixed(0) + ' ms', b: (1000 * b.rankMs / b.requests).toFixed(0) + ' ms' },
+        { k: 'True expected revenue / 1,000 requests', a: '$' + a.expRpm.toFixed(0), b: '$' + b.expRpm.toFixed(0) + ' <span class="muted">(' + Book.signed(100 * d.trueRpm.lift, 1, '%') + ')</span>' }
+      ]);
+      out.appendChild(el('p', { class: 'small', html: 'Retrieval cut the ranker\'s work by <b>' + Book.pct(1 - b.candidates / a.candidates, 0) + '</b>. The revenue change is the recall cost (or gain, if retrieval filtered out candidates the ranker over-rated). At Pebble\'s simulated size you don\'t need retrieval; at a million ads you couldn\'t live without it.' }));
+      var ship = el('button', { type: 'button', class: 'btn accent', text: 'Use two-tower top-' + K + ' in production' });
+      var keep = el('button', { type: 'button', class: 'btn secondary', text: 'Keep scoring all eligible ads' });
+      ship.onclick = function () { Stack.state.settings.retrieval = 'twotower'; Stack.state.settings.retrievalK = K; Stack.save(); Stack.clearLogCache(); document.dispatchEvent(new CustomEvent('stackchange')); ship.textContent = '✓ In production'; };
+      keep.onclick = function () { Stack.state.settings.retrieval = 'eligible'; Stack.save(); Stack.clearLogCache(); document.dispatchEvent(new CustomEvent('stackchange')); keep.textContent = '✓ Kept'; };
+      out.appendChild(el('div', { class: 'btn-row' }, [ship, keep]));
+    });
+  })();
+})();
+</script>
+</body>
+</html>

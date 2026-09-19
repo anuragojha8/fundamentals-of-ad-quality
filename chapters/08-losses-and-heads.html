@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Losses and Model Heads — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="08-losses-and-heads">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 8 · Part III · Learning</div>
+  <h1>Losses and Model Heads</h1>
+  <p class="dek">In which I tell the model what "good" means, and it takes me extremely literally.</p>
+</header>
+
+<div class="stack-panel" data-chapter="8"></div>
+
+<p class="lead">In Chapter 7 you used log loss without asking a single question about it. I let you. It was a big day, you were training your first model, I didn't want to ruin it.</p>
+
+<p>But here's the thing: the loss function is the only thing a model truly listens to. It's the model's entire definition of "good." And different losses produce models that are good at genuinely different things. Some rank beautifully but can't price. Some price well but rank a little worse. Some are built for counts, or for picking one item out of millions. This chapter is about telling them apart, and about how modern models bolt several losses onto one network using <em>heads</em>.</p>
+
+<h2 id="menu"><span class="sec">8.1</span>The menu</h2>
+
+<div class="table-wrap"><table class="data">
+<thead><tr><th>Loss</th><th>Formula (for one example)</th><th>Good for</th><th>Used in ads for</th></tr></thead>
+<tbody>
+<tr><td><b>Log loss</b> (binary cross-entropy)</td><td>−[y log p + (1−y) log(1−p)]</td><td>Calibrated probabilities</td><td>pCTR, pCVR: anything that feeds an auction</td></tr>
+<tr><td><b>MSE</b> (squared error)</td><td>(p − y)²</td><td>Continuous targets</td><td>Rarely for clicks; sometimes for values</td></tr>
+<tr><td><b>Poisson</b></td><td>λ − y log λ, with λ = e<sup>z</sup></td><td>Counts (0, 1, 2, …) and rates</td><td>Number of conversions, purchases, visits</td></tr>
+<tr><td><b>Pairwise</b> (RankNet / AUC surrogate)</td><td>log(1 + e<sup>−(z<sub>+</sub> − z<sub>−</sub>)</sup>)</td><td>Ordering items</td><td>Ranking within a request; organic ranking</td></tr>
+<tr><td><b>Softmax</b> (cross-entropy over choices)</td><td>−log( e<sup>z<sub>chosen</sub></sup> / Σ e<sup>z<sub>j</sub></sup> )</td><td>Picking one of many</td><td>Retrieval (Ch. 10)</td></tr>
+</tbody></table></div>
+
+<h2 id="shape"><span class="sec">8.2</span>What each loss pays attention to</h2>
+
+<p>When you're sizing up a loss, two properties matter most. First, <strong>how hard does it punish confident mistakes?</strong> Second, <strong>does it care about the actual value of the prediction, or only the order?</strong> Play with both below.</p>
+
+<div class="widget" id="w-shape">
+  <div class="w-title">Loss and gradient as the prediction changes</div>
+  <div class="w-sub">Left: the loss for one example as the predicted probability p moves. Right: how hard the loss pushes on the logit (|∂loss/∂z|), which is what actually drives learning.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Log loss keeps pushing hard when the model is confidently wrong: predict 1% for something that actually happened, and the gradient is close to 1. MSE on a probability does the opposite. It <em>stops pushing</em> right there, because its gradient has a factor of p(1−p) that shrinks to zero. That's why MSE learns rare events so sluggishly. It basically shrugs at the click it predicted at 1%.</p>
+</div>
+
+<div class="exercise" data-id="ch8-e1" data-answer="4.605" data-tol="0.01">
+  <p class="q">The model predicted a 1% chance of a click, and the user clicked. What's the log loss for this example? (Natural log.)</p>
+  <details class="hint"><summary>Hint</summary><p>With y = 1, the loss is −log p.</p></details>
+  <div class="explain"><p>−ln(0.01) ≈ <strong>4.605</strong>. Now compare a correct, confident prediction: predicting 1% for a <em>non</em>-click costs −ln(0.99) ≈ 0.01. So one surprise click costs as much as about 460 correctly predicted non-clicks. That asymmetry is exactly what keeps log loss honest about rare events.</p></div>
+</div>
+
+<h2 id="order"><span class="sec">8.3</span>Order vs. value: the pairwise loss</h2>
+
+<p>A <dfn>pairwise loss</dfn> takes two ads shown in the same request, one clicked and one not, and asks just one thing: did the clicked one score higher? It only depends on the <em>difference</em> between the scores, so if you add the same constant to every score, nothing changes. That's exactly what ranking needs.</p>
+
+<p>And it's also exactly why a pairwise model is useless for pricing. It has zero reason to put its scores on a probability scale. It'll happily tell you ad A beats ad B, and have no idea whether either one gets clicked 2% or 20% of the time.</p>
+
+<div class="widget" id="w-pair">
+  <div class="w-title">Shift both scores</div>
+  <div class="w-sub">Two ads in one request. The first was clicked, the second wasn't. Move both logits together, or change the gap between them.</div>
+</div>
+
+<div class="quiz" data-id="ch8-q1">
+  <p class="q">A model trained only with a pairwise loss ranks ads within each request very well. Why can't your auction use its outputs directly as pCTR?</p>
+  <ul>
+    <li data-why="Pairwise models do rank; that's what they're trained for.">It can't rank ads</li>
+    <li data-correct>Its scores are only meaningful relative to each other, not as probabilities, so bid × score isn't expected revenue</li>
+    <li data-why="Training speed isn't the problem.">It's too slow to serve</li>
+    <li data-why="Pairwise losses are used on click data all the time.">It needs conversion data</li>
+  </ul>
+  <div class="explain"><p>Your auction multiplies pCTR by a bid, and your prices divide by pCTR. Both need <em>calibrated</em> values. A pairwise model's scores could all shift by +3 and its loss wouldn't even notice. Production systems that want pairwise ranking quality usually combine it with a pointwise log loss (a weighted sum of the two), or calibrate afterwards.</p></div>
+</div>
+
+<h2 id="poisson"><span class="sec">8.4</span>Poisson: when the label is a count</h2>
+
+<p>Sometimes the label isn't yes-or-no, it's a count: purchases per click (some people buy twice), app opens in the week after an install, clicks per thousand impressions in an aggregated row. <dfn>Poisson loss</dfn> treats the model's output as a rate, \( \lambda = e^z \), and asks it to match the average count.</p>
+
+<p>Two nice things about it. Its gradient, \( \lambda - y \), looks just like log loss's \( p - y \). And for rare events (rates well below 1), it behaves almost exactly like log loss. You'll see that for yourself in a second.</p>
+
+<h2 id="build"><span class="sec">8.5</span>Build: losses and their gradients</h2>
+
+<p>Your stack's trainer handles the pairwise loss itself, since it needs to build pairs from the same request by grouping rows. For the pointwise losses, it asks <em>your</em> function for the loss and its gradient with respect to the logit. The tests check your gradients numerically: they nudge z by a tiny amount and watch how the loss moves. So no faking it.</p>
+
+<div class="code-cell" data-slot="lossGrad"></div>
+
+<p>Now for the fun experiment. Train the exact same logistic regression on the exact same logs four times, once per loss, and compare. Two kinds of AUC show up here. The usual <strong>AUC</strong> compares every impression with every other impression. <strong>Within-request AUC</strong> only compares ads shown <em>in the same request</em>, which is the decision the auction actually makes. Chapter 9 makes both of these precise.</p>
+
+<div class="widget" id="w-losses">
+  <div class="w-title">One model, four losses</div>
+  <div class="w-sub">Logistic regression on your logs (days 0–9), evaluated on day 10.</div>
+</div>
+
+<h2 id="heads"><span class="sec">8.6</span>Model heads and multi-task learning</h2>
+
+<p>A real Pebble ranking model has to predict a bunch of things at once. Will the user click? Convert? Hide the ad? Watch the video? You could train a separate model for each, but that's expensive and kind of wasteful, since they're all learning about the same users and ads. So modern systems share most of the network and attach a small <dfn>head</dfn> for each task: a final layer (or a few) that turns the shared representation into one specific prediction, with its own loss.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 290" role="img" aria-label="Multi-task model: shared embeddings and layers feed three heads for click, conversion and hide, each with its own loss, combined into a ranking score">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <rect x="20" y="115" width="140" height="60" rx="10" class="box"/><text x="90" y="140" text-anchor="middle" class="t-md t-b">Features</text><text x="90" y="157" text-anchor="middle" class="t-sm">IDs, context, history</text>
+  <rect x="200" y="100" width="170" height="90" rx="10" class="box b"/><text x="285" y="135" text-anchor="middle" class="t-md t-b">Shared layers</text><text x="285" y="153" text-anchor="middle" class="t-sm">embeddings, crosses,</text><text x="285" y="168" text-anchor="middle" class="t-sm">attention (Ch. 11)</text>
+  <path class="arrow" d="M160,145 H198"/>
+  <rect x="420" y="30" width="120" height="50" rx="10" class="box a"/><text x="480" y="52" text-anchor="middle" class="t-md t-b">Click head</text><text x="480" y="68" text-anchor="middle" class="t-sm">pCTR · log loss</text>
+  <rect x="420" y="120" width="120" height="50" rx="10" class="box g"/><text x="480" y="142" text-anchor="middle" class="t-md t-b">Conversion head</text><text x="480" y="158" text-anchor="middle" class="t-sm">pCVR · log loss</text>
+  <rect x="420" y="210" width="120" height="50" rx="10" class="box v"/><text x="480" y="232" text-anchor="middle" class="t-md t-b">Hide head</text><text x="480" y="248" text-anchor="middle" class="t-sm">pHide · log loss</text>
+  <path class="arrow" d="M370,130 C395,100 400,60 418,55"/><path class="arrow" d="M370,145 H418"/><path class="arrow" d="M370,160 C395,190 400,230 418,235"/>
+  <rect x="590" y="100" width="150" height="90" rx="10" class="box"/><text x="665" y="128" text-anchor="middle" class="t-md t-b">Ranking score</text><text x="665" y="146" text-anchor="middle" class="t-sm">bid × pCTR × pCVR</text><text x="665" y="162" text-anchor="middle" class="t-sm">− λ · pHide · cost</text><text x="665" y="178" text-anchor="middle" class="t-sm">(Ch. 12, 14)</text>
+  <path class="arrow" d="M540,55 C570,60 575,110 588,120"/><path class="arrow" d="M540,145 H588"/><path class="arrow" d="M540,235 C570,230 575,180 588,170"/>
+  <text x="285" y="222" text-anchor="middle" class="t-sm">total loss = L_click + α·L_conv + β·L_hide</text>
+</svg>
+<figcaption>A multi-task model. The heads share what they learn about users and ads, and their outputs get combined into the ranking score. The task weights α and β are product decisions dressed up as hyperparameters.</figcaption>
+</figure>
+
+<p>Sharing is great for sparse tasks. Conversions are rare, but the click task feeds the shared layers tons of signal about which users like which ads, and the conversion head gets to ride along for free. But sharing can also backfire. Tasks that disagree can pull the shared layers in different directions, which is called <dfn>negative transfer</dfn> (basically, roommates who can't agree on the thermostat). Architectures like MMoE (Multi-gate Mixture-of-Experts, Google, 2018) and PLE (Tencent, 2020) give each head its own weighted mix of shared "expert" sub-networks to keep the peace.</p>
+
+<p>There's also the <dfn>calibration head</dfn>: a small final layer (sometimes one per segment) trained to fix the scale of the main output. It's the learned cousin of the calibration layer you built back in Chapter 3.</p>
+
+<div class="quiz" data-id="ch8-q2">
+  <p class="q">Your team adds a hide head to the click model, with total loss = L_click + β·L_hide. They raise β from 0.1 to 1.0 and offline click AUC drops slightly. What's the right way to decide β?</p>
+  <ul>
+    <li data-why="Click AUC alone ignores the purpose of the hide head.">Pick the β with the best click AUC</li>
+    <li data-why="Hide AUC alone ignores the click task.">Pick the β with the best hide AUC</li>
+    <li data-correct>Evaluate the <em>ranking score</em> that combines the heads, online, on the metrics you care about (revenue, hides, retention)</li>
+    <li data-why="β changes what the shared layers learn; it isn't only a display choice.">β doesn't matter; heads are independent</li>
+  </ul>
+  <div class="explain"><p>Task weights trade one objective against another inside the shared layers. A small drop in click AUC might be totally worth a big drop in hides, or it might not. That's a product tradeoff, and it has to be judged on the combined outcome, usually in an A/B test with guardrails. Chapter 14 is all about owning that objective.</p></div>
+</div>
+
+<div class="reflect" data-id="ch8-r1">
+  <p class="q">A research team proposes replacing Pebble's pointwise log-loss pCTR model with a listwise ranking loss. Offline, within-request ranking (GAUC) improves by 1%. What are your concerns, and what would you ask for?</p>
+  <div class="model">
+    <ul>
+      <li><strong>Pricing.</strong> The auction needs calibrated pCTR, both for ranking by bid × pCTR and for setting prices. A listwise loss doesn't produce probabilities. Ask how calibration will be restored (a combined loss, a calibration head, post-hoc calibration) and ask to see calibration slices.</li>
+      <li><strong>Cross-request decisions.</strong> Reserve prices, ad load (ad vs. organic), and CPM-vs-CPC competition all compare scores <em>across</em> requests and bid types. Only calibrated values make those comparisons meaningful.</li>
+      <li><strong>The metric matches the loss.</strong> Of course a loss that optimizes GAUC improves GAUC. Ask for revenue-weighted metrics and an online test.</li>
+      <li><strong>A combined objective</strong> (pointwise + pairwise) often gets most of the ranking gain while keeping calibration intact. Ask whether they tried it.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p><strong>Your loss functions</strong> now power your stack's trainer, and you've seen what each one actually optimizes: log loss for calibrated probabilities, pairwise for order, Poisson for counts. Your production model stays on log loss, because your auction prices with it, and a model that can't price is a very expensive way to sort things.</p>
+  <p>Throughout this chapter I kept saying things like "AUC went up" and "calibration is off" as if those were obviously the right ways to keep score. They're not obvious, and they can absolutely lie to you. Next time, we figure out how to tell whether a model is actually better. It's the chapter I'd make every PM read twice.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Loss function</b>The number training minimizes; it defines "good."</div>
+    <div><b>Pointwise vs. pairwise</b>Scoring items alone vs. scoring the order of pairs.</div>
+    <div><b>Poisson loss</b>λ − y log λ for counts; ≈ log loss for rare events.</div>
+    <div><b>Head</b>A task-specific final layer on shared representations.</div>
+    <div><b>Multi-task learning</b>Several heads and losses trained together; weights are tradeoffs.</div>
+    <div><b>Negative transfer</b>Tasks that conflict degrade each other through shared layers.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el;
+
+  /* ---------------- loss shapes ---------------- */
+  (function () {
+    var host = document.getElementById('w-shape');
+    var y = 1;
+    var top = el('div', { class: 'btn-row', style: 'margin-bottom:8px' });
+    Book.seg(top, [{ label: 'The user clicked (y = 1)', value: 1 }, { label: 'The user didn\'t (y = 0)', value: 0 }], 1, function (v) { y = v; draw(); });
+    host.appendChild(top);
+    var g = el('div', { class: 'w-grid two' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); host.appendChild(g);
+    var c1 = Book.chart(L, { w: 420, h: 250, x: [0, 1], y: [0, 5], xlabel: 'Predicted probability p', ylabel: 'Loss', xfmt: function (v) { return Math.round(v * 100) + '%'; } });
+    var c2 = Book.chart(R, { w: 420, h: 250, x: [0, 1], y: [0, 1.05], xlabel: 'Predicted probability p', ylabel: '|∂loss / ∂z|', xfmt: function (v) { return Math.round(v * 100) + '%'; } });
+    Book.legend(host, [{ label: 'Log loss', color: 'var(--s1)' }, { label: 'MSE', color: 'var(--s2)' }, { label: 'Poisson (λ = p)', color: 'var(--s3)', dash: true }]);
+    function draw() {
+      var ll = [], ms = [], po = [], gl = [], gm = [], gp = [];
+      for (var i = 1; i < 200; i++) {
+        var p = i / 200;
+        ll.push([p, y ? -Math.log(p) : -Math.log(1 - p)]); ms.push([p, (p - y) * (p - y)]); po.push([p, p - y * Math.log(p)]);
+        gl.push([p, Math.abs(p - y)]); gm.push([p, Math.abs(2 * (p - y) * p * (1 - p))]); gp.push([p, Math.abs(p - y)]);
+      }
+      c1.clear(); c1.line(ll, { color: 'var(--s1)' }); c1.line(ms, { color: 'var(--s2)' }); c1.line(po, { color: 'var(--s3)', dash: '5 4' });
+      c2.clear(); c2.line(gl, { color: 'var(--s1)' }); c2.line(gm, { color: 'var(--s2)' }); c2.line(gp, { color: 'var(--s3)', dash: '5 4', width: 1.5 });
+    }
+    draw();
+  })();
+
+  /* ---------------- pairwise shift ---------------- */
+  (function () {
+    var host = document.getElementById('w-pair');
+    var g = el('div', { class: 'w-grid side' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); host.appendChild(g);
+    var ctl = Book.controls(L, [
+      { key: 'shift', label: 'Shift both logits by', min: -3, max: 3, step: 0.1, value: 0, fmt: function (v) { return (v >= 0 ? '+' : '') + v.toFixed(1); } },
+      { key: 'gap', label: 'Gap (clicked − other)', min: -2, max: 3, step: 0.1, value: 1, fmt: function (v) { return v.toFixed(1); } }
+    ], draw);
+    var st = Book.stats(R, [
+      { key: 'p1', label: 'p (clicked ad)' }, { key: 'p2', label: 'p (other ad)' },
+      { key: 'll', label: 'Log loss (sum of both)' }, { key: 'pw', label: 'Pairwise loss' }, { key: 'cal', label: 'Predicted clicks', sub: 'actual: 1' }
+    ]);
+    function draw() {
+      var v = ctl.values, z1 = -2 + v.shift + v.gap / 2, z2 = -2 + v.shift - v.gap / 2, s = Book.sigmoid;
+      st({ p1: Book.pct(s(z1), 1), p2: Book.pct(s(z2), 1), ll: (Book.logloss(s(z1), 1) + Book.logloss(s(z2), 0)).toFixed(3), pw: Math.log(1 + Math.exp(-(z1 - z2))).toFixed(3), cal: (s(z1) + s(z2)).toFixed(2) });
+    }
+    draw();
+    R.appendChild(el('p', { class: 'small muted', text: 'Slide "shift": the pairwise loss doesn\'t move, but the predicted probabilities, and hence log loss and calibration, change a lot. A pairwise-trained model can drift to any shift.' }));
+  })();
+
+  /* ---------------- four losses on your logs ---------------- */
+  (function () {
+    var host = document.getElementById('w-losses');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    function gauc(p, y, g) {
+      var by = new Map();
+      p.forEach(function (_, i) { var k = g[i]; if (!by.has(k)) by.set(k, []); by.get(k).push(i); });
+      var s = 0, n = 0;
+      by.forEach(function (ix) {
+        var yy = ix.map(function (i) { return y[i]; }), np = yy.filter(Boolean).length;
+        if (!np || np === ix.length) return;
+        s += Stack.aucRef(ix.map(function (i) { return p[i]; }), yy) * ix.length; n += ix.length;
+      });
+      return s / n;
+    }
+    StackUI.asyncButton(btnHost, 'Train with all four losses', async function (progress) {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.2, 'Collecting logs…'); } });
+      var ev = await Stack.evalLog({ onProgress: function (p) { progress(0.2 + p * 0.05, 'Collecting day 10…'); } });
+      var rows = Stack.labeledRows(tl), er = Stack.labeledRows(ev);
+      var y = er.map(function (r) { return r.click; }), t = ev.truth.map(function (x) { return x.pctr; }), g = er.map(function (r) { return r.rid; });
+      var cfg = [['logloss', 'Log loss', 0.05], ['mse', 'MSE', 0.5], ['poisson', 'Poisson', 0.05], ['pairwise', 'Pairwise', 0.05]], res = [];
+      for (var i = 0; i < cfg.length; i++) {
+        var m = await Stack.trainLR({ rows: rows, epochs: 2, lr: cfg[i][2], loss: cfg[i][0], onProgress: function (p) { progress(0.25 + 0.75 * (i + p) / cfg.length, 'Training with ' + cfg[i][1] + '…'); } });
+        var p = Stack.lrPredictRows(m, er), e = Stack.evaluate(p, y, t);
+        res.push({ name: cfg[i][1], e: e, g: gauc(Stack.lrPredictRows(m, er, 0), y, g) });
+      }
+      out.innerHTML = '';
+      var bestG = Math.max.apply(null, res.map(function (r) { return r.g; })), bestA = Math.max.apply(null, res.map(function (r) { return r.e.auc; }));
+      StackUI.table(out, [
+        { label: 'Loss', key: 'name' },
+        { label: 'AUC (all pairs)', num: true, get: function (r) { return (r.e.auc === bestA ? '<b>' : '') + r.e.auc.toFixed(3); } },
+        { label: 'Within-request AUC', num: true, get: function (r) { return (r.g === bestG ? '<b>' : '') + r.g.toFixed(3); } },
+        { label: 'NE', num: true, get: function (r) { return r.e.ne.toFixed(3); } },
+        { label: 'Calibration', num: true, get: function (r) { var c = r.e.calibration; return '<span class="' + (Math.abs(c - 1) > 0.2 ? 'neg' : '') + '">' + c.toFixed(2) + '</span>'; } }
+      ], res);
+      var pw = res[3], pwWins = pw.g >= Math.max(res[0].g, res[2].g);
+      var pwText = pwWins
+        ? 'Pairwise is best at ordering ads <em>within</em> a request, which is what it optimizes. '
+        : 'On your logs, pairwise doesn\'t even win within requests. It only learns from requests that contain both a click and a non-click, a small fraction of your data, while log loss learns from every row. Whether pairwise wins here depends on how much data you have and on what your logging policy put side by side. ';
+      out.appendChild(el('p', { class: 'small', html: pwText + 'Either way, its outputs aren\'t probabilities (calibration ' + pw.e.calibration.toFixed(1) + '), and it never learned user-level effects, because every pair it saw shared a user. Log loss and Poisson are nearly identical, since clicks are rare. MSE trails slightly. Your production model stays on log loss. ' + (Stack.implSource('lossGrad') === 'you' ? 'Your lossGrad() computed the MSE and Poisson gradients.' : '(MSE and Poisson used the reference lossGrad until yours passes.)') }));
+      var c = Stack.state.code.lossGrad;
+      if (c && c.passed) { Stack.markBuilt(8, 'you'); document.dispatchEvent(new CustomEvent('stackchange')); }
+    });
+  })();
+})();
+</script>
+</body>
+</html>

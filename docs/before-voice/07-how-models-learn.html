@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a Model Learns — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="07-how-models-learn">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 7 · Part III · Learning</div>
+  <h1>How a Model Learns</h1>
+  <p class="dek">Training is a loop you can write in eight lines: predict, measure how wrong you were, nudge every weight a little in the direction that would have helped. Repeat 360,000 times.</p>
+</header>
+
+<div class="stack-panel" data-chapter="7"></div>
+
+<p class="lead">Your stack has logs (Chapter 4), labels that you understand the biases of (Chapter 5), and features (Chapter 6). In this chapter you'll write the heart of machine learning, a single gradient step, and use it to train a logistic regression on your own logs, right here in the browser. It's the same model family that ran most of the world's ad auctions for a decade, and it's still the baseline every new model has to beat.</p>
+
+<h2 id="model"><span class="sec">7.1</span>The model</h2>
+
+<p>Logistic regression computes a score \(z\), called the <dfn>logit</dfn>, by adding up one weight per active feature, then squashes it into a probability with the sigmoid:</p>
+
+\[ z = \sum_{f \in \text{features}(x)} w_f, \qquad \hat p = \sigma(z) = \frac{1}{1 + e^{-z}} \]
+
+<p>Each weight has a readable meaning: it's how much that feature shifts the <em>log-odds</em> of a click. A weight of +0.7 on <code>hour×cat=12_Food</code> means "Food ads at noon: roughly double the odds," since \(e^{0.7} \approx 2\). Training means finding the weights that make the predictions match the labels as closely as possible.</p>
+
+<h2 id="loss"><span class="sec">7.2</span>Measuring wrongness: log loss</h2>
+
+<p>"As closely as possible" needs a number. For probabilities the standard choice is <dfn>log loss</dfn> (also called binary cross-entropy):</p>
+
+\[ \ell(\hat p, y) = -\big[\, y \log \hat p + (1-y)\log(1-\hat p) \,\big] \]
+
+<p>If the user clicked (\(y = 1\)), the loss is \(-\log \hat p\): small if you predicted a high probability, huge if you predicted near zero. It punishes confident mistakes hardest. Chapter 8 compares it with other losses. For now, one fact matters, and it's the reason logistic regression is so pleasant to train. The derivative of the log loss with respect to the logit is simply</p>
+
+\[ \frac{\partial \ell}{\partial z} = \hat p - y \]
+
+<p>the prediction minus the truth. And since \(z\) is a sum of weights, each active weight has that same gradient. So one training step is:</p>
+
+\[ w_f \leftarrow w_f - \eta \,(\hat p - y) \quad \text{for every active feature } f \]
+
+<p>where \(\eta\) is the <dfn>learning rate</dfn>. If the model under-predicted a click (\(\hat p = 0.02\), \(y=1\)), every active weight goes up by \(0.98\eta\). If it predicted a non-click at 2%, every active weight goes down by \(0.02\eta\), a tiny amount. Many small downward nudges from non-clicks balance a few big upward ones from clicks, and the weights settle where the predicted rates match the observed ones.</p>
+
+<h2 id="gd"><span class="sec">7.3</span>Gradient descent, visualized</h2>
+
+<p>With only two weights you can draw the loss as a landscape and watch training walk downhill. Below: a bias weight \(b\) (for every impression) and one feature weight \(w\) (say, <code>recent3=2</code>). The feature's true click rate is 20%, and 5% without it. Pick a learning rate and watch 60 steps of gradient descent.</p>
+
+<div class="widget" id="w-gd">
+  <div class="w-title">Walking down the loss surface</div>
+  <div class="w-sub">Darker = lower loss. The path starts at b = 0, w = 0. The minimum is where σ(b) = 5% and σ(b + w) = 20%.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>The learning rate is a step size. Too small and training crawls; you run out of data before you arrive. Too large and every step overshoots the valley floor, bouncing from wall to wall or flying off entirely. Real training uses <strong>stochastic</strong> gradient descent: one example (or a small batch) per step. Each step is noisy, but you take millions of them.</p>
+</div>
+
+<div class="exercise" data-id="ch7-e1" data-answer="0.58" data-tol="0.001">
+  <p class="q">A feature's weight is 0.5. On an example where that feature is active, the model predicts \(\hat p = 0.2\), and the user clicked (\(y = 1\)). With learning rate 0.1 and no regularization, what's the weight after this step?</p>
+  <details class="hint"><summary>Hint</summary><p>Gradient = p̂ − y = −0.8. New weight = old − η × gradient.</p></details>
+  <div class="explain"><p>0.5 − 0.1 × (0.2 − 1) = 0.5 + 0.08 = <strong>0.58</strong>. The click pulled the weight up, so next time this feature appears the prediction will be a bit higher.</p></div>
+</div>
+
+<h2 id="build"><span class="sec">7.4</span>Build: one step of SGD</h2>
+
+<p>Write the step. It's the whole learning algorithm. You'll also add <dfn>L2 regularization</dfn>, which pulls every weight slightly toward zero on each step (the <code>l2 * w[i]</code> term). Section 7.6 explains why.</p>
+
+<div class="code-cell" data-slot="sgdStep"></div>
+
+<h2 id="train"><span class="sec">7.5</span>Train your model</h2>
+
+<p>Now train on your stack's logs: ten days of impressions, joined with your Chapter 4 join, featurized by your Chapter 6 extractor, stepped by your function above. An <dfn>epoch</dfn> is one pass over the training data. After each epoch the widget measures log loss on the training data and on <strong>held-out</strong> data: day 10, which the model never trained on. Evaluation against the truth comes in Chapter 9. Here we use AUC, which you can read as "how often the model ranks a clicked impression above a non-clicked one."</p>
+
+<div class="widget" id="w-train">
+  <div class="w-title">Train logistic regression on your logs</div>
+  <div class="w-sub">≈180,000 training rows. Everything runs in this browser tab.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>More epochs isn't more learning. Try 5 epochs above: training loss keeps falling while held-out loss flattens or rises. The model is memorizing rare features, such as the IDs of users with only a handful of impressions, instead of learning patterns that transfer. Large ads models are notorious for this. Deep CTR models often overfit after just <em>one</em> epoch, which is why many production systems train on each example exactly once (Zhang et al., "Towards Understanding the Overfitting Phenomenon of Deep Click-Through Rate Models," 2022).</p>
+</div>
+
+<h2 id="overfit"><span class="sec">7.6</span>Overfitting and regularization</h2>
+
+<p>A model <dfn>overfits</dfn> when it fits noise in the training data that won't recur. The prime suspects in ads are rare IDs. A user with 8 impressions and 1 click gets a weight tuned to that one click. <dfn>L2 regularization</dfn> adds a penalty \(\lambda \sum w^2\) to the loss, which in the update becomes a constant pull toward zero. Weights for common features, backed by lots of data, resist the pull. Weights for rare features, backed by little data, stay small. That's usually exactly the behaviour you want. Too much regularization and <em>every</em> weight stays small, and the model <dfn>underfits</dfn>.</p>
+
+<div class="quiz" data-id="ch7-q1">
+  <p class="q">After training, held-out log loss is much worse than training log loss, and the gap grows each epoch. What's the best first move?</p>
+  <ul>
+    <li data-why="More epochs would widen the gap.">Train for more epochs</li>
+    <li data-correct>Stop earlier and/or increase regularization</li>
+    <li data-why="A higher learning rate makes steps bigger, not the model more general.">Raise the learning rate</li>
+    <li data-why="Removing held-out data removes your ability to see the problem.">Evaluate on training data instead</li>
+  </ul>
+  <div class="explain"><p>A growing train/held-out gap is the signature of overfitting. Stop at the epoch where held-out loss was lowest (<dfn>early stopping</dfn>), regularize more, or reduce the capacity that's overfitting, such as by hashing rare IDs together or dropping them.</p></div>
+</div>
+
+<div class="quiz" data-id="ch7-q2">
+  <p class="q">Training loss goes up and down wildly and never settles; after a while the predictions are all 0 or 1. What's most likely wrong?</p>
+  <ul>
+    <li data-correct>The learning rate is too high</li>
+    <li data-why="Too much regularization shrinks weights; it doesn't make predictions extreme.">Regularization is too strong</li>
+    <li data-why="Too few epochs leaves loss high but stable.">Too few epochs</li>
+    <li data-why="Collisions blur features; they don't cause divergence.">Too many hash collisions</li>
+  </ul>
+  <div class="explain"><p>Overshooting. Each step jumps past the minimum, weights grow, and the sigmoid saturates at 0 or 1. Lower the learning rate, or use an adaptive optimizer that scales steps per weight (AdaGrad, Adam).</p></div>
+</div>
+
+<h2 id="inside"><span class="sec">7.7</span>Look inside your model</h2>
+
+<p>Because logistic regression has one weight per feature, you can read what it learned. Pebble's world has a real lunchtime effect for Food ads, one the model was never told about. Did your model find it from clicks alone?</p>
+
+<div class="widget" id="w-inside">
+  <div class="w-title">Did it find lunchtime?</div>
+  <div class="w-sub">The learned weight of <code>hour×cat=h_10</code> (Food, by hour) in your trained model, against the true hour effect in the simulator.</div>
+</div>
+
+<details class="callout deep"><summary><div class="label">Going deeper: optimizers, batches, and why ads models use AdaGrad</div></summary>
+<p>Your step uses one learning rate for every weight. That's a poor fit for sparse data: the bias feature appears on every row and gets millions of updates, while a user ID appears on a handful. <dfn>AdaGrad</dfn> gives each weight its own step size, shrinking as that weight accumulates squared gradients, so rare features learn quickly and common ones settle. For years it was the standard for sparse CTR models. The FTRL-Proximal algorithm from Google's "Ad Click Prediction: a View from the Trenches" (McMahan et al., 2013) is a close relative that also produces sparse weights. Deep models use <dfn>Adam</dfn> for dense layers and often AdaGrad-style updates for embedding tables. <dfn>Mini-batching</dfn> (averaging gradients over, say, 512 examples per step) makes each step less noisy and lets GPUs process examples in parallel.</p>
+</details>
+
+<div class="reflect" data-id="ch7-r1">
+  <p class="q">An engineer reports: "The new model's training loss is 8% lower than the current model's." Is that good news? What would you ask?</p>
+  <div class="model">
+    <ul>
+      <li><strong>Training loss isn't the goal.</strong> A model can drive training loss down by memorizing. Ask for <strong>held-out</strong> metrics on data <em>after</em> the training period (not a random split, which leaks the future into training), plus calibration.</li>
+      <li><strong>Same data?</strong> Were both models trained and evaluated on the same examples, the same label definition, and the same sampling? Otherwise the numbers aren't comparable.</li>
+      <li><strong>How many epochs, and where was held-out loss lowest?</strong> A falling training loss with a rising held-out loss means overfitting.</li>
+      <li><strong>Where does it help?</strong> Slices by new vs. established ads and users, and by country.</li>
+      <li><strong>And ultimately:</strong> the online A/B test (Chapter 9).</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>Your stack has its first <strong>learned model</strong>: a logistic regression trained on your own logs, using your features and your gradient step. It's saved, but not yet in production. Deciding whether it should be is Chapter 9's job.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Logit</b>The raw score z; the sigmoid turns it into a probability.</div>
+    <div><b>Log loss</b>−[y log p + (1−y) log(1−p)]; its gradient in z is p − y.</div>
+    <div><b>Learning rate</b>Step size; too small is slow, too big diverges.</div>
+    <div><b>Epoch</b>One pass over the training data.</div>
+    <div><b>Overfitting</b>Fitting noise: training loss falls while held-out loss rises.</div>
+    <div><b>L2 regularization</b>A pull toward zero that tames weights backed by little data.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world();
+
+  /* ---------------- loss landscape ---------------- */
+  (function () {
+    var host = document.getElementById('w-gd');
+    var grid = el('div', { class: 'w-grid side' }), L = el('div'), R = el('div'); grid.appendChild(L); grid.appendChild(R); host.appendChild(grid);
+    var sig = Book.sigmoid, lg = Book.logloss;
+    function loss(b, wt) { return 0.5 * (0.05 * -Math.log(sig(b)) + 0.95 * -Math.log(1 - sig(b))) + 0.5 * (0.2 * -Math.log(sig(b + wt)) + 0.8 * -Math.log(1 - sig(b + wt))); }
+    var ctl = Book.controls(L, [{ key: 'lr', label: 'Learning rate η', min: -1, max: 2, step: 0.05, value: 0.7, fmt: function (v) { return Math.pow(10, v).toFixed(2); } }], draw);
+    var st = Book.stats(L, [{ key: 'l', label: 'Loss after 60 steps' }, { key: 'p0', label: 'σ(b)', sub: 'target 5%' }, { key: 'p1', label: 'σ(b + w)', sub: 'target 20%' }]);
+    var B = [-6, 1], Wr = [-1.5, 4];
+    var c = Book.chart(R, { w: 520, h: 330, x: B, y: Wr, xlabel: 'bias b', ylabel: 'feature weight w' });
+    var cells = [], N = 36, mn = Infinity, mx = -Infinity;
+    for (var i = 0; i < N; i++) for (var j = 0; j < N; j++) {
+      var b = B[0] + (i + 0.5) * (B[1] - B[0]) / N, wt = Wr[0] + (j + 0.5) * (Wr[1] - Wr[0]) / N, l = Math.log(loss(b, wt));
+      cells.push([b, wt, l]); mn = Math.min(mn, l); mx = Math.max(mx, l);
+    }
+    function draw() {
+      c.clear();
+      var db = (B[1] - B[0]) / N, dw = (Wr[1] - Wr[0]) / N;
+      cells.forEach(function (q) { var t = (q[2] - mn) / (mx - mn); c.rect(q[0] - db / 2, q[1] - dw / 2, q[0] + db / 2, q[1] + dw / 2, { fill: 'var(--s1)', opacity: 0.08 + 0.75 * (1 - t), rx: 0 }); });
+      var eta = Math.pow(10, ctl.values.lr), b = 0, wt = 0, path = [[b, wt]];
+      for (var k = 0; k < 60; k++) {
+        var gb = 0.5 * (sig(b) - 0.05) + 0.5 * (sig(b + wt) - 0.2), gw = 0.5 * (sig(b + wt) - 0.2);
+        b -= eta * gb; wt -= eta * gw;
+        b = Math.max(B[0] - 3, Math.min(B[1] + 3, b)); wt = Math.max(Wr[0] - 3, Math.min(Wr[1] + 3, wt));
+        path.push([b, wt]);
+      }
+      var tb = Book.logit(0.05), tw = Book.logit(0.2) - tb;
+      c.line(path, { color: 'var(--s2)', width: 2, top: true });
+      c.dots(path.map(function (p) { return [p[0], p[1], 2.5, 'var(--s2)']; }), { top: true });
+      c.dots([[tb, tw, 6, 'var(--s3)']], { top: true, stroke: 'var(--paper)' });
+      st({ l: loss(b, wt).toFixed(4), p0: Book.pct(sig(b), 1), p1: Book.pct(sig(b + wt), 1) });
+    }
+    draw();
+    L.appendChild(el('p', { class: 'small muted', text: 'Green dot = the minimum. Try η ≈ 0.3 (slow), 5 (good), and 60 (overshoots).' }));
+  })();
+
+  /* ---------------- training ---------------- */
+  var trained = null;
+  (function () {
+    var host = document.getElementById('w-train');
+    var grid = el('div', { class: 'w-grid side' }), L = el('div'), R = el('div'); grid.appendChild(L); grid.appendChild(R); host.appendChild(grid);
+    var lrs = [0.01, 0.02, 0.05, 0.1, 0.3], l2s = [0, 1e-6, 1e-5, 1e-4, 1e-3];
+    var ctl = Book.controls(L, [
+      { key: 'ep', label: 'Epochs', min: 1, max: 5, step: 1, value: 2 },
+      { key: 'lr', label: 'Learning rate', min: 0, max: 4, step: 1, value: 2, fmt: function (v) { return String(lrs[v]); } },
+      { key: 'l2', label: 'L2 strength', min: 0, max: 4, step: 1, value: 1, fmt: function (v) { return l2s[v] ? l2s[v].toExponential(0) : '0'; } }
+    ], function () {});
+    var btnHost = el('div', { style: 'margin-top:10px' }); L.appendChild(btnHost);
+    var c1 = Book.chart(R, { w: 520, h: 200, x: [0, 2], y: [0.1, 0.2], xlabel: 'Epoch', ylabel: 'Running train loss', yfmt: function (v) { return v.toFixed(3); } });
+    var c2host = el('div'); R.appendChild(c2host);
+    var out = el('div'); host.appendChild(out);
+    var data = null;
+    StackUI.asyncButton(btnHost, 'Train on your logs', async function (progress) {
+      if (!data) {
+        var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.25, 'Collecting logs…'); } });
+        var ev = await Stack.evalLog({ onProgress: function (p) { progress(0.25 + p * 0.1, 'Collecting day 10…'); } });
+        var rows = Stack.labeledRows(tl), er = Stack.labeledRows(ev);
+        var sub = rows.filter(function (_, i) { return i % 9 === 0; });
+        data = { rows: rows, er: er, ev: ev, sub: sub };
+      }
+      var v = ctl.values, E = v.ep, perEpoch = [];
+      c1.setDomain([0, E], null);
+      var ll = function (m, rs) { return Stack.loglossRef(Stack.lrPredictRows(m, rs), rs.map(function (r) { return r.click; })); };
+      var m = await Stack.trainLR({ rows: data.rows, epochs: E, lr: lrs[v.lr], l2: l2s[v.l2],
+        onProgress: function (p, curve) {
+          progress(0.35 + 0.6 * p, 'Training…');
+          if (!curve || !curve.length) return;
+          var ys = curve.map(function (q) { return q.loss; });
+          c1.setDomain([0, E], [Math.max(0, Math.min.apply(null, ys) * 0.95), Math.min(1, Math.max.apply(null, ys) * 1.05)]);
+          c1.clear(); c1.line(curve.map(function (q) { return [q.x, q.loss]; }), { color: 'var(--s1)', width: 1.6 });
+        },
+        onEpoch: function (e, snap) { perEpoch.push({ e: e, train: ll(snap, data.sub), held: ll(snap, data.er) }); }
+      });
+      trained = m;
+      var ey = data.er.map(function (r) { return r.click; }), et = data.ev.truth.map(function (t) { return t.pctr; });
+      var ev = Stack.evaluate(Stack.lrPredictRows(m, data.er), ey, et);
+      var heur = Stack.evaluate(data.ev.impressions.map(function (i) { return i.pctr * w.cfg.examine[i.slot]; }), ey, et);
+      c2host.innerHTML = '';
+      var ys = []; perEpoch.forEach(function (p) { ys.push(p.train, p.held); });
+      var c2 = Book.chart(c2host, { w: 520, h: 190, x: [0.8, E + 0.2], y: [Math.min.apply(null, ys) * 0.98, Math.max.apply(null, ys) * 1.02], xticks: perEpoch.map(function (p) { return p.e; }), xlabel: 'After epoch', ylabel: 'Log loss', yfmt: function (v) { return v.toFixed(3); } });
+      c2.line(perEpoch.map(function (p) { return [p.e, p.train]; }), { color: 'var(--s1)' });
+      c2.line(perEpoch.map(function (p) { return [p.e, p.held]; }), { color: 'var(--s2)' });
+      c2.dots(perEpoch.map(function (p) { return [p.e, p.held, 4, 'var(--s2)']; }).concat(perEpoch.map(function (p) { return [p.e, p.train, 4, 'var(--s1)']; })));
+      Book.legend(c2host, [{ label: 'Training data', color: 'var(--s1)' }, { label: 'Held-out (day 10)', color: 'var(--s2)' }]);
+      out.innerHTML = '';
+      var st = Book.stats(out, [{ key: 'auc', label: 'Held-out AUC', sub: 'heuristic: ' + heur.auc.toFixed(3) }, { key: 'll', label: 'Held-out log loss' }, { key: 'cal', label: 'Calibration', sub: 'Σ predicted / Σ clicks' }, { key: 'src', label: 'Gradient step', sub: '' }]);
+      st({ auc: { v: ev.auc.toFixed(3), tone: ev.auc > heur.auc ? 'good' : 'bad' }, ll: ev.logloss.toFixed(4), cal: { v: ev.calibration.toFixed(2), tone: Math.abs(ev.calibration - 1) < 0.1 ? 'good' : 'bad' }, src: Stack.implSource('sgdStep') === 'you' ? 'yours ✓' : 'reference' });
+      var best = perEpoch.reduce(function (a, b) { return b.held < a.held ? b : a; });
+      out.appendChild(el('p', { class: 'small', html: 'Held-out loss was lowest after epoch <b>' + best.e + '</b>. ' + (best.e < E ? 'Training past it only memorized noise.' : '') + ' Your model ranks clicked impressions above non-clicked ones ' + Book.pct(ev.auc, 1) + ' of the time, against ' + Book.pct(heur.auc, 1) + ' for your Chapter 1 heuristic.' }));
+      var save = el('button', { type: 'button', class: 'btn accent', text: 'Save this as your stack\'s model' });
+      save.onclick = function () {
+        Stack.putModel('lr', m, { source: Stack.implSource('sgdStep'), epochs: E, lr: lrs[v.lr], l2: l2s[v.l2], auc: +ev.auc.toFixed(4), trainedOn: 'days 0–9' });
+        if (Stack.implSource('sgdStep') === 'you') Stack.markBuilt(7, 'you'); else Stack.markBuilt(7, 'reference');
+        save.textContent = '✓ Saved. Chapter 9 decides whether it goes to production';
+        save.disabled = true;
+        document.dispatchEvent(new CustomEvent('stackchange'));
+        drawInside();
+      };
+      out.appendChild(el('div', { class: 'btn-row' }, [save]));
+      drawInside();
+    });
+  })();
+
+  /* ---------------- inside the model ---------------- */
+  var insideHost = document.getElementById('w-inside');
+  var insideOut = el('div'); insideHost.appendChild(insideOut);
+  function drawInside() {
+    var m = trained || Stack.getModel('lr');
+    insideOut.innerHTML = '';
+    if (!m) { insideOut.appendChild(el('p', { class: 'small muted', text: 'Train (or load) a model above first.' })); return; }
+    var mask = (1 << m.bits) - 1, learned = [], truth = [], found = 0;
+    for (var h = 0; h < 24; h++) {
+      var k = Stack.fnv1a('hour×cat=' + h + '_10') & mask;
+      if (m.w[k] !== 0) found++;
+      learned.push([h, m.w[k]]); truth.push([h, w.truth.hourEffect(10, h)]);
+    }
+    if (found < 12) { insideOut.appendChild(el('p', { class: 'small', html: 'Your model has no <code>hour×cat</code> features, so it can\'t represent a lunchtime effect for Food. Add <code>"hour×cat=" + user.hour + "_" + c</code> to your <code>featurize()</code> in Chapter 6 and retrain.' })); return; }
+    var mL = Stack.mean(learned.map(function (p) { return p[1]; })), mT = Stack.mean(truth.map(function (p) { return p[1]; }));
+    var L2 = learned.map(function (p) { return [p[0], p[1] - mL]; }), T2 = truth.map(function (p) { return [p[0], p[1] - mT]; });
+    var all = L2.concat(T2).map(function (p) { return p[1]; });
+    var c = Book.chart(insideOut, { w: 640, h: 240, x: [0, 23], y: [Math.min.apply(null, all) - 0.1, Math.max.apply(null, all) + 0.1], xlabel: 'Hour of day', ylabel: 'Effect on log-odds', xticks: [0, 3, 6, 9, 12, 15, 18, 21], xfmt: function (v) { return v + ':00'; }, yfmt: function (v) { return v.toFixed(1); } });
+    c.line(T2, { color: 'var(--ink-3)', dash: '5 4' }); c.line(L2, { color: 'var(--s2)' }); c.dots(L2.map(function (p) { return [p[0], p[1], 3, 'var(--s2)']; }));
+    Book.legend(insideOut, [{ label: 'Your model\'s learned weights (centred)', color: 'var(--s2)' }, { label: 'True effect in the simulator (centred)', color: 'var(--ink-3)', dash: true }]);
+    insideOut.appendChild(el('p', { class: 'small', text: 'Both are centred on zero because only the shape matters: a constant shift is absorbed by other weights. Peaks at lunch and dinner were learned from clicks alone. The wiggles are noise; some hours have little Food traffic.' }));
+  }
+  drawInside();
+})();
+</script>
+</body>
+</html>

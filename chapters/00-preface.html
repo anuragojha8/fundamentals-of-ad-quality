@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Read This Book — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+</head>
+<body data-chapter="00-preface">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Start here</div>
+  <h1>How to Read This Book</h1>
+  <p class="dek">In which I become an Ads Quality PM, and nobody warns me about the math.</p>
+</header>
+
+<p class="lead">Look, I'll be honest with you. Most PMs who work on ads know the words. <em>pCTR</em>. <em>eCPM</em>. <em>Two-tower</em>. <em>Calibration</em>. You nod along in the model review, you write "calibration ↑" in your notes, and you hope nobody asks you a follow-up question. I've been there. It's not a great feeling.</p>
+
+<p>Far fewer people can explain why a model that improved AUC made revenue go <em>down</em>, or why the ML team wants to spend an entire quarter on, of all things, logging. That second kind of knowledge is what this book is about. An ad system is a machine that turns predictions into prices. Once you understand the predictions, you understand the business.</p>
+
+<!-- ANURAG: optional. A line or two about why you wanted to write this book, e.g. the moment you realized you were nodding along in a model review. -->
+
+<p>This book is for product managers with a computer science background. You've taken a probability course, you can read Python, and you remember roughly what a derivative is (it's the slope thing, don't panic). You don't need to have trained a model. By the end, I promise you'll be able to:</p>
+
+<ul>
+  <li><strong>Trace an ad request end to end</strong>, from the moment a user opens the app to the moment a conversion comes back and becomes a training label.</li>
+  <li><strong>Reason about the auction</strong>: how predictions set prices, and why a miscalibrated model is a pricing bug.</li>
+  <li><strong>Read a model design doc</strong> and ask good questions about its labels, features, loss, architecture, and evaluation.</li>
+  <li><strong>Tell a real win from a measurement artifact</strong> in an offline metric or an A/B test.</li>
+  <li><strong>Make the tradeoffs a quality PM owns</strong>: revenue vs. user experience, latency vs. model size, freshness vs. cost, short-term vs. long-term.</li>
+</ul>
+
+<h2 id="stack"><span class="sec">0.1</span>The map</h2>
+
+<p>Here's the whole system on one page. Each box is a chapter or two. You'll keep coming back to this diagram, because everything in the book is a zoom into one of these boxes, or into one of the arrows between them.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 360" role="img" aria-label="Ad system overview: request flows through retrieval, early ranking, late ranking, auction, and serving; logs feed training which updates models.">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <rect class="box" x="10" y="40" width="96" height="64" rx="10"/>
+  <text x="58" y="68" text-anchor="middle" class="t-md t-b">Ad request</text>
+  <text x="58" y="86" text-anchor="middle" class="t-sm">user + context</text>
+
+  <rect class="box b" x="136" y="40" width="112" height="64" rx="10"/>
+  <text x="192" y="64" text-anchor="middle" class="t-md t-b">Retrieval</text>
+  <text x="192" y="81" text-anchor="middle" class="t-sm">millions → ~1,000</text>
+  <text x="192" y="96" text-anchor="middle" class="t-sm">Ch. 10</text>
+
+  <rect class="box b" x="278" y="40" width="112" height="64" rx="10"/>
+  <text x="334" y="64" text-anchor="middle" class="t-md t-b">Early ranking</text>
+  <text x="334" y="81" text-anchor="middle" class="t-sm">1,000 → ~100</text>
+  <text x="334" y="96" text-anchor="middle" class="t-sm">Ch. 11</text>
+
+  <rect class="box b" x="420" y="40" width="112" height="64" rx="10"/>
+  <text x="476" y="64" text-anchor="middle" class="t-md t-b">Late ranking</text>
+  <text x="476" y="81" text-anchor="middle" class="t-sm">pCTR, pCVR, pHide…</text>
+  <text x="476" y="96" text-anchor="middle" class="t-sm">Ch. 11–12, 14</text>
+
+  <rect class="box a" x="562" y="40" width="88" height="64" rx="10"/>
+  <text x="606" y="64" text-anchor="middle" class="t-md t-b">Auction</text>
+  <text x="606" y="81" text-anchor="middle" class="t-sm">rank & price</text>
+  <text x="606" y="96" text-anchor="middle" class="t-sm">Ch. 2–3</text>
+
+  <rect class="box" x="672" y="40" width="78" height="64" rx="10"/>
+  <text x="711" y="68" text-anchor="middle" class="t-md t-b">Serve</text>
+  <text x="711" y="86" text-anchor="middle" class="t-sm">ad shown</text>
+
+  <path class="arrow" d="M106,72 H134"/><path class="arrow" d="M248,72 H276"/><path class="arrow" d="M390,72 H418"/><path class="arrow" d="M532,72 H560"/><path class="arrow" d="M650,72 H670"/>
+
+  <rect class="box g" x="560" y="170" width="190" height="64" rx="10"/>
+  <text x="655" y="194" text-anchor="middle" class="t-md t-b">Logging</text>
+  <text x="655" y="211" text-anchor="middle" class="t-sm">impressions, clicks, conversions</text>
+  <text x="655" y="226" text-anchor="middle" class="t-sm">Ch. 4</text>
+  <path class="arrow" d="M711,104 V168"/>
+
+  <rect class="box g" x="300" y="170" width="220" height="64" rx="10"/>
+  <text x="410" y="194" text-anchor="middle" class="t-md t-b">Labels + features</text>
+  <text x="410" y="211" text-anchor="middle" class="t-sm">joins, windows, bias, leakage</text>
+  <text x="410" y="226" text-anchor="middle" class="t-sm">Ch. 5–6</text>
+  <path class="arrow" d="M560,202 H522"/>
+
+  <rect class="box v" x="40" y="170" width="220" height="64" rx="10"/>
+  <text x="150" y="194" text-anchor="middle" class="t-md t-b">Training + evaluation</text>
+  <text x="150" y="211" text-anchor="middle" class="t-sm">losses, heads, metrics, A/B tests</text>
+  <text x="150" y="226" text-anchor="middle" class="t-sm">Ch. 7–9, 13</text>
+  <path class="arrow" d="M300,202 H262"/>
+
+  <path class="arrow" d="M150,170 C150,130 230,125 300,108"/>
+  <text x="178" y="138" class="t-sm">new models deployed</text>
+
+  <rect class="box" x="40" y="280" width="710" height="54" rx="10" style="stroke-dasharray:4 4"/>
+  <text x="395" y="304" text-anchor="middle" class="t-md t-b">The objective you own (Ch. 14): advertiser value + user experience + platform revenue, over the long run</text>
+  <text x="395" y="322" text-anchor="middle" class="t-sm">Capstone (Ch. 15): make those tradeoffs in a live simulation</text>
+</svg>
+<figcaption>The ad stack. The top row runs in about 200 milliseconds for every request. The bottom row runs over hours to days and closes the loop: what we show decides what we log, what we log decides what we learn, and what we learn decides what we show.</figcaption>
+</figure>
+
+<p>Notice the loop? That loop is the most important structural fact about ad systems, and it's why you'll hear "bias," "exploration," and "feedback loop" thrown around so much. The model is trained on data that the model itself chose to collect. If that doesn't make you slightly uneasy, give it a few chapters. It will.</p>
+
+<h2 id="pebble"><span class="sec">0.2</span>Our running example: Pebble</h2>
+
+<div class="callout story">
+  <div class="label">The setup</div>
+  <p>Congratulations! You've just joined <strong>Pebble</strong>, a photo-sharing app with 80 million daily users, as the PM for <strong>Ads Quality</strong>. Pebble shows one ad for roughly every eight posts in the feed, and about 40,000 advertisers fight over those slots. Your team owns the models that decide which ad a user sees and how much the advertiser pays. So, you know. Just the money.</p>
+  <p>You'll meet a few Pebble advertisers along the way: <strong>Trailhead</strong> (hiking boots), <strong>Nimbus</strong> (a neobank), <strong>Sprout</strong> (meal kits), <strong>Orbit</strong> (a mobile game), and <strong>Lumen</strong> (skincare). They all want different things, and at some point every one of them will be mad at you. That's how you know you're doing the job.</p>
+</div>
+
+<p>Pebble is made up (sadly, I don't own a photo app with 80 million users), but its numbers are realistic in shape, and every mechanism in the book is one that real platforms actually use. Where a technique comes from a specific published paper, I'll name it so you can go read the original if you're into that kind of thing.</p>
+
+<h2 id="build"><span class="sec">0.3</span>What you'll build</h2>
+
+<p>Here's the fun part. This isn't a book you just read. Chapter by chapter, we're going to build <strong>one working ad system</strong> together, running entirely in your browser, against a simulated Pebble: 4,000 users, 60 advertisers, and about 340 ads, all clicking, converting, and occasionally rage-hiding ads in realistic ways. You'll write the key pieces yourself in small JavaScript functions: the eligibility filter, the auction, the label join, the gradient step, the evaluation metrics. You'll train real models on your own logs and ship them into your own stack. Pretty cool, right?</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 120" role="img" aria-label="Your stack: request loop, retrieval, ranking, auction, logging, training, evaluation">
+  <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <g font-size="12">
+  <rect x="10" y="30" width="90" height="46" rx="8" class="box"/><text x="55" y="50" text-anchor="middle" class="t-md t-b">Requests</text><text x="55" y="66" text-anchor="middle" class="t-sm">Ch. 1</text>
+  <rect x="115" y="30" width="95" height="46" rx="8" class="box b"/><text x="162" y="50" text-anchor="middle" class="t-md t-b">Retrieval</text><text x="162" y="66" text-anchor="middle" class="t-sm">Ch. 10</text>
+  <rect x="225" y="30" width="100" height="46" rx="8" class="box b"/><text x="275" y="50" text-anchor="middle" class="t-md t-b">Ranking</text><text x="275" y="66" text-anchor="middle" class="t-sm">Ch. 1, 7, 11, 12</text>
+  <rect x="340" y="30" width="90" height="46" rx="8" class="box a"/><text x="385" y="50" text-anchor="middle" class="t-md t-b">Auction</text><text x="385" y="66" text-anchor="middle" class="t-sm">Ch. 2, 3, 14</text>
+  <rect x="445" y="30" width="95" height="46" rx="8" class="box g"/><text x="492" y="50" text-anchor="middle" class="t-md t-b">Logs + joins</text><text x="492" y="66" text-anchor="middle" class="t-sm">Ch. 4, 5</text>
+  <rect x="555" y="30" width="90" height="46" rx="8" class="box v"/><text x="600" y="50" text-anchor="middle" class="t-md t-b">Training</text><text x="600" y="66" text-anchor="middle" class="t-sm">Ch. 6–8, 13</text>
+  <rect x="660" y="30" width="90" height="46" rx="8" class="box v"/><text x="705" y="50" text-anchor="middle" class="t-md t-b">Evaluation</text><text x="705" y="66" text-anchor="middle" class="t-sm">Ch. 9</text>
+  <path class="arrow" d="M100,53 H113" marker-end="url(#arr2)"/><path class="arrow" d="M210,53 H223" marker-end="url(#arr2)"/><path class="arrow" d="M325,53 H338" marker-end="url(#arr2)"/><path class="arrow" d="M430,53 H443" marker-end="url(#arr2)"/><path class="arrow" d="M540,53 H553" marker-end="url(#arr2)"/><path class="arrow" d="M645,53 H658" marker-end="url(#arr2)"/>
+  <path class="arrow" d="M705,76 C705,110 275,110 275,78" marker-end="url(#arr2)"/>
+  </g>
+</svg>
+<figcaption>Your stack. Each chapter adds or upgrades one piece; the capstone (Ch. 15) runs all of it for a simulated quarter.</figcaption>
+</figure>
+
+<p>Two things make the simulation a teaching tool rather than a toy:</p>
+<ul>
+  <li><strong>It knows the truth.</strong> Every user–ad pair has a true click probability, a true conversion probability, and a true hide probability. Your models never get to see them, but the widgets do, and they use them to grade your models against reality instead of against noisy logged labels. At work you will never, ever get this. Here, you get to see exactly what your metrics were hiding from you.</li>
+  <li><strong>Your decisions stick.</strong> The exploration rate you pick in Chapter 5 shapes the logs your Chapter 7 model learns from, which decides whether it wins the Chapter 9 A/B test. (Yes, I'm setting you up. No, I won't tell you the right answer yet.) Your code, settings, and trained models are saved in this browser.</li>
+</ul>
+
+<div class="callout pm"><div class="label">Skipping ahead?</div>
+<p>No judgment. Every chapter starts with a <strong>Your ad stack</strong> panel. If you jump to a chapter whose prerequisites you haven't built, a <em>Load reference solutions</em> button fills them in, trains any missing models, and lets you pick up from there. Anything you built yourself stays yours. Every code exercise has a reference solution too, so nothing can block you.</p>
+</div>
+
+<h2 id="how"><span class="sec">0.4</span>How each chapter works</h2>
+
+<p>Every chapter mixes a few kinds of material, and each looks different so you can skim or go deep depending on how much coffee you've had:</p>
+
+<div class="callout intuition"><div class="label">Intuition</div><p>The one idea to hold onto, before or after the math. If you remember nothing else, remember these.</p></div>
+<div class="callout pm"><div class="label">In your job</div><p>How this concept shows up in your actual week: in a review, a roadmap debate, a metrics readout, or a 2 a.m. incident.</p></div>
+<div class="callout trap"><div class="label">Common trap</div><p>Mistakes smart people make, usually because the obvious reading of a metric is wrong. I've made most of them.</p></div>
+<details class="callout deep"><summary><div class="label">Going deeper</div></summary><p>Optional detail for the curious: derivations, paper references, edge cases. Skip them guilt-free. The story still makes sense without them.</p></details>
+
+<p>And then there's the stuff you get to poke at:</p>
+<ul>
+  <li><strong>Build steps</strong> (marked <span class="tag" style="background:var(--violet-soft);color:var(--violet)">BUILD</span>). A small function to write, with tests that run in the page. Your code joins your stack as soon as its tests pass; until then, the stack uses the reference solution.</li>
+  <li><strong>Simulations</strong> (marked <span class="tag a">INTERACTIVE</span>). Most run on your own stack. Drag things. Try to break them. Honestly, breaking them is where most of the learning happens.</li>
+  <li><strong>Checks</strong>: multiple-choice questions and numeric exercises, graded in the page. A chapter counts as complete when you've solved all of them.</li>
+  <li><strong>Apply it</strong>: open-ended PM scenarios. Write your answer, then compare it with a strong one. They don't count toward completion, but between you and me, they're the most useful part of the book.</li>
+</ul>
+
+<h2 id="math"><span class="sec">0.5</span>A note on math (and code)</h2>
+
+<p>The code exercises are short, usually 5 to 15 lines of plain JavaScript, and each one starts from a commented template. If you can read Python, you can write these. I believe in you.</p>
+
+<p>There's some math too. Not much, and it's always the kind that tells you something. You'll see probabilities like \(P(\text{click} \mid \text{user}, \text{ad})\), the logistic function, a few sums, and one or two gradients. Whenever a formula shows up, the sentence right after it says what it means in plain English. If you can read this one, you're ready:</p>
+
+\[ \mathbb{E}[\text{revenue per impression}] = P(\text{click}) \times \text{price per click} \]
+
+<div class="quiz" data-id="ch0-q1">
+  <p class="q">Warm-up. Trailhead pays $2.00 per click, and its ad is clicked on 1.5% of impressions. What's the expected revenue from showing it 1,000 times?</p>
+  <ul>
+    <li data-why="That's the revenue from a single click, not from 1,000 impressions.">$2.00</li>
+    <li data-correct>$30.00</li>
+    <li data-why="Check the decimal: 1.5% of 1,000 is 15 clicks.">$300.00</li>
+    <li data-why="That's the number of clicks, not dollars.">$15.00</li>
+  </ul>
+  <div class="explain"><p>1,000 × 0.015 = 15 expected clicks, and 15 × $2.00 = <strong>$30.00</strong>. Revenue per thousand impressions has a name, <dfn>eCPM</dfn> (effective cost per mille), and it's the single most important number in this book. It'll be back in Chapter 2. It's always back.</p></div>
+</div>
+
+<h2 id="paths"><span class="sec">0.6</span>Reading paths</h2>
+
+<div class="table-wrap">
+<table class="data">
+  <thead><tr><th>If you have…</th><th>Read</th></tr></thead>
+  <tbody>
+    <tr><td>One afternoon</td><td>Ch. 1, 2, 3, then load the reference stack and play the Capstone (Ch. 15). You'll get the economics and why predictions matter.</td></tr>
+    <tr><td>A week of evenings</td><td>Everything in order, building every piece, skipping "Going deeper" boxes.</td></tr>
+    <tr><td>A model review tomorrow</td><td>Ch. 9 (Evaluation) and Appendix B (question bank).</td></tr>
+    <tr><td>A new job on a conversions team</td><td>Ch. 3, 4, 5, then 12. Conversion modeling is mostly a data problem.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="recap">
+  <h3>Before you move on</h3>
+  <p>Ad systems are a loop: <strong>show → log → learn → show</strong>. Predictions (the probability of a click, a conversion, a hide) feed the auction, and the auction turns them into prices. In the rest of the book, you build every box yourself.</p>
+  <p>Okay, that's enough preamble. Somewhere on Pebble, someone just opened the app, and we have about 200 milliseconds to do something about it. Let's go.</p>
+</div>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Towers, Crosses, and Transformers — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="11-ranking-architectures">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 11 · Part IV · The Models</div>
+  <h1>Towers, Crosses, and Transformers</h1>
+  <p class="dek">The anatomy of a modern ranking model, piece by piece. Plus the uncomfortable discovery that a bigger model is not automatically a better one.</p>
+</header>
+
+<div class="stack-panel" data-chapter="11"></div>
+
+<p class="lead">Your logistic regression is a list of weights: one per feature string, added up. It can only learn interactions you spelled out by hand, like <code>hour×cat</code>. Modern ranking models <em>learn</em> their interactions. They turn every ID into a vector, let those vectors interact through dedicated layers, and read the user's history with attention, the same mechanism at the heart of transformers. This chapter builds one, piece by piece. Then it asks the question that matters: does it beat your LR where it counts?</p>
+
+<h2 id="anatomy"><span class="sec">11.1</span>The anatomy</h2>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 330" role="img" aria-label="Deep ranking model: sparse features to embeddings, history with target attention, concatenated, cross layers, MLP, heads; plus a wide linear part">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
+  <rect x="20" y="20" width="180" height="44" rx="8" class="box"/><text x="110" y="47" text-anchor="middle" class="t-md">user, ad, advertiser, age…</text>
+  <rect x="20" y="90" width="180" height="44" rx="8" class="box"/><text x="110" y="110" text-anchor="middle" class="t-md">history: 12 recent</text><text x="110" y="125" text-anchor="middle" class="t-sm">engaged categories</text>
+  <rect x="240" y="20" width="140" height="44" rx="8" class="box b"/><text x="310" y="40" text-anchor="middle" class="t-md t-b">Embeddings</text><text x="310" y="55" text-anchor="middle" class="t-sm">one vector per ID</text>
+  <rect x="240" y="90" width="140" height="44" rx="8" class="box v"/><text x="310" y="110" text-anchor="middle" class="t-md t-b">Target attention</text><text x="310" y="125" text-anchor="middle" class="t-sm">query = candidate ad</text>
+  <rect x="420" y="50" width="100" height="54" rx="8" class="box"/><text x="470" y="75" text-anchor="middle" class="t-md t-b">Concat</text><text x="470" y="92" text-anchor="middle" class="t-sm">x₀ (72 numbers)</text>
+  <rect x="420" y="140" width="100" height="44" rx="8" class="box a"/><text x="470" y="160" text-anchor="middle" class="t-md t-b">Cross layer</text><text x="470" y="175" text-anchor="middle" class="t-sm">x₀ ⊙ (W x + b) + x</text>
+  <rect x="420" y="215" width="100" height="44" rx="8" class="box b"/><text x="470" y="235" text-anchor="middle" class="t-md t-b">MLP</text><text x="470" y="250" text-anchor="middle" class="t-sm">72 → 32 → 1</text>
+  <rect x="20" y="215" width="360" height="44" rx="8" class="box g"/><text x="200" y="235" text-anchor="middle" class="t-md t-b">Wide part: your hashed features (the LR, inside)</text><text x="200" y="250" text-anchor="middle" class="t-sm">crosses, counts, history features → linear weights</text>
+  <rect x="580" y="215" width="160" height="44" rx="8" class="box a"/><text x="660" y="235" text-anchor="middle" class="t-md t-b">Σ logits → σ</text><text x="660" y="250" text-anchor="middle" class="t-sm">pCTR head (+ slot bias)</text>
+  <path class="arrow" d="M200,42 H238"/><path class="arrow" d="M200,112 H238"/><path class="arrow" d="M380,42 C400,42 405,65 418,70"/><path class="arrow" d="M380,112 C400,112 405,92 418,88"/>
+  <path class="arrow" d="M470,104 V138"/><path class="arrow" d="M470,184 V213"/><path class="arrow" d="M520,237 H578"/><path class="arrow" d="M380,237 C400,285 560,285 600,261"/>
+  <path class="arrow" d="M310,64 V88" style="stroke-dasharray:3 3"/><text x="318" y="80" class="t-sm">ad's category = query</text>
+</svg>
+<figcaption>Your stack's deep ranker. Each block is a real, trainable piece. You'll turn them on and off below.</figcaption>
+</figure>
+
+<h3>Embeddings</h3>
+<p>An <dfn>embedding</dfn> replaces an ID with a learned vector: 8 numbers per user, per ad, per category. Where the LR learns one number per ad ("how clickable is ad 182"), an embedding learns <em>how</em> ad 182 is clickable: which kinds of users, which contexts. Vectors of similar things drift close together, so what the model learns about one ad partly transfers to similar ones.</p>
+
+<h3>Cross layers</h3>
+<p>Feeding embeddings straight into an MLP (a stack of dense layers) works, but MLPs are surprisingly inefficient at learning multiplicative interactions like "this age × this category." A <dfn>cross layer</dfn> (from DCN, the Deep & Cross Network, Wang et al., 2017 and 2021) builds them explicitly:</p>
+\[ x_{l+1} = x_0 \odot (W x_l + b) + x_l \]
+<p>Each layer multiplies the original input \(x_0\) element-wise with a learned linear transformation of the current layer, so every layer adds one degree of feature interaction. It's the learned version of your hand-built crosses from Chapter 6.</p>
+
+<h3>Target attention over history</h3>
+<p>Your LR summarizes history with counts like "3 of the last 12 posts were Food." But which history items matter depends on the candidate ad: for a Food ad, the Food posts. <dfn>Target attention</dfn> (DIN, the Deep Interest Network, Alibaba, 2018) uses the candidate ad as a <em>query</em>, scores every history item against it, and takes a weighted average:</p>
+\[ \text{score}_i = \frac{h_i \cdot q}{\sqrt{d}}, \qquad \alpha = \text{softmax}(\text{score}), \qquad \text{pooled} = \sum_i \alpha_i h_i \]
+<p>That's the same attention that powers transformers. Sequence models like BST (Alibaba, 2019) and HSTU (Meta's "generative recommenders," 2024) stack many attention layers over long user histories. Those histories can run to thousands of events, and serving them is one of the hardest infrastructure problems in ads today.</p>
+
+<div class="code-cell" data-slot="attentionWeights"></div>
+
+<h2 id="xtower"><span class="sec">11.2</span>Two towers vs. cross towers</h2>
+
+<p>Chapter 10's two-tower model kept user and ad apart until one final dot product. That's what made it fast enough for retrieval over millions of ads. The model above is the opposite, sometimes called a <dfn>cross tower</dfn> or <dfn>early-interaction</dfn> model: user and ad features mix from the first layer, and attention even uses the ad to read the user's history. It's far more expressive, and it can't be precomputed, because every (user, ad) pair needs its own forward pass.</p>
+
+<div class="table-wrap"><table class="data">
+<thead><tr><th></th><th>Two-tower</th><th>Cross tower</th></tr></thead>
+<tbody>
+<tr><td>User–ad interaction</td><td>One dot product, at the end</td><td>Everywhere, from the first layer</td></tr>
+<tr><td>Ad side precomputable?</td><td>Yes, into an ANN index</td><td>No; one forward pass per pair</td></tr>
+<tr><td>Candidates per request</td><td>Millions</td><td>Tens to hundreds</td></tr>
+<tr><td>Where it lives</td><td>Retrieval, early ranking</td><td>Late ranking</td></tr>
+</tbody></table></div>
+
+<p>That's why your stack serves the deep model in two stages. A cheap early ranker (your LR) picks the top 30 by eCPM, and only those get the expensive forward pass. It's Chapter 1's funnel again.</p>
+
+<h2 id="wide"><span class="sec">11.3</span>Wide &amp; Deep: don't throw away what you know</h2>
+
+<p>Deep models learn interactions from data. Your hand-built features encode interactions you already know about. <dfn>Wide &amp; Deep</dfn> (Google, 2016) keeps both: a linear "wide" part over engineered features, added to the deep network's logit, trained jointly. The deep part generalizes. The wide part memorizes the specific, reliable patterns, and it's often what keeps a deep model honest on data it has seen little of.</p>
+
+<h2 id="train"><span class="sec">11.4</span>Train your deep ranker</h2>
+
+<p>Turn the pieces on and off, train, and look at two numbers. <strong>Offline AUC</strong> is the headline number a model review would show. <strong>Within-request accuracy against the truth</strong> is measured on the 30 candidates the model actually ranks in production, and it's the number the auction feels. Your LR is the baseline.</p>
+
+<div class="widget" id="w-train">
+  <div class="w-title">Build and train a deep ranker</div>
+  <div class="w-sub">Trained on your logs. Evaluated on held-out traffic, offline and against the truth.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>"The deep model has higher AUC, ship it." AUC compares every clicked impression with every non-clicked one, across all users. A model can raise it by getting better at <em>which users click a lot</em>, the ID embeddings are good at that, while getting no better, or worse, at <em>which ad to show this user</em>. The auction only ever makes the second decision. Always ask for within-request metrics (GAUC) next to global AUC, and never skip the A/B test.</p>
+</div>
+
+<h2 id="attn"><span class="sec">11.5</span>What is attention looking at?</h2>
+
+<div class="widget" id="w-attn">
+  <div class="w-title">Attention weights for one user</div>
+  <div class="w-sub">Rows: candidate ads. Columns: the user's 12 most recent engaged posts (most recent on the left). Darker = more attention. Computed with your trained model's embeddings and your attentionWeights().</div>
+</div>
+
+<h2 id="scale"><span class="sec">11.6</span>Does it win? Data decides</h2>
+
+<p>Here is the experiment that matters: an A/B test of your deep ranker against your LR, each trained on the same logs. Then run it again with three times as much training data. Deep models have far more parameters than an LR. With little data they tend to memorize, and with a lot they generalize. Where your stack sits on that curve decides whether the architecture pays. (On the reference stack, the deep model loses about 7% of revenue at 10 days and reaches parity at 30. Your stack may differ.)</p>
+
+<div class="widget" id="w-ab">
+  <div class="w-title">A/B: your LR vs. your deep ranker</div>
+  <div class="w-sub">Both arms use the same retrieval and auction. Choose how much history both models train on.</div>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Architecture launches at big companies are usually worth +0.1% to +0.5% in NE, and they cost real money in serving compute. When someone proposes a bigger model, ask: <em>how much data does it need to beat the current one, and do we have it?</em>, <em>what does it cost per 1,000 requests to serve?</em>, <em>which stage of the funnel will run it, and on how many candidates?</em>, and <em>does it win within requests, not just in global AUC?</em> The best teams scale data, features, and model size together, not the model alone.</p>
+</div>
+
+<div class="quiz" data-id="ch11-q1">
+  <p class="q">Why can't a cross-tower model with target attention be used for retrieval over millions of ads?</p>
+  <ul>
+    <li data-why="It's usually more accurate, not less.">It's less accurate than a two-tower</li>
+    <li data-correct>The user representation depends on the candidate ad (attention uses the ad as the query), so nothing can be precomputed; every pair needs a full forward pass</li>
+    <li data-why="Embeddings aren't the issue; both model types use them.">It doesn't use embeddings</li>
+    <li data-why="Training data isn't the constraint here.">It needs conversion labels</li>
+  </ul>
+  <div class="explain"><p>With target attention, "the user" is a different vector for every candidate ad. There's no single user vector to look up in an index, so the cost scales with (users × ads). That's affordable for 30 candidates, and impossible for 3 million.</p></div>
+</div>
+
+<div class="quiz" data-id="ch11-q2">
+  <p class="q">A deep model beats the production LR offline (AUC +0.02) but loses 5% revenue in an A/B test. Which follow-up is most likely to explain it?</p>
+  <ul>
+    <li data-why="More epochs usually worsen memorization.">Train it for more epochs</li>
+    <li data-correct>Compare within-request ranking accuracy and calibration on the candidates it ranks in production, not just global AUC on logged impressions</li>
+    <li data-why="The A/B test is the ground truth here; offline AUC isn't.">Rerun the A/B test until it's positive</li>
+    <li data-why="Latency affects timeouts, but the revenue loss here comes from ranking.">Reduce its latency</li>
+  </ul>
+  <div class="explain"><p>Offline AUC on logged impressions measures something different from what the auction does: cross-user pairs, only on previously shown ads. Evaluate the decision the model actually makes (within-request, over the real candidate set) and its calibration there. You did exactly that above.</p></div>
+</div>
+
+<div class="reflect" data-id="ch11-r1">
+  <p class="q">Your ranking team wants to replace the current model with a transformer over each user's last 2,000 events. It's +0.4% NE offline and costs 6× the serving compute. Draft the questions and the plan you'd bring to the review.</p>
+  <div class="model">
+    <ul>
+      <li><strong>Is the gain real where it matters?</strong> GAUC and calibration on the production candidate set, slices for heavy vs. light users (short histories get little from long-sequence models), and an A/B test with revenue, advertiser value, and user-experience guardrails.</li>
+      <li><strong>Cost vs. value.</strong> 6× compute on how many candidates? Can it run on fewer (a stricter early stage), or can the sequence encoding be cached per user and shared across candidates (user-side precomputation)? What's the $ per 1% NE, and how does that compare with other roadmap items?</li>
+      <li><strong>Latency and freshness.</strong> Where do 2,000 events come from at serve time, and how fresh are they? A stale history loses much of the point.</li>
+      <li><strong>Plan:</strong> a small-traffic A/B first; distill into a cheaper model if the win is real (Chapter 13); ramp with latency and timeout monitoring.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>A <strong>deep ranker</strong> with embeddings, a DCN cross layer, target attention using your <code>attentionWeights()</code>, and a wide part carrying your engineered features, served in <strong>two stages</strong> behind your LR. You also know when it's worth shipping, and how to tell.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Embedding</b>A learned vector per ID; similar entities end up close.</div>
+    <div><b>Cross layer (DCN)</b>x₀ ⊙ (Wx + b) + x: learned feature interactions.</div>
+    <div><b>Target attention</b>History items weighted by similarity to the candidate ad.</div>
+    <div><b>Cross tower</b>User and ad features interact early; accurate but not precomputable.</div>
+    <div><b>Wide &amp; Deep</b>A linear model over engineered features plus a deep network, trained jointly.</div>
+    <div><b>GAUC</b>AUC computed within requests (or users), then averaged.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world(), trained = null;
+
+  function withinTop30(m, lrM, stats, day) {
+    var pl = Stack.policy({ ranker: 'lr' }), agree = 0, tot = 0, agreeL = 0;
+    w.requestsForDay(day, 250, 1).forEach(function (q) {
+      var uv = Stack.userView(w, q), el2 = w.eligibleAds(q.user, day), a = pl.ranker.predict(q, uv, el2, stats);
+      var ord = el2.map(function (ad, i) { return [i, a[i] * w.ads[ad].cpcBid]; }).sort(function (x, y) { return y[1] - x[1]; }).slice(0, 30).map(function (x) { return x[0]; });
+      var L = ord.map(function (i) { return a[i]; }), D = ord.map(function (i) { return m.pctr(uv, el2[i], stats); }), T = ord.map(function (i) { return w.truth.relevance(q.user, el2[i], q); });
+      for (var i = 0; i < ord.length; i++) for (var j = i + 1; j < ord.length; j++) {
+        if (T[i] === T[j]) continue; tot++;
+        if ((D[i] - D[j]) * (T[i] - T[j]) > 0) agree++;
+        if ((L[i] - L[j]) * (T[i] - T[j]) > 0) agreeL++;
+      }
+    });
+    return { deep: agree / tot, lr: agreeL / tot };
+  }
+
+  /* ---------------- train ---------------- */
+  (function () {
+    var host = document.getElementById('w-train');
+    var cfg = { cross: 1, attention: true, wide: true };
+    function toggle(label, key) {
+      var cb = el('input', { type: 'checkbox' }); cb.checked = !!cfg[key];
+      cb.addEventListener('change', function () { cfg[key] = cb.checked ? (key === 'cross' ? 1 : true) : (key === 'cross' ? 0 : false); });
+      return el('label', { class: 'small', style: 'display:inline-flex;gap:6px;align-items:center;margin-right:16px' }, [cb, label]);
+    }
+    host.appendChild(el('div', { style: 'margin-bottom:10px' }, [toggle('Cross layer', 'cross'), toggle('Target attention (off = average the history)', 'attention'), toggle('Wide part (your features)', 'wide')]));
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var results = [];
+    StackUI.asyncButton(btnHost, 'Train deep ranker', async function (progress) {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.25, 'Collecting logs…'); } });
+      var ev = await Stack.evalLog({ onProgress: function (p) { progress(0.25 + p * 0.05, 'Collecting day 10…'); } });
+      var rows = Stack.labeledRows(tl), er = Stack.labeledRows(ev);
+      var lrM = Stack.getModel('lr');
+      if (!lrM) { progress(0.3, 'Training a baseline LR…'); lrM = await Stack.trainLR({ rows: rows, epochs: 2 }); Stack.putModel('lr', lrM, { source: 'reference' }); }
+      var c = Object.assign({}, cfg);
+      var m = await Stack.trainDeep(Object.assign({ rows: rows, epochs: 1 }, c, { onProgress: function (p) { progress(0.3 + 0.6 * p, 'Training deep ranker…'); } }));
+      trained = m;
+      progress(0.93, 'Evaluating…');
+      var y = er.map(function (r) { return r.click; }), t = ev.truth.map(function (x) { return x.pctr; });
+      var dp = er.map(function (r, i) { var pp = m.pctr(ev.impressions[i].uv, r.ad, null, r.feats), z = Math.log(pp / (1 - pp)); return Stack.sigmoid(z + m.P.slotB.data[r.slot] - m.P.slotB.data[0]); });
+      var e = Stack.evaluate(dp, y, t), eL = Stack.evaluate(Stack.lrPredictRows(lrM, er), y, t);
+      var wt = withinTop30(m, lrM, tl.stats, 11);
+      var name = [c.wide ? 'wide' : null, 'deep', c.cross ? '+ cross' : null, c.attention ? '+ attention' : '(mean history)'].filter(Boolean).join(' ');
+      results = results.filter(function (r) { return r.name !== name && !r.lr; });
+      results.unshift({ name: 'Your LR (baseline)', auc: eL.auc, ne: eL.ne, within: wt.lr, lr: true });
+      results.push({ name: name, auc: e.auc, ne: e.ne, within: wt.deep, model: m });
+      out.innerHTML = '';
+      StackUI.table(out, [
+        { label: 'Model', key: 'name' },
+        { label: 'Offline AUC', num: true, get: function (r) { return r.auc.toFixed(3); } },
+        { label: 'NE', num: true, get: function (r) { return r.ne.toFixed(3); } },
+        { label: 'Within-request accuracy vs. truth', num: true, get: function (r) { var better = !r.lr && r.within > results[0].within; return '<b class="' + (r.lr ? '' : better ? 'pos' : 'neg') + '">' + r.within.toFixed(3) + '</b>'; } }
+      ], results, { rowClass: function (r) { return r.lr ? 'hl' : ''; } });
+      out.appendChild(el('p', { class: 'small', html: 'Offline AUC and within-request accuracy often disagree. The first includes cross-user comparisons; the second is what the auction feels. Train several variants to see which pieces help on your data.' }));
+      var save = el('button', { type: 'button', class: 'btn accent', text: 'Save this deep ranker to your stack' });
+      save.onclick = function () {
+        Stack.putModel('deep', m, { source: Stack.implSource('attentionWeights') });
+        Stack.markBuilt(11, Stack.implSource('attentionWeights') === 'you' ? 'you' : 'reference');
+        save.disabled = true; save.textContent = '✓ Saved';
+        document.dispatchEvent(new CustomEvent('stackchange'));
+      };
+      out.appendChild(el('div', { class: 'btn-row' }, [save]));
+      drawAttn();
+    });
+  })();
+
+  /* ---------------- attention heatmap ---------------- */
+  var aHost = document.getElementById('w-attn'), aOut = el('div'), ai = 0;
+  var areqs = w.requestsForDay(11, 60, 1);
+  var nb = el('button', { type: 'button', class: 'btn secondary', text: 'Another user →' });
+  nb.onclick = function () { ai = (ai + 1) % areqs.length; drawAttn(); };
+  aHost.appendChild(el('div', { class: 'btn-row', style: 'margin-bottom:8px' }, [nb])); aHost.appendChild(aOut);
+  function drawAttn() {
+    aOut.innerHTML = '';
+    var m = trained || Stack.getModel('deep');
+    if (!m || !m.cfg.attention) { aOut.appendChild(el('p', { class: 'small muted', text: 'Train a deep ranker with target attention above to see its attention.' })); return; }
+    var q = areqs[ai], uv = Stack.userView(w, q), el2 = w.eligibleAds(q.user, 11), att = Stack.impl('attentionWeights');
+    var E = m.P.catEmb, R = m.P.recEmb, D = E.cols;
+    function vec(P, i) { return Array.from(P.data.slice(i * D, (i + 1) * D)); }
+    var hist = uv.history.map(function (c, i) { var a = vec(E, c), r = vec(R, i); return a.map(function (x, j) { return x + r[j]; }); });
+    var seen = {}, cands = [];
+    el2.forEach(function (a) { var c = w.ads[a].category; if (!seen[c] && cands.length < 6) { seen[c] = 1; cands.push(a); } });
+    var t = el('table', { class: 'data', style: 'font-size:12px' });
+    var hr = '<tr><th>Candidate ad</th>' + uv.history.map(function (c, i) { return '<th style="text-align:center;padding:4px 2px"><span class="swatch" style="background:' + StackUI.CAT_COLORS[c] + '"></span>' + w.categories[c].name.slice(0, 4) + '</th>'; }).join('') + '</tr>';
+    t.innerHTML = '<thead>' + hr + '</thead>';
+    var tb = el('tbody');
+    cands.forEach(function (a) {
+      var c = w.ads[a].category;
+      var T = m.P.attnT ? m.P.attnT.data[0] : 1, qv = vec(E, c).map(function (x) { return x * T; }); // learned sharpness
+      var wts = att(hist, qv), mx = Math.max.apply(null, wts);
+      var tr = el('tr');
+      tr.appendChild(el('td', { html: '<span class="swatch" style="background:' + StackUI.CAT_COLORS[c] + '"></span>' + w.categories[c].name + ' ad' }));
+      wts.forEach(function (v) { tr.appendChild(el('td', { style: 'text-align:center;padding:4px 2px;background:color-mix(in srgb, var(--violet) ' + Math.round(85 * v / mx) + '%, transparent);font-family:var(--mono)', text: (v * 100).toFixed(0) })); });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    aOut.appendChild(el('div', { class: 'table-wrap', style: 'margin:0' }, [t]));
+    // How much more attention goes to history items matching the candidate's category, vs. uniform.
+    var conc = 0, nc = 0;
+    areqs.forEach(function (q2) {
+      var uv2 = Stack.userView(w, q2), h2 = uv2.history.map(function (c, i) { var a = vec(E, c), r = vec(R, i); return a.map(function (x, j) { return x + r[j]; }); });
+      var c0 = uv2.history[0], share = uv2.history.filter(function (h) { return h === c0; }).length / 12;
+      var T2 = m.P.attnT ? m.P.attnT.data[0] : 1, ws = att(h2, vec(E, c0).map(function (x) { return x * T2; })), s = 0;
+      uv2.history.forEach(function (h, i) { if (h === c0) s += ws[i]; });
+      conc += s / share; nc++;
+    });
+    conc /= nc;
+    aOut.appendChild(el('p', { class: 'small', html: 'Numbers are attention weights in %. Across users, history items matching the candidate\'s category get <b>' + conc.toFixed(2) + '×</b> the attention they would under plain averaging. ' +
+      (conc < 1.2 ? 'That\'s close to uniform. In Pebble\'s world, histories are short (12 items) and dominated by one or two categories, and if your model has a wide part, it already has hand-built history features. So attention has little to add, and the model learned not to bother. Attention earns its keep on <em>long, mixed</em> histories, like the thousands of events real sequence models read.'
+        : 'The model learned to look at the relevant part of the history, which a count feature can only approximate.') +
+      ' Computed with ' + (Stack.implSource('attentionWeights') === 'you' ? 'your attentionWeights().' : 'the reference attentionWeights().') }));
+  }
+  drawAttn();
+  document.addEventListener('stackchange', drawAttn);
+
+  /* ---------------- A/B with data scale ---------------- */
+  (function () {
+    var host = document.getElementById('w-ab');
+    var nd = 10;
+    var r = el('div', { class: 'btn-row', style: 'margin-bottom:10px' }); r.appendChild(el('span', { class: 'small', text: 'Training data for both models:' }));
+    Book.seg(r, [{ label: '10 days (180k rows)', value: 10 }, { label: '30 days (540k rows, slower)', value: 30 }], 10, function (v) { nd = v; });
+    host.appendChild(r);
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var history = [];
+    StackUI.asyncButton(btnHost, 'Train both and run the A/B', async function (progress) {
+      var days = []; for (var i = 0; i < nd; i++) days.push(i);
+      var tl = await Stack.trainingLog({ days: days, onProgress: function (p) { progress(p * 0.3, 'Collecting ' + nd + ' days of logs…'); } });
+      var rows = Stack.labeledRows(tl);
+      progress(0.3, 'Training LR…');
+      var lrM = await Stack.trainLR({ rows: rows, epochs: 2 });
+      var dm = await Stack.trainDeep({ rows: rows, epochs: 1, cross: 1, attention: true, wide: true, onProgress: function (p) { progress(0.35 + 0.4 * p, 'Training wide & deep…'); } });
+      // Temporarily install both, run the A/B, then restore the reader's saved models.
+      var snap = Stack.snapshotModels(['lr', 'deep']);
+      Stack.putModel('lr', lrM); Stack.putModel('deep', dm);
+      var res = await Stack.abTest({ control: { ranker: 'lr' }, treatment: { ranker: 'deep' }, controlName: 'LR', treatmentName: 'Wide & deep', days: [nd + 1, nd + 2], onProgress: function (p) { progress(0.75 + 0.25 * p, 'Running both arms…'); } });
+      history.push({ nd: nd, d: res.diffs });
+      Stack.restoreModels(snap);
+      out.innerHTML = '';
+      var pc = function (x) { return Book.signed(100 * x, 1, '%'); };
+      StackUI.table(out, [
+        { label: 'Training data', get: function (h) { return h.nd + ' days'; } },
+        { label: 'True revenue lift', num: true, get: function (h) { return '<b class="' + (h.d.trueRpm.lift > 0 ? 'pos' : 'neg') + '">' + pc(h.d.trueRpm.lift) + '</b>'; } },
+        { label: 'True advertiser value lift', num: true, get: function (h) { return pc(h.d.trueValue.lift); } },
+        { label: 'Observed revenue lift [95% CI]', num: true, get: function (h) { return pc(h.d.rpm.lift) + ' <span class="muted">[' + pc(h.d.rpm.lo) + ', ' + pc(h.d.rpm.hi) + ']</span>'; } }
+      ], history);
+      var msg = 'Run both data sizes and compare. ';
+      var h10 = history.filter(function (h) { return h.nd === 10; }).pop(), h30 = history.filter(function (h) { return h.nd === 30; }).pop();
+      if (h10 && h30) msg += (h30.d.trueRpm.lift > h10.d.trueRpm.lift ? 'More data moved the result in the deep model\'s favour (' + pc(h10.d.trueRpm.lift) + ' → ' + pc(h30.d.trueRpm.lift) + '): it has far more parameters than the LR, and they need data.' : 'On your stack, more data didn\'t help the deep model here. Check its within-request accuracy above, and the noise of a single short test.');
+      else msg += 'Deep models have many more parameters than your LR, so their advantage usually grows with training data. How it plays out depends on your logs: your exploration rate, your features, and luck.';
+      out.appendChild(el('p', { class: 'small', text: msg + ' (Your saved models are unchanged. This experiment trains its own pair.)' }));
+      var c = Stack.state.code.attentionWeights;
+      if (c && c.passed && Stack.hasModel('deep')) { Stack.markBuilt(11, 'you'); document.dispatchEvent(new CustomEvent('stackchange')); }
+    });
+  })();
+})();
+</script>
+</body>
+</html>

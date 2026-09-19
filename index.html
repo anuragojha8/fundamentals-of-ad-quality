@@ -1,3 +1,38 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f7f4ed"><title>Fundamentals of Ad Quality</title><link rel="stylesheet" href="styles.css"><script defer src="app.js"></script></head>
-<body><a class="skip" href="#content">Skip to content</a><header class="top"><a href="#" class="brand">AQ<span>FIELDNOTES / ANURAG OJHA</span></a><span class="edition">An interactive book · Design preview</span></header><div class="layout"><aside><p class="eyebrow">THE BOOK</p><a class="overview" href="#">Start here</a><nav id="chapters" aria-label="Chapters"></nav><p class="aside-note">Build a little. Break something.<br>Understand why it broke.</p></aside><main id="content" tabindex="-1"></main></div><footer>Fundamentals of Ad Quality <span>Structure & design · First reconstruction milestone</span></footer></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fundamentals of Ad Quality</title>
+<meta name="description" content="An interactive, technical book on ads ranking, auctions, and conversion modeling for product managers with a CS background.">
+<link rel="stylesheet" href="assets/book.css">
+<script src="assets/book.js"></script>
+</head>
+<body data-index>
+<section class="hero">
+  <div class="kicker">An interactive book for product managers</div>
+  <h1>Fundamentals of Ad&nbsp;Quality</h1>
+  <p class="dek">How modern ad systems retrieve, predict, price, and learn, taught by <em>building one</em>. Chapter by chapter you write, train, test, and ship a working ad stack in your browser, graded against a simulated world whose ground truth you can see. It's written for PMs with a CS background who want to hold their own in a model review.</p>
+  <div class="btn-row" style="margin-top:28px">
+    <a class="btn accent" href="chapters/00-preface.html" style="text-decoration:none">Start reading →</a>
+    <a class="btn secondary" href="chapters/15-capstone.html" style="text-decoration:none">Jump to the game</a>
+  </div>
+</section>
+
+<section class="wide" style="font-family:var(--sans);font-size:15px;margin-top:18px">
+  <div class="w-grid two" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+    <div class="stat"><div class="k">You build</div><div class="v">1 ad stack</div><div class="d">Retrieval, ranking, auction, logging, training, evaluation</div></div>
+    <div class="stat"><div class="k">Code exercises</div><div class="v">15</div><div class="d">Small JS functions, auto-tested, reference solutions included</div></div>
+    <div class="stat"><div class="k">Models you train</div><div class="v">7</div><div class="d">LR, two-tower, wide &amp; deep, naive pCVR, ESMM, pHide, calibrator</div></div>
+    <div class="stat"><div class="k">Capstone</div><div class="v">A game</div><div class="d">Run your stack for a simulated quarter</div></div>
+  </div>
+</section>
+
+<div id="chapterCards" style="padding-bottom:40px"></div>
+
+<section class="wide small muted sans" style="border-top:1px solid var(--rule);padding:24px 0 60px">
+  Your progress, code, trained models, and written answers are saved only in this browser.
+  <button class="btn secondary" style="margin-left:8px" onclick="if(confirm('Reset all progress, notes, code, and trained models?')) { try { Object.keys(localStorage).filter(function (k) { return k.indexOf('faq-') === 0; }).forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {} location.reload(); }">Reset everything</button>
+</section>
+</body>
+</html>

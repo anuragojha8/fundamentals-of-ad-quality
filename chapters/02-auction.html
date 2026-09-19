@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Auction — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="02-auction">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 2 · Part I · The Marketplace</div>
+  <h1>The Auction</h1>
+  <p class="dek">In which forty thousand advertisers fight over three seats, and I try to make everyone pay a fair price.</p>
+</header>
+
+<div class="stack-panel" data-chapter="2"></div>
+
+<p class="lead">So here's a question that sounds dumb but isn't: why do ads need an auction at all? Why doesn't Pebble just put up a price list, say $1 a click, and let advertisers form an orderly queue?</p>
+
+<p>Because Pebble has no idea what a click is worth. To Nimbus, the neobank, a click that turns into a new account might be worth $10. To Orbit, a mobile game, a click might be worth 30 cents. Each advertiser knows its own number, and each has every reason in the world to keep it a secret. (Would you tell the store the maximum you'd pay? Exactly.) An auction is a clever little mechanism for getting them to reveal that number anyway, through their bids.</p>
+
+<h2 id="first-second"><span class="sec">2.1</span>First price or second price?</h2>
+
+<p>Let's start as simple as possible: one slot, and every ad is equally likely to be clicked. Everyone submits a sealed bid, and the highest bid wins. Easy. The only real question is what the winner pays.</p>
+
+<ul>
+  <li>In a <dfn>first-price auction</dfn>, the winner pays its own bid.</li>
+  <li>In a <dfn>second-price auction</dfn>, the winner pays the <em>second-highest</em> bid, i.e. the least it could have bid and still won.</li>
+</ul>
+
+<p>First price sounds like it makes more money, right? The winner pays more! But advertisers aren't naive. If you pay what you bid, you'll bid <em>less</em> than the click is worth to you (this is called <dfn>bid shading</dfn>), and now everyone's playing a guessing game about how much to shade. Don't take my word for it. You're Trailhead, and you know what a click is worth to you. The other bidders are fixed. Find the bid that maximizes your expected <dfn>surplus</dfn>: value minus price, averaged over lots of auctions.</p>
+
+<div class="widget" id="w-rules">
+  <div class="w-title">Find your best bid</div>
+  <div class="w-sub">Expected surplus per auction as a function of your bid, under each pricing rule. The competition is fixed: the highest of four rival bids.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Here's the magic of second price: <strong>bidding your true value is the best strategy, no matter what anyone else does</strong>. Your bid only decides <em>whether</em> you win, never <em>what you pay</em>. Bid above your value and you risk winning at a price that's more than the click is worth to you. Bid below it and you lose auctions you'd have happily won. Economists call this <dfn>truthfulness</dfn> (or incentive compatibility, if you want to sound fancy at dinner parties). It makes life simpler for advertisers, and it lets the platform learn what clicks are actually worth.</p>
+</div>
+
+<div class="quiz" data-id="ch2-q1">
+  <p class="q">In a single-slot second-price auction, Nimbus values a click at $4.00. The other bids are $2.50, $3.10, and $1.80. What should Nimbus bid, and what does it pay if it wins?</p>
+  <ul>
+    <li data-why="Shading doesn't help in a second-price auction; the price is set by the next bid anyway.">Bid $3.11, pay $3.11</li>
+    <li data-correct>Bid $4.00, pay $3.10</li>
+    <li data-why="In a second-price auction, the winner pays the second-highest bid, not its own.">Bid $4.00, pay $4.00</li>
+    <li data-why="That's the lowest bid, not the second-highest.">Bid $4.00, pay $1.80</li>
+  </ul>
+  <div class="explain"><p>Bid the true value, $4.00. Nimbus wins and pays the second-highest bid, <strong>$3.10</strong>, pocketing $0.90 of surplus. Any bid above $3.10 gives the exact same outcome, which is precisely why shading is pointless here.</p></div>
+</div>
+
+<h2 id="ecpm"><span class="sec">2.2</span>Ranking by expected value: eCPM</h2>
+
+<p>Now let's drop the unrealistic part. Ads are <em>not</em> equally likely to be clicked. And here's the wrinkle: Pebble charges per <em>click</em> (that's <dfn>CPC</dfn> bidding), but what it actually sells is <em>impressions</em>, a slot in someone's feed. An ad bidding $5 per click that nobody ever clicks earns Pebble a grand total of zero dollars. So the auction ranks by <strong>expected revenue per impression</strong>:</p>
+
+\[ \text{score} = \text{bid} \times \text{pCTR}, \qquad \text{eCPM} = \text{bid} \times \text{pCTR} \times 1000 \]
+
+<p><dfn>eCPM</dfn> ("effective cost per mille," because the ad industry loves Latin) is the same score expressed per thousand impressions. It's the common currency that lets you compare an ad bidding per click with one bidding per impression or per conversion.</p>
+
+<p>And this, right here, is the moment <strong>predictions enter the auction</strong>. From now on, Pebble's revenue and every advertiser's position depend on pCTR just as much as on bids. Remember that. It's going to haunt us.</p>
+
+<div class="exercise" data-id="ch2-e1" data-answer="30" data-tol="0.01" data-unit="$ eCPM">
+  <p class="q">Sprout bids $1.20 per click and its predicted CTR is 2.5%. What's its eCPM?</p>
+  <details class="hint"><summary>Hint</summary><p>bid × pCTR × 1000, with pCTR as a probability (0.025).</p></details>
+  <div class="explain"><p>1.20 × 0.025 × 1000 = <strong>$30</strong>. Pebble expects to earn $30 for every thousand times it shows this ad.</p></div>
+</div>
+
+<h2 id="gsp"><span class="sec">2.3</span>Many slots: the generalized second-price auction</h2>
+
+<p>A Pebble feed load has three ad slots, and they're not created equal. People see the first one a lot more than the third (Chapter 5 measures exactly how much). The classic design for multiple slots, used for decades in search and feed ads, is the <dfn>generalized second-price auction</dfn> (GSP):</p>
+
+<ol>
+  <li>Rank candidates by score = bid × pCTR.</li>
+  <li>The top-ranked ad gets slot 1, the next gets slot 2, and so on.</li>
+  <li>Each winner pays, <em>per click</em>, the least it could have bid and still kept its spot. That works out to the score of the ad just below it, divided by its own pCTR:</li>
+</ol>
+
+\[ \text{price}_i = \frac{\text{bid}_{i+1} \cdot \text{pCTR}_{i+1}}{\text{pCTR}_i} \]
+
+<p>Read that formula again, slowly. <strong>Your price depends on your own pCTR.</strong> If the model thinks your ad is more clickable, you pay <em>less</em> per click for the same slot. That's on purpose: it rewards relevant ads. But it also means that when the model is wrong about your ad, your price is wrong too. Which is, conveniently, the entire plot of Chapter 3.</p>
+
+<div class="widget" id="w-gsp">
+  <div class="w-title">A GSP auction you can edit</div>
+  <div class="w-sub">Five advertisers, three slots. Edit bids and pCTRs. Slot click rates fall with position: 100%, 62%, 41% of slot 1's.</div>
+</div>
+
+<div class="exercise" data-id="ch2-e2" data-answer="1.5" data-tol="0.005" data-unit="$ per click">
+  <p class="q">Three ads compete for one slot. Lumen bids $2.00 with pCTR 3%; Orbit bids $3.00 with pCTR 1.5%; Trailhead bids $1.00 with pCTR 4%. Under GSP, what does the winner pay per click?</p>
+  <details class="hint"><summary>Hint</summary><p>Scores: 2.00×0.03, 3.00×0.015, 1.00×0.04. The winner pays the runner-up's score divided by its own pCTR.</p></details>
+  <div class="explain"><p>Scores: Lumen 0.060, Orbit 0.045, Trailhead 0.040. Lumen wins and pays 0.045 / 0.03 = <strong>$1.50</strong> per click. And poor Orbit bid the most and still lost, because its ad is predicted to be half as clickable as Lumen's. Money can't buy you love, or feed slots, apparently.</p></div>
+</div>
+
+<details class="callout deep"><summary><div class="label">Going deeper: GSP isn't truthful, and VCG is</div></summary>
+<p>Plot twist: with multiple slots, GSP loses the second-price magic. An advertiser can sometimes do better by bidding <em>below</em> value to drop into a cheaper slot. The <dfn>VCG mechanism</dfn> (Vickrey–Clarke–Groves) fixes this by charging each winner the harm its presence does to everyone else, which makes truthful bidding optimal again. Some large platforms have used VCG-style pricing for exactly this reason. In practice it matters less than you'd think, because most advertisers now use <dfn>autobidding</dfn>: the platform bids on their behalf toward a goal like "get me conversions at $40 each." A lot of modern auction research is about designing well in that world. The classic analyses are Edelman, Ostrovsky and Schwarz (2007) and Varian (2007).</p>
+</details>
+
+<h2 id="build"><span class="sec">2.4</span>Build: your auction</h2>
+
+<p>Alright, you've been using my auction long enough. Let's replace it with yours.</p>
+
+<p>Your function gets the candidates, each with a <code>bid</code> and a <code>pctr</code>, plus the number of slots and a <dfn>reserve price</dfn>, a minimum eCPM an ad has to clear to be shown at all. (More on that in a second.) The tests include the edge cases that bite real auction code: ties, a single bidder, a reserve nobody clears, and never, ever charging more than the bid. Advertisers get <em>very</em> upset about that last one.</p>
+
+<div class="code-cell" data-slot="runAuction"></div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Ranking by bid alone. It sounds fair ("highest bidder wins, duh"), and it's usually what people build first. But it hands slots to ads nobody clicks. Pebble earns less, users waste their attention, and low-quality advertisers get to buy their way to the top. Try it in the widget above: switch the ranking to "by bid only" and watch expected revenue drop.</p>
+</div>
+
+<h2 id="reserve"><span class="sec">2.5</span>Reserve prices: the platform's lever</h2>
+
+<p>When only a few advertisers show up for a request, second prices can get embarrassingly low. A lone bidder pays nothing at all! A <dfn>reserve price</dfn> sets a floor: an ad needs an eCPM of at least the reserve to be shown, and the last winner pays at least the reserve. Crank it up and prices rise, but some slots go empty. Empty slots are lost revenue, though they also mean fewer weak ads in front of users. Tradeoffs everywhere.</p>
+
+<p>Let's test it on your own stack. Run your auction at different reserve prices over a day of Pebble traffic. Then run the sweep again in a <em>thin</em> market, where only two ads compete for three slots, which is what a niche audience or a brand-new surface looks like. Then pick a reserve for production.</p>
+
+<div class="widget" id="w-reserve">
+  <div class="w-title">Tune the reserve on your stack</div>
+  <div class="w-sub">Each point is a full simulated day (3,000 requests) through your eligibility filter, your heuristic pCTR, and your auction.</div>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>Reserve prices are one of the very few levers that change prices <em>directly</em>, so get ready for some spirited meetings. Sales worries about advertisers who stop spending, finance loves the revenue, and quality teams love having fewer weak ads. Good reserve policies have two things in common. They're usually <em>personalized</em> (different floors for different users, surfaces, or countries, learned from data). And they're judged on <strong>long-run</strong> advertiser retention, not next week's revenue. An advertiser you price out today might just not come back.</p>
+</div>
+
+<div class="quiz" data-id="ch2-q2">
+  <p class="q">You raise Pebble's reserve and revenue goes up 4% in a week-long A/B test. Which effect would the test most likely <em>miss</em>?</p>
+  <ul>
+    <li data-why="The test measures fill directly: empty slots show up immediately.">Fewer slots being filled</li>
+    <li data-why="Price per click is measured directly in the test.">Higher prices per click</li>
+    <li data-correct>Small advertisers slowly reducing budgets or churning because their costs rose</li>
+    <li data-why="User-facing effects of fewer ads are measurable within a week.">Users seeing fewer ads</li>
+  </ul>
+  <div class="explain"><p>Advertisers are slow. Budgets get set monthly, and campaigns get reviewed by humans (or autobidders) over weeks. A short test sees prices go up but not the quiet exodus that follows. That's why marketplace teams use longer holdouts and advertiser-level metrics like spend retention and ROI. Chapter 14 comes back to this short-term vs. long-term tension, because it's everywhere.</p></div>
+</div>
+
+<h2 id="bidtypes"><span class="sec">2.6</span>What advertisers actually bid for</h2>
+
+<p>So far everyone bids per click. Real platforms offer a whole menu, and each option is really a promise about what the advertiser pays for:</p>
+
+<div class="table-wrap"><table class="data">
+<thead><tr><th>Bid type</th><th>Advertiser pays per…</th><th>eCPM (the auction score)</th><th>Predictions needed</th></tr></thead>
+<tbody>
+<tr><td><b>CPM</b></td><td>thousand impressions</td><td>bid</td><td>none (for pricing)</td></tr>
+<tr><td><b>CPC</b></td><td>click</td><td>bid × pCTR × 1000</td><td>pCTR</td></tr>
+<tr><td><b>CPA / oCPM</b></td><td>conversion (or impression, optimized for conversions)</td><td>bid × pCTR × pCVR × 1000</td><td>pCTR and pCVR</td></tr>
+<tr><td><b>Value / ROAS</b></td><td>impression, optimized for purchase value</td><td>bid × pCTR × pCVR × E[value] × 1000</td><td>all of the above, plus predicted value</td></tr>
+</tbody></table></div>
+
+<p>Notice the pattern? As you go down the table, the advertiser takes on less risk and Pebble takes on more. <strong>Every step down needs another accurate prediction.</strong> Your stack runs on CPC for now. In Chapter 12, you'll build a conversion model and flip on oCPM.</p>
+
+<div class="reflect" data-id="ch2-r1">
+  <p class="q">Two weeks after your team launched a new pCTR model, Lumen's account manager escalates: Lumen's cost per click rose 20%, even though their bids didn't change. Nothing else changed in the marketplace. Using the GSP price formula, give two different explanations, and say what data you'd pull to tell them apart.</p>
+  <div class="model">
+    <p>From price = (runner-up's bid × runner-up's pCTR) / Lumen's pCTR, the price goes up if the top of that fraction goes up or the bottom goes down.</p>
+    <ul>
+      <li><strong>The model now predicts a lower pCTR for Lumen.</strong> Maybe the new model thinks Lumen's creatives are less clickable. If it's right, Lumen was being undercharged before. If it's wrong (say, a feature bug for Lumen's category), Lumen is now overcharged. Pull Lumen's average pCTR before and after, next to their <em>actual</em> CTR. In other words, the calibration of predictions against outcomes for Lumen's ads.</li>
+      <li><strong>The model now predicts a higher pCTR for Lumen's competitors.</strong> The runner-up's score went up, so Lumen pays more to hold the same spot. Pull the scores of the ads ranked just below Lumen's.</li>
+      <li><strong>A composition shift.</strong> Lumen might just be winning different impressions now (different users or slots) where prices are naturally higher. Compare like with like: same slot, similar users.</li>
+    </ul>
+    <p>The underlying point, which Chapter 3 makes precise: a pCTR model change is a pricing change. That's why launches get reviewed for per-advertiser calibration, not just overall AUC.</p>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>Your stack now runs <strong>your very own GSP auction</strong>, with a reserve price you picked. Every impression it serves now has a price, and every price depends on your pCTR predictions.</p>
+  <p>Which raises an uncomfortable question. Your heuristic pCTR from Chapter 1 is… let's say "approximate." If the price divides by pCTR, and pCTR is wrong, then somebody is paying the wrong price. Who? And how wrong? That's next time. Bring snacks.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Second-price auction</b>Winner pays the runner-up's bid; bidding true value is optimal.</div>
+    <div><b>eCPM</b>Expected revenue per thousand impressions: bid × pCTR × 1000 for CPC.</div>
+    <div><b>GSP</b>Multi-slot auction: rank by bid × pCTR, pay the next score ÷ own pCTR.</div>
+    <div><b>Reserve price</b>Minimum eCPM to be shown; trades fill rate for price.</div>
+    <div><b>Bid shading</b>Bidding below value, needed in first-price auctions.</div>
+    <div><b>oCPM / autobidding</b>The platform bids for the advertiser toward a conversion goal.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el;
+
+  /* ---------------- first vs second price ---------------- */
+  (function () {
+    var host = document.getElementById('w-rules');
+    var grid = el('div', { class: 'w-grid side' }), L = el('div'), R = el('div');
+    grid.appendChild(L); grid.appendChild(R); host.appendChild(grid);
+    var rng = Book.rng(3), rivals = [];
+    for (var i = 0; i < 6000; i++) {
+      var m = 0;
+      for (var k = 0; k < 4; k++) m = Math.max(m, Math.exp(rng.normal() * 0.45 + Math.log(1.2)));
+      rivals.push(m);
+    }
+    var ctl = Book.controls(L, [{ key: 'v', label: 'Your value per click', min: 0.8, max: 3, step: 0.05, value: 2, fmt: function (v) { return '$' + v.toFixed(2); } }], draw);
+    var st = Book.stats(L, [{ key: 'sp', label: 'Best bid · 2nd price' }, { key: 'fp', label: 'Best bid · 1st price' }]);
+    var c = Book.chart(R, { w: 560, h: 260, x: [0, 3.5], y: [0, 1], xlabel: 'Your bid ($ per click)', ylabel: 'Expected surplus', xfmt: function (v) { return '$' + v; }, yfmt: function (v) { return '$' + v.toFixed(2); } });
+    Book.legend(R, [{ label: 'Second price (pay the runner-up\'s bid)', color: 'var(--s1)' }, { label: 'First price (pay your own bid)', color: 'var(--s2)' }, { label: 'Your value', color: 'var(--ink-3)', dash: true }]);
+    function surplus(b, v, rule) {
+      var s = 0;
+      for (var i = 0; i < rivals.length; i++) if (b > rivals[i]) s += v - (rule === 2 ? rivals[i] : b);
+      return s / rivals.length;
+    }
+    function draw() {
+      var v = ctl.values.v, p2 = [], p1 = [], best2 = [0, -1], best1 = [0, -1], ymax = 0.05;
+      for (var b = 0; b <= 3.5001; b += 0.05) {
+        var s2 = surplus(b, v, 2), s1 = surplus(b, v, 1);
+        p2.push([b, s2]); p1.push([b, s1]);
+        if (s2 > best2[1] + 1e-9) best2 = [b, s2];
+        if (s1 > best1[1]) best1 = [b, s1];
+        ymax = Math.max(ymax, s2, s1);
+      }
+      c.setDomain(null, [Math.min(0, Math.min.apply(null, p2.concat(p1).map(function (p) { return p[1]; }))) , ymax * 1.15]);
+      c.clear();
+      c.hline(0, { dash: '', color: 'var(--rule)' });
+      c.line(p2, { color: 'var(--s1)' }); c.line(p1, { color: 'var(--s2)' });
+      c.vline(v, {});
+      c.dots([[best2[0], best2[1], 5, 'var(--s1)'], [best1[0], best1[1], 5, 'var(--s2)']], { top: true });
+      st({ sp: '$' + best2[0].toFixed(2), fp: '$' + best1[0].toFixed(2) });
+    }
+    draw();
+  })();
+
+  /* ---------------- editable GSP ---------------- */
+  (function () {
+    var host = document.getElementById('w-gsp');
+    var ads = [
+      { name: 'Trailhead', bid: 1.80, pctr: 0.030 }, { name: 'Nimbus', bid: 4.50, pctr: 0.010 }, { name: 'Sprout', bid: 1.20, pctr: 0.045 },
+      { name: 'Orbit', bid: 0.60, pctr: 0.070 }, { name: 'Lumen', bid: 2.20, pctr: 0.018 }
+    ];
+    var ex = [1, 0.62, 0.41], rankBy = 'ecpm';
+    var top = el('div', { class: 'btn-row', style: 'margin-bottom:8px' });
+    Book.seg(top, [{ label: 'Rank by bid × pCTR', value: 'ecpm' }, { label: 'Rank by bid only', value: 'bid' }], 'ecpm', function (v) { rankBy = v; render(); });
+    host.appendChild(top);
+    var tbl = el('div'); host.appendChild(tbl);
+    var st = Book.stats(host, [{ key: 'rev', label: 'Expected revenue', sub: 'per request (true CTR = pCTR)' }, { key: 'clk', label: 'Expected clicks', sub: 'per request' }]);
+    function render() {
+      tbl.innerHTML = '';
+      var cands = ads.map(function (a, i) { return { i: i, score: a.bid * a.pctr, key: rankBy === 'bid' ? a.bid : a.bid * a.pctr }; }).sort(function (a, b) { return b.key - a.key; });
+      var res = {};
+      cands.forEach(function (c, k) {
+        if (k >= 3) return;
+        var a = ads[c.i], nx = cands[k + 1];
+        var price = !nx ? 0 : rankBy === 'bid' ? nx.key : Math.min(a.bid, nx.score / a.pctr);
+        res[c.i] = { slot: k, price: price };
+      });
+      var rev = 0, clk = 0;
+      var t = el('table', { class: 'data' });
+      t.innerHTML = '<thead><tr><th>Advertiser</th><th class="num">Bid ($/click)</th><th class="num">pCTR</th><th class="num">eCPM</th><th>Slot</th><th class="num">Price/click</th><th class="num">Exp. revenue</th></tr></thead>';
+      var tb = el('tbody');
+      ads.forEach(function (a, i) {
+        var r = res[i], er = r ? a.pctr * ex[r.slot] * r.price : 0;
+        if (r) { rev += er; clk += a.pctr * ex[r.slot]; }
+        var tr = el('tr', { class: r ? 'win' : '' });
+        var bidIn = el('input', { type: 'number', step: '0.1', min: '0', value: a.bid.toFixed(2) }), pIn = el('input', { type: 'number', step: '0.005', min: '0', max: '1', value: a.pctr.toFixed(3) });
+        bidIn.addEventListener('change', function () { a.bid = Math.max(0, +bidIn.value || 0); render(); });
+        pIn.addEventListener('change', function () { a.pctr = Math.min(1, Math.max(0.0001, +pIn.value || 0)); render(); });
+        [el('td', { text: a.name }), el('td', { class: 'num' }, [bidIn]), el('td', { class: 'num' }, [pIn]), el('td', { class: 'num', text: '$' + (a.bid * a.pctr * 1000).toFixed(0) }),
+          el('td', { html: r ? '<span class="tag g">' + (r.slot + 1) + '</span>' : '<span class="muted">—</span>' }),
+          el('td', { class: 'num', text: r ? '$' + r.price.toFixed(2) : '' }), el('td', { class: 'num', text: r ? '$' + er.toFixed(4) : '' })].forEach(function (td) { tr.appendChild(td); });
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      tbl.appendChild(el('div', { class: 'table-wrap', style: 'margin:0' }, [t]));
+      st({ rev: '$' + (rev * 1000).toFixed(2) + ' eCPM', clk: (clk * 100).toFixed(2) + '%' });
+    }
+    render();
+  })();
+
+  /* ---------------- reserve sweep on the reader's stack ---------------- */
+  (function () {
+    var host = document.getElementById('w-reserve');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var chartHost = el('div'); host.appendChild(chartHost);
+    var c = Book.chart(chartHost, { w: 640, h: 260, x: [0, 45], y: [0, 1.05], xlabel: 'Reserve price ($ eCPM)', ylabel: 'Relative to no reserve', xfmt: function (v) { return '$' + v; }, yfmt: function (v) { return Math.round(v * 100) + '%'; } });
+    Book.legend(chartHost, [{ label: 'Revenue', color: 'var(--s1)' }, { label: 'Fill rate', color: 'var(--s2)' }, { label: 'Advertiser conversions', color: 'var(--s3)' }]);
+    var pick = el('div', { style: 'margin-top:10px;display:none' }); host.appendChild(pick);
+    var reserves = [0, 3, 6, 10, 15, 20, 30, 45], results = null, market = 'thick';
+    var segRow = el('div', { class: 'btn-row', style: 'margin-bottom:10px' });
+    btnHost.appendChild(segRow);
+    Book.seg(segRow, [{ label: 'Pebble today (~150 bidders per request)', value: 'thick' }, { label: 'Thin market (2 bidders)', value: 'thin' }], 'thick', function (v) { market = v; });
+    function marketPolicy(reserve) {
+      var pol = Stack.policy({ reserveEcpm: reserve, ranker: 'heuristic', epsilon: 0, shuffle: 0, calibrate: false, pricing: 'cpc', retrieval: 'eligible' });
+      if (market === 'thin') {
+        var base = pol.retrieve;
+        pol.retrieve = function (req, uv) {
+          var all = base(req, uv);
+          return all.map(function (a) { return [a, World.hashUnit(99, req.id, a)]; }).sort(function (x, y) { return x[1] - y[1]; }).slice(0, 2).map(function (x) { return x[0]; });
+        };
+      }
+      return pol;
+    }
+    StackUI.asyncButton(btnHost, 'Run the sweep (8 simulated days)', async function (progress) {
+      results = [];
+      for (var i = 0; i < reserves.length; i++) {
+        var log = await Stack.simulate({ days: [0], requestsPerDay: 3000, logFeatures: false, policy: marketPolicy(reserves[i]),
+          onProgress: function (p) { progress((i + p) / reserves.length, 'Reserve $' + reserves[i]); } });
+        results.push(log.summary);
+      }
+      draw();
+      var a = Stack.state.code.runAuction;
+      if (a && a.passed) { Stack.markBuilt(2, 'you'); document.dispatchEvent(new CustomEvent('stackchange')); }
+    });
+    function draw() {
+      var base = results[0];
+      c.clear();
+      var rev = results.map(function (s, i) { return [reserves[i], s.expRevenue / base.expRevenue]; });
+      var fill = results.map(function (s, i) { return [reserves[i], s.fill / base.fill]; });
+      var conv = results.map(function (s, i) { return [reserves[i], s.expConvs / base.expConvs]; });
+      var ymax = Math.max.apply(null, rev.map(function (p) { return p[1]; }).concat([1])) * 1.08;
+      c.setDomain(null, [0, ymax]);
+      c.line(rev, { color: 'var(--s1)' }); c.line(fill, { color: 'var(--s2)' }); c.line(conv, { color: 'var(--s3)' });
+      c.dots(rev.map(function (p) { return [p[0], p[1], 3.5, 'var(--s1)']; }));
+      var best = rev.reduce(function (a, b) { return b[1] > a[1] ? b : a; });
+      pick.style.display = '';
+      pick.innerHTML = '';
+      var msg = best[0] === 0
+        ? 'With this much competition, <b>no reserve earns the most</b>. The runner-up\'s score is almost always above any sensible floor, so a reserve only removes ads. Now try the thin market.'
+        : 'Revenue peaks near a <b>$' + best[0] + '</b> reserve (' + Book.signed((best[1] - 1) * 100, 0, '%') + ' vs. none), with fill at ' + Book.pct(results[reserves.indexOf(best[0])].fill, 0) + '. With two bidders for three slots, the last winner has no runner-up and pays nothing. The reserve makes it pay something, at the cost of some empty slots.';
+      pick.appendChild(el('p', { class: 'small', html: msg + ' (Revenue here is <em>expected</em> revenue under the true click probabilities, so the curves aren\'t noise.) Choose the reserve your stack uses from now on:' }));
+      var row = el('div', { class: 'btn-row' });
+      reserves.slice(0, 6).forEach(function (r) {
+        var b = el('button', { type: 'button', class: 'btn ' + (Stack.state.settings.reserveEcpm === r ? '' : 'secondary'), text: r ? '$' + r : 'No reserve' });
+        b.onclick = function () { Stack.state.settings.reserveEcpm = r; Stack.save(); Stack.clearLogCache(); draw(); document.dispatchEvent(new CustomEvent('stackchange')); };
+        row.appendChild(b);
+      });
+      pick.appendChild(row);
+      pick.appendChild(el('p', { class: 'small muted', style: 'margin-top:6px', text: 'Current production reserve: ' + (Stack.state.settings.reserveEcpm ? '$' + Stack.state.settings.reserveEcpm + ' eCPM' : 'none') + '. Pebble is a thick market, so a small reserve mostly acts as a quality floor, cutting the weakest ads. The capstone revisits reserves with advertiser budgets in play.' }));
+    }
+  })();
+})();
+</script>
+</body>
+</html>

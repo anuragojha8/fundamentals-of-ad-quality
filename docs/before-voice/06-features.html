@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="06-features">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 6 · Part II · Data</div>
+  <h1>Features</h1>
+  <p class="dek">A model can only learn patterns it can see. Features decide what it can see, and occasionally let it see things it shouldn't.</p>
+</header>
+
+<div class="stack-panel" data-chapter="6"></div>
+
+<p class="lead">In the next chapter you'll train a logistic regression: a model that adds up weights, one per feature, and squashes the sum into a probability. That's all it does. Whatever structure exists in Pebble's click behaviour, the model can only capture it if some feature, or combination of features, points at it. This chapter is about building those features. It's the part of modeling where product intuition helps most.</p>
+
+<h2 id="kinds"><span class="sec">6.1</span>The kinds of features</h2>
+
+<div class="table-wrap"><table class="data">
+<thead><tr><th>Kind</th><th>Examples on Pebble</th><th>What it captures</th></tr></thead>
+<tbody>
+<tr><td><b>ID (sparse categorical)</b></td><td><code>ad=182</code>, <code>adv=17</code>, <code>user=517</code></td><td>Anything specific to that one entity: an ad's appeal, a user's click habits</td></tr>
+<tr><td><b>Categorical context</b></td><td><code>device=android</code>, <code>hour=21</code>, <code>country=BR</code></td><td>Situation-level effects</td></tr>
+<tr><td><b>Cross</b></td><td><code>age×cat=0_9</code> (18–24 × Gaming), <code>hour×cat=12_10</code> (noon × Food)</td><td>Effects that exist only for a <em>combination</em></td></tr>
+<tr><td><b>Sequence / history</b></td><td>categories of the last 12 engaged posts</td><td>Current and long-term interests</td></tr>
+<tr><td><b>Counting (statistical)</b></td><td>the ad's CTR so far; the user's CTR so far</td><td>Dense summaries of past behaviour; they generalize across IDs</td></tr>
+<tr><td><b>Dense / embedding</b></td><td>a learned 16-number vector per user (Ch. 10–11)</td><td>Similarity: users and ads that behave alike end up close</td></tr>
+</tbody></table></div>
+
+<p>Your stack's logistic regression uses <strong>binary features</strong>: each feature is a string like <code>"hour×cat=12_10"</code>, it's either present or absent, and the model learns one weight per string. The prediction is the sigmoid of the sum of the weights of the features present:</p>
+
+\[ \hat p = \sigma\Big(\sum_{f \in \text{features}(x)} w_f\Big), \qquad \sigma(z) = \frac{1}{1+e^{-z}} \]
+
+<h2 id="hashing"><span class="sec">6.2</span>The hashing trick</h2>
+
+<p>How many distinct feature strings are there? For users and ads alone, as many as there are users and ads, and new ones appear every minute. Instead of maintaining a dictionary from string to weight, production systems <strong>hash</strong> each string into one of \(B\) buckets and keep a fixed-size weight table. New strings need no dictionary update. The price is <dfn>collisions</dfn>: two unrelated features that land in the same bucket share a weight.</p>
+
+<div class="widget" id="w-hash">
+  <div class="w-title">How big should the table be?</div>
+  <div class="w-sub">The distinct feature strings in your logs, hashed into tables of different sizes. Then the same logistic regression is trained with each table size.</div>
+</div>
+
+<div class="exercise" data-id="ch6-e1" data-answer="12.8" data-tol="0.05" data-unit="GB">
+  <p class="q">A production model has an embedding table for user IDs: 50 million rows, 64 numbers per row, 4 bytes per number. How big is the table in gigabytes (10⁹ bytes)?</p>
+  <details class="hint"><summary>Hint</summary><p>50,000,000 × 64 × 4 bytes.</p></details>
+  <div class="explain"><p>50M × 64 × 4 = 12.8 × 10⁹ bytes = <strong>12.8 GB</strong>, for one feature's table. That's why ID features dominate the memory (and cost) of big recommender models, why hashing and pruning matter, and why "add an ID feature for X" is an infrastructure request, not just a modeling one.</p></div>
+</div>
+
+<h2 id="counting"><span class="sec">6.3</span>Counting features and smoothing</h2>
+
+<p>An ID feature learns an ad's appeal slowly, one gradient step at a time. A <dfn>counting feature</dfn> hands the model a summary directly: this ad's CTR so far. Counting features also generalize to <em>new</em> IDs as soon as a little data arrives, with no retraining needed. But raw ratios are noisy when counts are small. An ad with 1 click in 3 impressions doesn't have a 33% CTR. The standard fix is to <dfn>smooth</dfn> toward a prior, as if you'd seen some extra impressions at the average rate:</p>
+
+\[ \widetilde{\text{CTR}} = \frac{\text{clicks} + \text{prior} \cdot m}{\text{impressions} + m} \]
+
+<p>where \(m\) (the <em>strength</em>) is how many imaginary impressions the prior is worth. Watch an ad's estimate evolve as its impressions arrive:</p>
+
+<div class="widget" id="w-smooth">
+  <div class="w-title">Raw vs. smoothed CTR as data arrives</div>
+  <div class="w-sub">A single ad's top-slot impressions, with clicks drawn from its true CTR. Try different strengths.</div>
+</div>
+
+<div class="code-cell" data-slot="smoothedCTR"></div>
+
+<h2 id="crosses"><span class="sec">6.4</span>Crosses</h2>
+
+<p>A logistic regression is <em>additive</em>. With separate features <code>hour=12</code> and <code>cat=Food</code>, it can learn "noon is a bit better for everyone" and "Food is clicked a lot," but not "Food ads do especially well at lunchtime." That effect exists only for the combination. A <dfn>feature cross</dfn> makes the combination a feature of its own: <code>hour×cat=12_Food</code> gets its own weight.</p>
+
+<p>Pebble's world contains exactly such interactions: food at mealtimes, gaming late at night, finance on iOS, and category preferences that shift with age. Crosses let a linear model capture them. The cost is combinatorial: crossing two features with 24 and 12 values makes 288 new features, and crosses of IDs explode. Deciding which crosses to build used to be the main job of ranking engineers. Chapter 11's cross layers and attention are ways to <em>learn</em> the useful interactions instead of hand-picking them.</p>
+
+<h2 id="build"><span class="sec">6.5</span>Build: your feature extractor</h2>
+
+<p>Write the function that turns a (user, ad) pair into feature strings. Your stack logs its output at serve time and trains on it. Start from the starter and add crosses, history features, and a counting feature. Keep to the rule from Chapter 4: <code>stats</code> holds counts as of the <em>start of the day</em>, and you must never reach for anything later.</p>
+
+<div class="code-cell" data-slot="featurize"></div>
+
+<p>How much does each group of features buy? The widget below trains the same logistic regression with feature groups added one at a time, and evaluates it on the next day's traffic against the truth. The last row trains on <em>your</em> <code>featurize()</code>.</p>
+
+<div class="widget" id="w-ablate">
+  <div class="w-title">What each feature group is worth</div>
+  <div class="w-sub">Train on days 0–9 of your logs, evaluate on day 10. Each row adds one group to the previous row.</div>
+</div>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>An <dfn>ablation</dfn> table like this one is the most useful artifact in a feature review. Ask for it. Diminishing returns are normal: once user IDs are in, history adds less, because both describe the same user. Each feature also has an <em>ongoing</em> cost: logging, storage, serving latency, freshness pipelines, privacy review, and one more thing that can break. A feature worth +0.001 AUC might not be worth owning.</p>
+</div>
+
+<h2 id="leakage"><span class="sec">6.6</span>Leakage: the feature that knows the answer</h2>
+
+<p>A leaky feature contains information about the label that won't be available at serve time. The classic ads example is a counting feature computed over a window that includes the impression's own outcome. Take a per-user CTR feature. Computed properly, it uses the user's clicks <em>before</em> the day of the impression. Computed carelessly, after the fact, over all ten days, it includes <em>this row's click</em>. For a user with 30 impressions, one click moves their CTR a lot. The model learns to read the answer off the feature.</p>
+
+<div class="widget" id="w-leak">
+  <div class="w-title">A leak, measured</div>
+  <div class="w-sub">Your features plus a user-CTR feature, computed two ways. "Offline" evaluates each model the way it was built; "online" uses what serving would actually have.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>An offline gain that looks too good to be true. If a new feature takes AUC past what anyone thought possible (here, <em>above the oracle</em>), assume a leak until proven otherwise. Ask three questions. When exactly is this feature computed, relative to the impression? Would its value be the same if we computed it at serve time? Does it aggregate over a window that overlaps the label's window?</p>
+</div>
+
+<div class="quiz" data-id="ch6-q1">
+  <p class="q">Which of these proposed features leaks the label for a pCTR model?</p>
+  <ul>
+    <li data-why="Computed before the request; no future information.">Number of ads the user clicked in the previous 7 days, as of the request</li>
+    <li data-why="Known at serve time.">The hour of day of the request</li>
+    <li data-correct>The user's session length for the session containing the impression, from the session log</li>
+    <li data-why="Known at serve time, from the ad's metadata.">The ad's category</li>
+  </ul>
+  <div class="explain"><p>Session length is only known when the session <em>ends</em>, after the ad was shown. And clicking an ad changes the session (the user leaves the app, or stays longer). The feature is correlated with the label for reasons that won't exist at serve time. It would look great offline and be unavailable, or different, in production.</p></div>
+</div>
+
+<div class="quiz" data-id="ch6-q2">
+  <p class="q">You shrink the hashed weight table from 2²⁰ to 2¹² buckets to save memory, and AUC drops. What's the mechanism?</p>
+  <ul>
+    <li data-why="Hashing doesn't remove features; every string still maps to some bucket.">Features are dropped when the table is full</li>
+    <li data-correct>Unrelated features share buckets and have to share one weight</li>
+    <li data-why="Model depth is unrelated to the table size.">The model has fewer layers</li>
+    <li data-why="Learning rates don't depend on table size.">The learning rate becomes too high</li>
+  </ul>
+  <div class="explain"><p>With fewer buckets, collisions increase, and a single weight has to serve, say, a user ID and an hour×category cross at once. The model can't tell them apart. Frequent features dominate the shared weight and rare ones get noise.</p></div>
+</div>
+
+<div class="reflect" data-id="ch6-r1">
+  <p class="q">A data scientist proposes adding "advertiser's total spend last 30 days" as a feature, and it gives +0.8% AUC offline. You're the PM. What do you want to know before it ships?</p>
+  <div class="model">
+    <ul>
+      <li><strong>Leakage and timing.</strong> Is spend computed as of the impression, with a lag matching how fresh it will be in serving? Spend is literally the sum of clicks × prices, so a window overlapping the label period leaks clicks.</li>
+      <li><strong>Serve-time availability and freshness.</strong> Can serving fetch it within the latency budget, and how stale will it be? A daily batch? Train it with the same staleness.</li>
+      <li><strong>Fairness to advertisers and incentives.</strong> The feature makes big spenders look more clickable. Is that real signal (brand strength) or a rich-get-richer loop, where spend buys delivery, which becomes more spend? Check calibration for small vs. large advertisers, and new advertisers with zero spend.</li>
+      <li><strong>Ablation against what's already there.</strong> Does it add over the advertiser ID and counting features, or duplicate them?</li>
+      <li><strong>Online test.</strong> Offline AUC gains from features like this often shrink online. Require an A/B test with per-advertiser-tier metrics.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>Your stack now has <strong>your feature extractor</strong>: IDs, crosses, history, and a smoothed counting feature, logged at serve time and hashed into a weight table. Chapter 7 trains a model on them.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Hashing trick</b>Map feature strings to a fixed number of buckets; collisions are the price.</div>
+    <div><b>Counting feature</b>A historical rate (CTR so far) supplied as a feature.</div>
+    <div><b>Smoothing</b>Shrink small-sample rates toward a prior: (c + p·m)/(n + m).</div>
+    <div><b>Feature cross</b>A feature for a combination, so a linear model can learn interactions.</div>
+    <div><b>Ablation</b>Measuring a feature group's value by adding or removing it.</div>
+    <div><b>Leakage</b>A feature that contains information about the label that serving won't have.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world();
+  var dataPromise = null;
+  function getData(progress) {
+    if (!dataPromise) dataPromise = (async function () {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.8, 'Collecting training logs…'); } });
+      var ev = await Stack.evalLog({ onProgress: function (p) { progress(0.8 + p * 0.2, 'Collecting day 10…'); } });
+      return { tl: tl, rows: Stack.labeledRows(tl), ev: ev, er: Stack.labeledRows(ev) };
+    })();
+    return dataPromise;
+  }
+  document.addEventListener('stackchange', function () { dataPromise = null; });
+  var REF = Stack.compile('featurize', Stack.SLOTS.featurize.reference);
+
+  /* ---------------- hashing ---------------- */
+  (function () {
+    var host = document.getElementById('w-hash');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Hash and train at 5 table sizes', async function (progress) {
+      var d = await getData(progress);
+      var uniq = new Set(); d.rows.forEach(function (r) { r.feats.forEach(function (f) { uniq.add(f); }); });
+      var strs = Array.from(uniq), bitsList = [8, 10, 12, 15, 18], res = [];
+      for (var i = 0; i < bitsList.length; i++) {
+        var b = bitsList[i], counts = new Map();
+        strs.forEach(function (s) { var k = Stack.fnv1a(s) & ((1 << b) - 1); counts.set(k, (counts.get(k) || 0) + 1); });
+        var collided = 0; counts.forEach(function (c) { if (c > 1) collided += c; });
+        progress(i / bitsList.length, 'Training with 2^' + b + ' buckets…');
+        var m = await Stack.trainLR({ rows: d.rows, bits: b, epochs: 2 });
+        var e = Stack.evaluate(Stack.lrPredictRows(m, d.er), d.er.map(function (r) { return r.click; }), d.ev.truth.map(function (t) { return t.pctr; }));
+        res.push({ b: b, collided: collided / strs.length, auc: e.auc, mem: (1 << b) * 4 });
+      }
+      out.innerHTML = '';
+      out.appendChild(el('p', { class: 'small', html: 'Your features produced <b>' + strs.length.toLocaleString() + '</b> distinct strings over 10 days.' }));
+      StackUI.table(out, [
+        { label: 'Buckets', get: function (r) { return '2<sup>' + r.b + '</sup> = ' + (1 << r.b).toLocaleString(); } },
+        { label: 'Weight table', num: true, get: function (r) { return r.mem >= 1e6 ? (r.mem / 1e6).toFixed(1) + ' MB' : (r.mem / 1e3).toFixed(0) + ' KB'; } },
+        { label: 'Features in a collision', num: true, get: function (r) { return Book.pct(r.collided, 0); } },
+        { label: 'AUC on day 10', num: true, get: function (r) { return r.auc.toFixed(3); } }
+      ], res, { rowClass: function (r) { return r.b === Stack.state.settings.hashBits ? 'hl' : ''; } });
+      out.appendChild(el('p', { class: 'small muted', text: 'Highlighted: your stack\'s setting (2^' + Stack.state.settings.hashBits + '). Past the point where collisions are rare, extra buckets buy almost nothing.' }));
+    });
+  })();
+
+  /* ---------------- smoothing ---------------- */
+  (function () {
+    var host = document.getElementById('w-smooth');
+    var grid = el('div', { class: 'w-grid side' }), L = el('div'), R = el('div'); grid.appendChild(L); grid.appendChild(R); host.appendChild(grid);
+    var trueCtr = 0.06, prior = 0.035;
+    var ctl = Book.controls(L, [
+      { key: 'm', label: 'Smoothing strength m', min: 0, max: 400, step: 10, value: 100 },
+      { key: 'seed', label: 'Random draw', min: 1, max: 20, step: 1, value: 1 }
+    ], draw);
+    L.appendChild(el('p', { class: 'small muted', html: 'True CTR ' + (trueCtr * 100) + '%, prior ' + (prior * 100).toFixed(1) + '% (the global CTR). m = 0 is the raw ratio.' }));
+    var c = Book.chart(R, { w: 520, h: 250, x: [0, 1000], y: [0, 0.15], xlabel: 'Impressions so far', ylabel: 'Estimated CTR', yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+    Book.legend(R, [{ label: 'Raw clicks / impressions', color: 'var(--s2)' }, { label: 'Smoothed', color: 'var(--s1)' }, { label: 'True CTR', color: 'var(--ink-3)', dash: true }]);
+    function draw() {
+      var r = Book.rng(ctl.values.seed * 7919), m = ctl.values.m, sm = Stack.impl('smoothedCTR'), clicks = 0, raw = [], smo = [];
+      for (var n = 1; n <= 1000; n++) {
+        clicks += r() < trueCtr ? 1 : 0;
+        if (n % 5 === 0 || n < 30) { raw.push([n, clicks / n]); smo.push([n, sm(clicks, n, prior, m)]); }
+      }
+      c.clear(); c.hline(trueCtr, {}); c.line(raw, { color: 'var(--s2)', width: 1.6 }); c.line(smo, { color: 'var(--s1)' });
+    }
+    draw();
+    document.addEventListener('stackchange', draw);
+  })();
+
+  /* ---------------- ablation ---------------- */
+  var GROUPS = [
+    { name: 'Ad, advertiser, category IDs', re: /^(ad|adv|cat)=/ },
+    { name: '+ context crosses (age/device/hour/country × category)', re: /×cat=/ },
+    { name: '+ user ID', re: /^user=/ },
+    { name: '+ history (category counts, recency)', re: /^(hist×cat|recent3|last)=/ },
+    { name: '+ counting feature (ad CTR so far)', re: /^adCTR=/ }
+  ];
+  (function () {
+    var host = document.getElementById('w-ablate');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Run the ablation (6 models)', async function (progress) {
+      var d = await getData(progress);
+      var tr = Stack.refeaturize(d.rows, REF, 'serve'), ev = Stack.refeaturize(d.er, REF, 'serve');
+      var ey = d.er.map(function (r) { return r.click; }), et = d.ev.truth.map(function (t) { return t.pctr; });
+      var res = [];
+      for (var g = 0; g < GROUPS.length; g++) {
+        var use = GROUPS.slice(0, g + 1);
+        var f = function (r) { return Object.assign({}, r, { feats: r.feats.filter(function (x) { return use.some(function (u) { return u.re.test(x); }); }) }); };
+        progress(g / (GROUPS.length + 1), 'Training: ' + GROUPS[g].name);
+        var m = await Stack.trainLR({ rows: tr.map(f), epochs: 2 });
+        var e = Stack.evaluate(Stack.lrPredictRows(m, ev.map(f)), ey, et);
+        res.push({ name: GROUPS[g].name, e: e });
+      }
+      progress(0.9, 'Training on your featurize()…');
+      var mine = await Stack.trainLR({ rows: d.rows, epochs: 2 });
+      var em = Stack.evaluate(Stack.lrPredictRows(mine, d.er), ey, et);
+      res.push({ name: '<b>Your featurize()</b>' + (Stack.implSource('featurize') === 'you' ? '' : ' <span class="muted">(reference until your tests pass)</span>'), e: em, mine: true });
+      out.innerHTML = '';
+      var prev = null;
+      StackUI.table(out, [
+        { label: 'Features', key: 'name' },
+        { label: 'AUC', num: true, get: function (r) { return r.e.auc.toFixed(3); } },
+        { label: 'Δ AUC', num: true, get: function (r, i) { var s = i === 0 || r.mine ? '' : Book.signed(r.e.auc - res[i - 1].e.auc, 3); return s; } },
+        { label: 'NE', num: true, get: function (r) { return r.e.ne.toFixed(3); } },
+        { label: 'Calibration', num: true, get: function (r) { return r.e.calibration.toFixed(2); } }
+      ], res, { rowClass: function (r) { return r.mine ? 'hl' : ''; } });
+      out.appendChild(el('p', { class: 'small', html: 'For reference: a model that knew the true probabilities would score AUC <b>' + em.oracleAuc.toFixed(3) + '</b> on the same day. That\'s the ceiling. NE (normalized entropy) and calibration are explained in Chapter 9; lower NE is better.' }));
+      var c1 = Stack.state.code.featurize, c2 = Stack.state.code.smoothedCTR;
+      if (c1 && c1.passed && c2 && c2.passed) { Stack.markBuilt(6, 'you'); document.dispatchEvent(new CustomEvent('stackchange')); }
+    });
+  })();
+
+  /* ---------------- leakage ---------------- */
+  (function () {
+    var host = document.getElementById('w-leak');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    function bucket(c) { return 'userCTR=' + Math.round(Math.log2((c[1] + 0.04 * 20) / (c[0] + 20)) * 2); }
+    StackUI.asyncButton(btnHost, 'Train both and compare', async function (progress) {
+      var d = await getData(progress);
+      var byUser = {}, full = {}, evFull = {};
+      d.rows.forEach(function (r) { (byUser[r.user] = byUser[r.user] || []).push(r); var c = full[r.user] || (full[r.user] = [0, 0]); c[0]++; c[1] += r.click; });
+      d.er.forEach(function (r) { var c = evFull[r.user] || (evFull[r.user] = [0, 0]); c[0]++; c[1] += r.click; });
+      function before(u, day) { var c = [0, 0]; (byUser[u] || []).forEach(function (r) { if (r.day < day) { c[0]++; c[1] += r.click; } }); return c; }
+      function add(rows, fn) { return rows.map(function (r) { return Object.assign({}, r, { feats: r.feats.concat([fn(r)]) }); }); }
+      var trClean = add(d.rows, function (r) { return bucket(before(r.user, r.day)); });
+      var trLeak = add(d.rows, function (r) { return bucket(full[r.user]); });
+      var evServe = add(d.er, function (r) { return bucket(full[r.user] || [0, 0]); });
+      var evLeak = add(d.er, function (r) { var a = full[r.user] || [0, 0], b = evFull[r.user]; return bucket([a[0] + b[0], a[1] + b[1]]); });
+      var ey = d.er.map(function (r) { return r.click; }), et = d.ev.truth.map(function (t) { return t.pctr; });
+      progress(0.3, 'Training the clean model…');
+      var mC = await Stack.trainLR({ rows: trClean, epochs: 2 });
+      progress(0.65, 'Training the leaky model…');
+      var mL = await Stack.trainLR({ rows: trLeak, epochs: 2 });
+      var cOff = Stack.evaluate(Stack.lrPredictRows(mC, evServe), ey, et), lOff = Stack.evaluate(Stack.lrPredictRows(mL, evLeak), ey, et), lOn = Stack.evaluate(Stack.lrPredictRows(mL, evServe), ey, et);
+      out.innerHTML = '';
+      StackUI.table(out, [
+        { label: 'Model', key: 'n' }, { label: 'Offline AUC', num: true, key: 'off' }, { label: 'Online AUC', num: true, key: 'on' }, { label: 'Online calibration', num: true, key: 'cal' }
+      ], [
+        { n: 'User CTR from <b>earlier days</b> (clean)', off: cOff.auc.toFixed(3), on: '<b>' + cOff.auc.toFixed(3) + '</b>', cal: cOff.calibration.toFixed(2) },
+        { n: 'User CTR over <b>all days</b>, including this row (leaky)', off: '<b class="pos">' + lOff.auc.toFixed(3) + '</b>', on: '<b class="neg">' + lOn.auc.toFixed(3) + '</b>', cal: lOn.calibration.toFixed(2) }
+      ]);
+      var beat = lOff.auc > cOff.oracleAuc;
+      out.appendChild(el('p', { class: 'small', html: 'The oracle, which knows the true probabilities, scores <b>' + cOff.oracleAuc.toFixed(3) + '</b>. ' +
+        (beat ? 'The leaky model "beats" it offline, which is impossible without cheating. ' : 'The leaky model gets suspiciously close to it offline, a jump no honest feature produces. ') +
+        'Online it does <b>' + (lOn.auc < cOff.auc ? 'worse than' : 'no better than') + '</b> the clean model, because it learned to trust a feature that no longer contains the answer.' }));
+    });
+  })();
+})();
+</script>
+</body>
+</html>

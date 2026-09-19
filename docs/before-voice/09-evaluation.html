@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evaluation, Offline and Online — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="09-evaluation">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 9 · Part III · Learning</div>
+  <h1>Evaluation, Offline and Online</h1>
+  <p class="dek">Offline metrics tell you whether a model learned something. Only an experiment tells you whether it's worth shipping, and the two disagree more often than anyone likes.</p>
+</header>
+
+<div class="stack-panel" data-chapter="9"></div>
+
+<p class="lead">You have a trained logistic regression sitting in your stack, and a heuristic serving production. This chapter gives you the tools to decide whether to swap them. You'll build the two metrics every ads ranking review opens with, read them against the simulator's truth, slice them, and then run the real test: a randomized A/B experiment on your own traffic. At the end you make the ship decision.</p>
+
+<h2 id="auc"><span class="sec">9.1</span>AUC: can the model rank?</h2>
+
+<p><dfn>AUC</dfn> (area under the ROC curve) has a definition that sounds technical and a meaning that's simple: <strong>pick a random clicked impression and a random non-clicked one. AUC is the probability the model scored the clicked one higher.</strong> A coin flip gets 0.5 and a perfect ranker gets 1.0. Pebble's own truth only reaches about 0.85, because clicks are random even when you know the exact probabilities.</p>
+
+<p>Two properties make AUC popular. It ignores calibration completely (only the order matters), and it doesn't depend on the base rate. Two properties make it dangerous. It ignores calibration completely, and it averages over every pair, including pairs the auction never compares, like two different users at two different times.</p>
+
+<div class="code-cell" data-slot="auc"></div>
+
+<h2 id="ne"><span class="sec">9.2</span>Normalized entropy: are the numbers right?</h2>
+
+<p>Log loss measures probabilities, but its raw value depends on the base rate: a 1% CTR dataset has lower log loss than a 10% one, however good the model. <dfn>Normalized entropy</dfn> (NE), popularized by Facebook's ads team (He et al., 2014), divides the model's log loss by the log loss of the laziest honest model, the one that always predicts the average CTR:</p>
+
+\[ \text{NE} = \frac{-\frac{1}{N}\sum_i \big[y_i \log \hat p_i + (1-y_i)\log(1-\hat p_i)\big]}{-\big[\bar y \log \bar y + (1-\bar y)\log(1-\bar y)\big]} \]
+
+<p>NE = 1 means "no better than predicting the average." Lower is better. Because log loss punishes miscalibration, NE captures ranking <em>and</em> calibration together. That makes it the natural headline metric for a model whose outputs become prices.</p>
+
+<div class="code-cell" data-slot="normalizedEntropy"></div>
+
+<div class="exercise" data-id="ch9-e1" data-answer="0.892" data-tol="0.004">
+  <p class="q">A dataset has a 10% click rate. Your model's average log loss on it is 0.29. What's its NE?</p>
+  <details class="hint"><summary>Hint</summary><p>Denominator: −(0.1 ln 0.1 + 0.9 ln 0.9).</p></details>
+  <div class="explain"><p>−(0.1 × −2.303 + 0.9 × −0.105) = 0.325, and 0.29 / 0.325 ≈ <strong>0.892</strong>. The model removes about 11% of the uncertainty that predicting the average leaves. In mature ads systems, launches are often decided on NE improvements of a <em>tenth of a percent</em>.</p></div>
+</div>
+
+<h2 id="dashboard"><span class="sec">9.3</span>Your model's report card</h2>
+
+<p>Here's the offline evaluation a model review would ask for, computed with <em>your</em> metric functions on held-out day 10. Because this is a simulation, there's a column you'll never have at work: the same metrics for a model that knew the true probabilities, which is the best any model could do.</p>
+
+<div class="widget" id="w-report">
+  <div class="w-title">Offline evaluation: heuristic vs. your model vs. the truth</div>
+  <div class="w-sub">Day 10 impressions from your production logs.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Evaluating on a random sample of the training period instead of a later one. Ads data drifts (Chapter 13) and has leaky time structure (Chapter 6), so a random split flatters the model. Always evaluate on data from <em>after</em> the training window, the way it'll be used.</p>
+</div>
+
+<h2 id="slices"><span class="sec">9.4</span>Slices</h2>
+
+<p>An overall number can hide a disaster in one segment. A model that's 3% better overall and 40% miscalibrated for new advertisers is a pricing incident waiting to happen (Chapter 3). Every serious model review looks at slices.</p>
+
+<div class="widget" id="w-slices">
+  <div class="w-title">Your model, sliced</div>
+  <div class="w-sub">Day 10, by category and by ad age. Calibration = Σ predicted / Σ clicks.</div>
+</div>
+
+<h2 id="gap"><span class="sec">9.5</span>The offline–online gap</h2>
+
+<p>Offline evaluation has a blind spot built in. It measures the model on impressions the <em>old</em> system chose to show. Once the new model is in charge, it will score ~150 candidates per request, most of which the old system never showed, so there are no labels for them. If the model is badly wrong about those unseen candidates, offline metrics can't tell you. Only serving it can. This is the <dfn>offline–online gap</dfn>, and the exposure bias from Chapter 5 is its most common cause.</p>
+
+<p>The simulator can show you the gap directly. For held-out requests, it compares each model's predictions against the truth on <em>all eligible candidates</em>, not just the ones that were shown:</p>
+
+<div class="widget" id="w-gap">
+  <div class="w-title">Shown ads vs. all candidates</div>
+  <div class="w-sub">Calibration against the truth. Left: impressions your production system actually showed. Right: every eligible ad for the same requests.</div>
+</div>
+
+<h2 id="ab"><span class="sec">9.6</span>The A/B test</h2>
+
+<p>The only way to measure what a model does in production is to put it in production for a random subset of users. In an <dfn>A/B test</dfn>, users are split at random, by a hash of their user ID, into a <em>control</em> arm (the current system) and a <em>treatment</em> arm (the new model). Both arms see the same days, the same advertisers, the same world. Any difference beyond chance is caused by the model.</p>
+
+<p>"Beyond chance" is the hard part. Revenue per user is noisy: most users click nothing, and a few click a lot. The widget reports a <dfn>95% confidence interval</dfn> for each lift, computed by resampling users (a bootstrap). If the interval includes zero, you can't rule out that the difference is noise. And because this is a simulation, it also shows the <em>true</em> expected lift, the number the experiment is trying to estimate.</p>
+
+<div class="widget" id="w-ab">
+  <div class="w-title">Run an experiment on your stack</div>
+  <div class="w-sub">Control: your heuristic. Treatment: your logistic regression. Three days, 4,000 requests a day, users split 50/50.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>Run an <strong>A/A test</strong> (both arms identical) and you'll still see "lifts" of several percent. That's the noise floor. A real effect has to clear it. Real ads experiments run for weeks on millions of users to detect lifts of a fraction of a percent. Your three-day test on a few thousand simulated users can only detect big effects.</p>
+</div>
+
+<div class="quiz" data-id="ch9-q1">
+  <p class="q">Your new model improves offline AUC from 0.742 to 0.748. In a two-week A/B test, revenue per user is −0.4% with a 95% CI of [−1.1%, +0.3%]. What's the right reading?</p>
+  <ul>
+    <li data-why="The interval includes zero; there's no evidence of harm.">The model hurts revenue; roll it back</li>
+    <li data-why="The interval includes zero; there's no evidence of a gain either.">The model helps revenue</li>
+    <li data-correct>No detectable revenue effect; if revenue was the goal, the offline gain didn't translate. Check other metrics and why before deciding</li>
+    <li data-why="Offline AUC doesn't override an online test.">Ship it, since AUC is up</li>
+  </ul>
+  <div class="explain"><p>The test can't distinguish the effect from zero. Before deciding, check guardrail metrics (user experience, advertiser value, latency) and whether the offline gain came from somewhere the auction doesn't care about. For example, a better ranking of pairs across users doesn't change who wins any auction.</p></div>
+</div>
+
+<div class="quiz" data-id="ch9-q2">
+  <p class="q">An A/B test shows CTR +6% (significant) but advertiser conversions −3% (significant). What's the most likely story?</p>
+  <ul>
+    <li data-why="Conversions dropping significantly isn't noise.">Measurement noise</li>
+    <li data-correct>The model favours ads that get clicked but don't convert, such as attention-grabbing creatives</li>
+    <li data-why="More clicks usually means more conversions, unless the mix of ads changes.">Users clicked more, so they must have bought more</li>
+    <li data-why="Advertisers' budgets aren't implied by these numbers.">Advertisers ran out of budget</li>
+  </ul>
+  <div class="explain"><p>A click model optimizes clicks. If the ads that gain delivery are clickbait-like (high CTR, low CVR), clicks rise while conversions fall. Advertisers pay more per conversion and eventually bid less. That's why advertiser value is a guardrail in ads experiments, and why Chapter 12 adds a conversion model.</p></div>
+</div>
+
+<h2 id="ship"><span class="sec">9.7</span>Your decision</h2>
+
+<div class="widget" id="w-ship">
+  <div class="w-title">Ship it?</div>
+  <div class="w-sub">This sets the ranker your stack serves with from now on. Later chapters build on the choice.</div>
+</div>
+
+<div class="reflect" data-id="ch9-r1">
+  <p class="q">Write the one-paragraph launch recommendation for your logistic regression as you would for a Pebble launch review. Include the offline metrics, the online results with uncertainty, the slices you checked, and any risks.</p>
+  <div class="model">
+    <p><em>Example structure (your numbers will differ):</em> "We recommend launching LR-v1 as the Pebble pCTR ranker. Offline, on held-out day 10, AUC improves from 0.64 to 0.74 and NE from 1.00 to 0.91, with calibration of 0.98 overall and within ±10% in every category slice except Travel (1.14, low volume). In a 3-day A/B test (≈2,000 users per arm), true revenue per request is +X% [CI a, b] and CTR +Y% [CI]. Advertiser conversion value is flat [CI], so there's no evidence the model trades conversions for clicks. Risks: the model was trained on logs with Z% exploration, so behaviour on rarely shown ads is less certain; new-ad calibration should be monitored for 2 weeks; the test was short, so long-run advertiser response is unmeasured. We'll keep a 5% holdout on the heuristic for 4 weeks."</p>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>An <strong>evaluation toolkit</strong>: your own AUC and NE, reliability and slices, and an <strong>A/B testing harness</strong> with confidence intervals. With it, you made your stack's first launch decision.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>AUC</b>P(random positive scored above random negative); ranking only.</div>
+    <div><b>NE</b>Log loss ÷ entropy of the base rate; ranking and calibration.</div>
+    <div><b>Slice</b>A segment-level metric: category, ad age, country, bid type.</div>
+    <div><b>Offline–online gap</b>Offline data only covers what the old system showed.</div>
+    <div><b>A/B test</b>A randomized user split; the only causal measure of a launch.</div>
+    <div><b>Confidence interval</b>The range of lifts consistent with the data; includes 0 → no detectable effect.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world();
+  var dataP = null;
+  function data(progress) {
+    if (!dataP) dataP = (async function () {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress && progress(p * 0.8, 'Collecting logs…'); } });
+      var ev = await Stack.evalLog({ onProgress: function (p) { progress && progress(0.8 + p * 0.2, 'Collecting day 10…'); } });
+      return { tl: tl, ev: ev, er: Stack.labeledRows(ev) };
+    })();
+    return dataP;
+  }
+  function needModel(host) {
+    if (Stack.getModel('lr')) return false;
+    host.appendChild(el('p', { class: 'note warn', html: 'No trained model in your stack yet. Train one in <a href="07-how-models-learn.html#train">Chapter 7</a>, or use the "Load reference solutions" button at the top of this page.' }));
+    return true;
+  }
+  document.addEventListener('stackchange', function () { dataP = null; });
+
+  /* ---------------- report card ---------------- */
+  (function () {
+    var host = document.getElementById('w-report');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Evaluate', async function (progress) {
+      out.innerHTML = '';
+      if (needModel(out)) return;
+      var d = await data(progress), m = Stack.getModel('lr');
+      var y = d.er.map(function (r) { return r.click; }), t = d.ev.truth.map(function (x) { return x.pctr; });
+      var heurP = d.ev.impressions.map(function (i) { return Math.min(0.99, i.pctr * w.cfg.examine[i.slot]); });
+      var lrP = Stack.lrPredictRows(m, d.er);
+      var eH = Stack.evaluate(heurP, y, t), eL = Stack.evaluate(lrP, y, t), eT = Stack.evaluate(t, y, t);
+      StackUI.table(out, [
+        { label: 'Metric', key: 'k' }, { label: 'Heuristic', num: true, key: 'h' }, { label: 'Your LR', num: true, key: 'l' }, { label: 'Truth (ceiling)', num: true, key: 't' }
+      ], [
+        { k: 'AUC (your auc())', h: eH.auc.toFixed(3), l: '<b>' + eL.auc.toFixed(3) + '</b>', t: eT.auc.toFixed(3) },
+        { k: 'NE (your normalizedEntropy())', h: eH.ne.toFixed(3), l: '<b>' + eL.ne.toFixed(3) + '</b>', t: eT.ne.toFixed(3) },
+        { k: 'Calibration (Σ pred / Σ clicks)', h: eH.calibration.toFixed(2), l: eL.calibration.toFixed(2), t: eT.calibration.toFixed(2) },
+        { k: 'Correlation with true log-odds', h: eH.corrWithTruth.toFixed(2), l: eL.corrWithTruth.toFixed(2), t: '1.00' }
+      ]);
+      var g = el('div', { class: 'w-grid two' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); out.appendChild(g);
+      var bins = Stack.reliability(lrP, t, 10), binsH = Stack.reliability(heurP, t, 10), mx = 0;
+      bins.concat(binsH).forEach(function (b) { mx = Math.max(mx, b.pred, b.actual); });
+      mx *= 1.1;
+      var c = Book.chart(L, { w: 420, h: 280, x: [0, mx], y: [0, mx], xlabel: 'Predicted', ylabel: 'True probability', xfmt: function (v) { return (v * 100).toFixed(0) + '%'; }, yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+      c.line([[0, 0], [mx, mx]], { color: 'var(--ink-3)', dash: '4 4', width: 1.2 });
+      c.line(binsH.map(function (b) { return [b.pred, b.actual]; }), { color: 'var(--s2)' });
+      c.line(bins.map(function (b) { return [b.pred, b.actual]; }), { color: 'var(--s1)' });
+      c.dots(bins.map(function (b) { return [b.pred, b.actual, 4, 'var(--s1)']; }));
+      Book.legend(L, [{ label: 'Your LR', color: 'var(--s1)' }, { label: 'Heuristic', color: 'var(--s2)' }, { label: 'Perfect', color: 'var(--ink-3)', dash: true }]);
+      R.appendChild(el('p', { class: 'small', html: 'Your model closes <b>' + Book.pct((eL.auc - eH.auc) / (eT.auc - eH.auc), 0) + '</b> of the AUC gap between the heuristic and the truth, and ' + Book.pct((eH.ne - eL.ne) / (eH.ne - eT.ne), 0) + ' of the NE gap. ' + (Math.abs(eL.calibration - 1) < 0.1 ? 'It\'s well calibrated overall.' : 'Its overall calibration is off by ' + Book.pct(Math.abs(eL.calibration - 1), 0) + '.') + '<br><br>Metric code: ' + (Stack.implSource('auc') === 'you' ? 'your auc() ✓' : 'reference auc()') + ', ' + (Stack.implSource('normalizedEntropy') === 'you' ? 'your normalizedEntropy() ✓' : 'reference normalizedEntropy()') + '.' }));
+    });
+  })();
+
+  /* ---------------- slices ---------------- */
+  (function () {
+    var host = document.getElementById('w-slices');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Slice', async function (progress) {
+      out.innerHTML = '';
+      if (needModel(out)) return;
+      var d = await data(progress), m = Stack.getModel('lr'), p = Stack.lrPredictRows(m, d.er), aucFn = Stack.impl('auc');
+      function slice(keyFn) {
+        var g = {};
+        d.er.forEach(function (r, i) { var k = keyFn(r); var s = g[k] || (g[k] = { p: [], y: [], t: [] }); s.p.push(p[i]); s.y.push(r.click); s.t.push(d.ev.truth[i].pctr); });
+        return Object.keys(g).map(function (k) { var s = g[k], nc = Stack.sum(s.y); return { k: k, n: s.y.length, clicks: nc, auc: nc && nc < s.y.length ? aucFn(s.p, s.y) : NaN, cal: Stack.sum(s.p) / Math.max(1, nc), calT: Stack.sum(s.p) / Stack.sum(s.t) }; });
+      }
+      var cats = slice(function (r) { return w.categories[r.cat].name; }).sort(function (a, b) { return b.n - a.n; });
+      var age = slice(function (r) { var a = r.day - w.ads[r.ad].startDay; return a < 3 ? 'launched < 3 days ago' : a < 10 ? '3–9 days old' : '10+ days old'; });
+      var cols = [
+        { label: 'Slice', key: 'k' }, { label: 'Impr.', num: true, get: function (r) { return r.n.toLocaleString(); } }, { label: 'Clicks', num: true, key: 'clicks' },
+        { label: 'AUC', num: true, get: function (r) { return isNaN(r.auc) ? '—' : r.auc.toFixed(3); } },
+        { label: 'Calibration', num: true, get: function (r) { var bad = Math.abs(r.cal - 1) > 0.15; return '<span class="' + (bad ? 'neg' : '') + '">' + r.cal.toFixed(2) + '</span>'; } },
+        { label: 'vs. truth', num: true, get: function (r) { return '<span class="muted">' + r.calT.toFixed(2) + '</span>'; } }
+      ];
+      out.appendChild(el('h3', { text: 'By ad age', style: 'margin:6px 0 0;font-size:14px' }));
+      StackUI.table(out, cols, age);
+      out.appendChild(el('h3', { text: 'By category', style: 'margin:10px 0 0;font-size:14px' }));
+      StackUI.table(out, cols, cats, { maxHeight: 320 });
+      out.appendChild(el('p', { class: 'small', text: 'Calibration measured on clicks is noisy in small slices; the "vs. truth" column shows what was really going on. In practice you\'d put confidence intervals on each slice, or wait for more data, before acting on a small one.' }));
+    });
+  })();
+
+  /* ---------------- offline-online gap ---------------- */
+  (function () {
+    var host = document.getElementById('w-gap');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    StackUI.asyncButton(btnHost, 'Measure', async function (progress) {
+      out.innerHTML = '';
+      if (needModel(out)) return;
+      var d = await data(progress), m = Stack.getModel('lr'), pol = Stack.policy({ ranker: 'lr' });
+      var shownP = Stack.lrPredictRows(m, d.er, 0), shownT = d.ev.truth.map(function (t) { return t.rel; });
+      var allP = [], allT = [];
+      w.requestsForDay(10, 400, 1).forEach(function (q) {
+        var uv = Stack.userView(w, q), el2 = w.eligibleAds(q.user, 10), ps = pol.ranker.predict(q, uv, el2, d.tl.stats);
+        el2.forEach(function (a, i) { allP.push(ps[i]); allT.push(w.truth.relevance(q.user, a, q)); });
+      });
+      var c1 = Stack.sum(shownP) / Stack.sum(shownT), c2 = Stack.sum(allP) / Stack.sum(allT);
+      var st = Book.stats(out, [{ key: 'a', label: 'Calibration on shown ads', sub: 'what offline eval sees' }, { key: 'b', label: 'Calibration on all candidates', sub: 'what the model faces in production' }, { key: 'e', label: 'Exploration in your logs' }]);
+      st({ a: { v: c1.toFixed(2), tone: Math.abs(c1 - 1) < 0.15 ? 'good' : 'bad' }, b: { v: c2.toFixed(2), tone: Math.abs(c2 - 1) < 0.2 ? 'good' : 'bad' }, e: Math.round((Stack.state.settings.epsilon || 0) * 100) + '%' });
+      out.appendChild(el('p', { class: 'small', html: Math.abs(c2 - 1) > 0.3
+        ? 'On candidates your old system never showed, the model is <b>' + c2.toFixed(1) + '×</b> off. It has never seen labels for ads like them, so its weights for their features are guesses. In production those guesses win auctions. Offline evaluation can\'t see this; the A/B test will.'
+        : 'Your model stays reasonably calibrated even on candidates the old system rarely showed. Your exploration traffic gave it labels for them.' }));
+    });
+  })();
+
+  /* ---------------- A/B ---------------- */
+  var lastAB = null;
+  (function () {
+    var host = document.getElementById('w-ab');
+    var row = el('div'); host.appendChild(row);
+    var out = el('div'); host.appendChild(out);
+    function render(res, aa) {
+      out.innerHTML = '';
+      var d = res.diffs, pc = function (x) { return Book.signed(100 * x, 1, '%'); };
+      var ci = function (m) { var sig = m.lo > 0 || m.hi < 0; return '<b class="' + (sig ? (m.lift > 0 ? 'pos' : 'neg') : '') + '">' + pc(m.lift) + '</b> <span class="muted">[' + pc(m.lo) + ', ' + pc(m.hi) + ']</span>'; };
+      StackUI.table(out, [{ label: 'Metric', key: 'k' }, { label: 'Observed lift, 95% CI', key: 'o' }, { label: 'True expected lift', num: true, key: 't' }], [
+        { k: 'Revenue per 1,000 requests', o: ci(d.rpm), t: pc(d.trueRpm.lift) },
+        { k: 'Clicks per request', o: ci(d.ctr), t: '' },
+        { k: 'Advertiser conversion value', o: ci(d.value), t: pc(d.trueValue.lift) }
+      ]);
+      out.appendChild(el('p', { class: 'small', html: aa
+        ? 'Both arms ran <b>the same system</b>. Every "lift" above is noise, and this is the size of noise your test has to beat.'
+        : 'Green or red = the 95% interval excludes zero. The last column is what you\'d never know at work: the true effect, free of noise. ' + (d.trueRpm.lift < 0 ? 'Your model <b>loses revenue</b> online despite its offline win. Section 9.5 shows why, and Chapter 5\'s exploration decision is the lever.' : 'Your model genuinely earns more.') }));
+    }
+    StackUI.asyncButton(row, 'Run A/B: heuristic vs. your LR', async function (progress) {
+      out.innerHTML = '';
+      if (needModel(out)) return;
+      await data(progress);
+      lastAB = await Stack.abTest({ control: { ranker: 'heuristic' }, treatment: { ranker: 'lr', calibrate: false }, onProgress: function (p) { progress(p, 'Running both arms…'); } });
+      render(lastAB, false);
+      document.dispatchEvent(new CustomEvent('abdone'));
+    });
+    StackUI.asyncButton(row, 'Run an A/A test', async function (progress) {
+      out.innerHTML = '';
+      await data(progress);
+      var r = await Stack.abTest({ control: { ranker: 'heuristic' }, treatment: { ranker: 'heuristic' }, onProgress: function (p) { progress(p, 'Running both arms…'); } });
+      render(r, true);
+    }, { cls: 'secondary' });
+  })();
+
+  /* ---------------- ship ---------------- */
+  (function () {
+    var host = document.getElementById('w-ship');
+    var body = el('div'); host.appendChild(body);
+    function render() {
+      body.innerHTML = '';
+      var cur = Stack.state.settings.ranker;
+      body.appendChild(el('p', { class: 'small', html: 'Production ranker right now: <b>' + (cur === 'lr' ? 'your logistic regression' : 'the heuristic') + '</b>.' + (lastAB ? ' Your last A/B: true revenue ' + Book.signed(100 * lastAB.diffs.trueRpm.lift, 1, '%') + ', observed ' + Book.signed(100 * lastAB.diffs.rpm.lift, 1, '%') + '.' : ' Run the A/B test above first. Shipping without one is how incidents happen.') }));
+      var ship = el('button', { type: 'button', class: 'btn ' + (cur === 'lr' ? '' : 'accent'), text: 'Ship the logistic regression' });
+      var keep = el('button', { type: 'button', class: 'btn secondary', text: 'Keep the heuristic' });
+      ship.disabled = !Stack.getModel('lr');
+      ship.onclick = function () { Stack.state.settings.ranker = 'lr'; Stack.state.settings.calibrate = false; finish(); };
+      keep.onclick = function () { Stack.state.settings.ranker = 'heuristic'; finish(); };
+      function finish() {
+        var a = Stack.state.code.auc, n = Stack.state.code.normalizedEntropy;
+        if (a && a.passed && n && n.passed) Stack.markBuilt(9, 'you'); else Stack.markBuilt(9, 'reference');
+        Stack.clearLogCache(); render(); document.dispatchEvent(new CustomEvent('stackchange'));
+      }
+      body.appendChild(el('div', { class: 'btn-row' }, [ship, keep]));
+      if (lastAB && lastAB.diffs.trueRpm.lift < 0) body.appendChild(el('p', { class: 'note warn', html: 'Your model lost revenue online. Consider going back to <a href="05-labels-and-bias.html#decide">Chapter 5</a>, raising exploration, then retraining in Chapter 7 and re-running this test. You\'ll see the offline–online gap close. (Or ship anyway, and own it.)' }));
+    }
+    render();
+    document.addEventListener('abdone', render);
+    document.addEventListener('stackchange', render);
+  })();
+})();
+</script>
+</body>
+</html>
