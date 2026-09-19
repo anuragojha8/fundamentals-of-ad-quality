@@ -22,7 +22,7 @@ Reviewed the preface, Chapters 2–15, and both appendices against `ANURAG_WRITI
 ### For Anurag
 - **Three claims about your experience to confirm or cut**, each marked with an `ANURAG:` comment: "I've been there" (preface lead), "I've made most of them" (preface, Common trap description), and "It surprised me" (Ch 11 intro).
 - **The nine original `ANURAG:` story slots** are still open (preface, Ch 1 ×2, 3, 4, 6, 9, 11, 14). Find them with `grep -n "ANURAG:" chapters/*.html`.
-- **Tics that are fine for now, to watch as you edit:** "No pressure" (Ch 1, 5, 14), "Here's…" as a sentence opener (about 30 uses), "never, ever" (about 6 uses).
+- **Tics that are fine for now, to watch as you edit:** "No pressure" (Ch 1, 5, 14), "Here's…" as a sentence opener (26 uses), "never, ever" (7 uses).
 
 ### For the reference check (not done in this pass)
 Citations that look right but should be checked against the sources:
