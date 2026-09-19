@@ -36,3 +36,26 @@ Citations that look right but should be checked against the sources:
 - Ch 12: Chapelle (2014), delayed feedback; ESMM (Ma et al., 2018)
 
 Math in the worked examples was spot-checked (Ch 3, 4, 7, 8, 9, 12) and is correct.
+
+## Pass 2 — reference check (Claude, 2026-09-19)
+
+Every citation from the list above was checked for authors, year, venue, and whether the book's claim matches the source.
+
+### Fixed
+| Where | Problem | Fix |
+|---|---|---|
+| Ch 5, Going deeper | Cited PAL and YouTube together for a shallow position tower "added to the main model's logit." Only YouTube's paper is additive; PAL multiplies P(seen \| position) by P(click \| seen) | Describes each paper's mechanism separately, and ties PAL back to the examination hypothesis in §5.2 |
+| Ch 11 §11.1 | Presented DIN as softmax-normalized scaled dot-product attention. DIN scores pairs with a small learned "activation unit" and deliberately does **not** normalize the weights | States what DIN does, and says the stack uses the simpler transformer-style dot product |
+| Ch 11, In your job | "Architecture launches are usually worth +0.1% to +0.5% in NE" was stated as fact without a source | Softened to "usually moves NE by a fraction of a percent" |
+
+### Verified, no change
+- Ch 2: Edelman, Ostrovsky & Schwarz (2007, *American Economic Review*), GSP analysis; Varian (2007, *International Journal of Industrial Organization*), position auctions; VCG-style pricing at a large platform (Facebook; see Varian & Harris, 2014)
+- Ch 7: McMahan et al. (2013, KDD), FTRL-Proximal with per-coordinate rates and sparsity; Zhang et al. (2022, CIKM, Alibaba), one-epoch overfitting in deep CTR models
+- Ch 8: MMoE (Ma et al., KDD 2018, Google); PLE (Tang et al., RecSys 2020, Tencent)
+- Ch 9: He et al. (2014, ADKDD, Facebook), normalized entropy
+- Ch 10: Yi et al. (2019, RecSys, Google/YouTube), logQ correction for in-batch/popularity-sampled negatives
+- Ch 11: DCN (Wang et al., 2017) and DCN-V2 (2021); the cross-layer formula shown is DCN-V2's form. BST (Alibaba, 2019); HSTU (Meta, 2024); Wide & Deep (Google, 2016)
+- Ch 12: Chapelle (2014, KDD), delayed feedback with an exponential delay model, which matches the book's F(t); ESMM (Ma et al., SIGIR 2018, Alibaba)
+
+### Not checked
+Uncited general claims (e.g. "logistic regression ran most of the world's ad auctions for about a decade") were read for plausibility only.

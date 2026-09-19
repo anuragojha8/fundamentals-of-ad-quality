@@ -107,7 +107,7 @@
 </div>
 
 <details class="callout deep"><summary><div class="label">Going deeper: position in the model itself</div></summary>
-<p>Production rankers usually handle position inside the model rather than through IPW. The slot is a feature during training, and it's pinned to a fixed value (slot 1) at serving time, so the model outputs relevance. Your Chapter 7 model does exactly this. A fancier version uses a separate <em>shallow tower</em> for position-like features, whose output is added to the main model's logit during training and dropped at serving. That keeps the main tower from confusing "shown high" with "good" (see the PAL paper from Huawei, 2019, and YouTube's multitask ranking paper, 2019). IPW is still the go-to tool for unbiased <em>evaluation</em> and for learning-to-rank losses.</p>
+<p>Production rankers usually handle position inside the model rather than through IPW. The slot is a feature during training, and it's pinned to a fixed value (slot 1) at serving time, so the model outputs relevance. Your Chapter 7 model does exactly this. A fancier version gives position its own small component that gets dropped at serving. YouTube's multitask ranking paper (2019) adds a <em>shallow tower</em>'s output to the main model's logit. Huawei's PAL (2019) multiplies a learned probability that the slot gets looked at by the main model's relevance prediction, which is the examination hypothesis from Section 5.2 built right into the network. Either way, the main model can't confuse "shown high" with "good." IPW is still the go-to tool for unbiased <em>evaluation</em> and for learning-to-rank losses.</p>
 </details>
 
 <h2 id="loop"><span class="sec">5.5</span>Selection bias and the feedback loop</h2>

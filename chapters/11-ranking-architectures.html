@@ -66,9 +66,9 @@
 <p>Each layer multiplies the original input \(x_0\), element by element, with a learned linear transformation of the current layer. So every layer adds one more degree of feature interaction. It's the learned, automatic version of the crosses you built by hand in Chapter 6.</p>
 
 <h3>Target attention over history</h3>
-<p>Your LR summarizes a user's history with counts, like "3 of the last 12 posts were Food." But which history items actually matter depends on the ad you're considering. For a Food ad, the Food posts matter. For a Gaming ad, the gaming posts. <dfn>Target attention</dfn> (DIN, the Deep Interest Network, Alibaba, 2018) uses the candidate ad as a <em>query</em>, scores every history item against it, and takes a weighted average:</p>
+<p>Your LR summarizes a user's history with counts, like "3 of the last 12 posts were Food." But which history items actually matter depends on the ad you're considering. For a Food ad, the Food posts matter. For a Gaming ad, the gaming posts. <dfn>Target attention</dfn> (DIN, the Deep Interest Network, Alibaba, 2018) uses the candidate ad as a <em>query</em>, scores every history item against it, and takes a weighted sum. DIN scores each pair with a small learned network, and it deliberately skips normalizing the weights, so their total can signal how strongly the ad matches the user's interests at all. Your stack uses the simpler scaled dot product from transformers:</p>
 \[ \text{score}_i = \frac{h_i \cdot q}{\sqrt{d}}, \qquad \alpha = \text{softmax}(\text{score}), \qquad \text{pooled} = \sum_i \alpha_i h_i \]
-<p>That's the exact same attention that powers transformers. Sequence models like BST (Alibaba, 2019) and HSTU (Meta's "generative recommenders," 2024) stack many layers of it over long user histories. Those histories can run to thousands of events, and serving them fast enough is one of the hardest infrastructure problems in ads right now.</p>
+<p>That's the same attention that powers transformers. Sequence models like BST (Alibaba, 2019) and HSTU (Meta's "generative recommenders," 2024) stack many layers of it over long user histories. Those histories can run to thousands of events, and serving them fast enough is one of the hardest infrastructure problems in ads right now.</p>
 
 <div class="code-cell" data-slot="attentionWeights"></div>
 
@@ -125,7 +125,7 @@
 </div>
 
 <div class="callout pm"><div class="label">In your job</div>
-<p>At big companies, architecture launches are usually worth somewhere between +0.1% and +0.5% in NE, and they cost real money in serving compute. So when someone pitches a bigger model, ask: <em>how much data does it need to beat the current one, and do we actually have it?</em> <em>What does it cost per 1,000 requests to serve?</em> <em>Which stage of the funnel runs it, and on how many candidates?</em> And <em>does it win within requests, or just in global AUC?</em> The best teams scale data, features, and model size together. Not the model alone.</p>
+<p>At big companies, a successful architecture launch usually moves NE by a fraction of a percent, and it costs real money in serving compute. So when someone pitches a bigger model, ask: <em>how much data does it need to beat the current one, and do we actually have it?</em> <em>What does it cost per 1,000 requests to serve?</em> <em>Which stage of the funnel runs it, and on how many candidates?</em> And <em>does it win within requests, or just in global AUC?</em> The best teams scale data, features, and model size together. Not the model alone.</p>
 </div>
 
 <!-- ANURAG: a story about a "bigger model" launch that didn't pay off (or did, after more data) would fit nicely here. -->
