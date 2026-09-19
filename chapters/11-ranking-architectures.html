@@ -31,7 +31,7 @@
 
 <p class="lead">Let's be honest about your logistic regression. It's a list of weights, one per feature string, all added up. Charming, reliable, and a bit of a golden retriever: it can only learn the interactions you spelled out for it by hand, like <code>hour×cat</code>.</p>
 
-<p>Modern ranking models <em>learn</em> their interactions instead. They turn every ID into a vector, let those vectors mingle through special layers, and read the user's history with attention, the same mechanism at the heart of transformers (yes, the ChatGPT kind). This chapter builds one, piece by piece. And then it asks the only question that matters: does it actually beat your LR where it counts? The answer is going to surprise you a little. It surprised me.</p>
+<p>Modern ranking models <em>learn</em> their interactions instead. They turn every ID into a vector, let those vectors mingle through special layers, and read the user's history with attention, the same mechanism at the heart of transformers (yes, the ChatGPT kind). This chapter builds one, piece by piece. And then it asks the only question that matters: does it actually beat your LR where it counts? The answer is going to surprise you a little. It surprised me. <!-- ANURAG: keep only if the result surprises you too. --></p>
 
 <h2 id="anatomy"><span class="sec">11.1</span>The anatomy</h2>
 
@@ -330,7 +330,7 @@
       ], history);
       var msg = 'Run both data sizes and compare. ';
       var h10 = history.filter(function (h) { return h.nd === 10; }).pop(), h30 = history.filter(function (h) { return h.nd === 30; }).pop();
-      if (h10 && h30) msg += (h30.d.trueRpm.lift > h10.d.trueRpm.lift ? 'More data moved the result in the deep model\'s favour (' + pc(h10.d.trueRpm.lift) + ' → ' + pc(h30.d.trueRpm.lift) + '): it has far more parameters than the LR, and they need data.' : 'On your stack, more data didn\'t help the deep model here. Check its within-request accuracy above, and the noise of a single short test.');
+      if (h10 && h30) msg += (h30.d.trueRpm.lift > h10.d.trueRpm.lift ? 'More data moved the result in the deep model\'s favor (' + pc(h10.d.trueRpm.lift) + ' → ' + pc(h30.d.trueRpm.lift) + '): it has far more parameters than the LR, and they need data.' : 'On your stack, more data didn\'t help the deep model here. Check its within-request accuracy above, and the noise of a single short test.');
       else msg += 'Deep models have many more parameters than your LR, so their advantage usually grows with training data. How it plays out depends on your logs: your exploration rate, your features, and luck.';
       out.appendChild(el('p', { class: 'small', text: msg + ' (Your saved models are unchanged. This experiment trains its own pair.)' }));
       var c = Stack.state.code.attentionWeights;

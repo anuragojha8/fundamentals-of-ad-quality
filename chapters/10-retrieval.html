@@ -45,7 +45,7 @@
   <li>The score is just their <strong>dot product</strong>, \(s = u \cdot a\).</li>
 </ul>
 
-<p>Here's why that's so clever. Since the ad tower never looks at the user, you can compute every ad's vector <em>ahead of time</em> and stash them all in an index. Then at request time, you compute one user vector and ask the index, "which ads have the biggest dot product with this?" That's called <dfn>maximum inner product search</dfn>, and <dfn>approximate nearest neighbour</dfn> (ANN) libraries like FAISS, ScaNN, and HNSW can answer it over millions of vectors in a millisecond or two. Pretty neat, right?</p>
+<p>Here's why that's so clever. Since the ad tower never looks at the user, you can compute every ad's vector <em>ahead of time</em> and stash them all in an index. Then at request time, you compute one user vector and ask the index, "which ads have the biggest dot product with this?" That's called <dfn>maximum inner product search</dfn>, and <dfn>approximate nearest neighbor</dfn> (ANN) indexes (FAISS, ScaNN, or graph-based HNSW) can answer it over millions of vectors in a millisecond or two. Pretty neat, right?</p>
 
 <figure class="diagram">
 <svg viewBox="0 0 760 240" role="img" aria-label="Two-tower model: user features to user tower to user vector; ad features to ad tower to ad vectors stored in an index; dot product top-K">
@@ -116,7 +116,7 @@
 
 <div class="widget" id="w-space">
   <div class="w-title">Your ads, in embedding space</div>
-  <div class="w-sub">2-D projection of your trained ad vectors, coloured by category. The star is the user; ringed ads are their top-30.</div>
+  <div class="w-sub">2-D projection of your trained ad vectors, colored by category. The star is the user; ringed ads are their top-30.</div>
 </div>
 
 <h2 id="ship"><span class="sec">10.6</span>Ship retrieval</h2>
@@ -147,11 +147,11 @@
 <div class="recap">
   <h3>What you built</h3>
   <p>A <strong>two-tower retrieval model</strong> trained with sampled softmax, <strong>your own top-K search</strong>, and a real funnel in production: retrieval → your ranker → your auction. Chapter 1 would be proud.</p>
-  <p>Your two-tower is fast precisely because it keeps users and ads apart until the very end. But your ranker doesn't have that constraint. It only sees a few dozen candidates, so it can afford to let users and ads interact as much as it likes. Next time, we build a ranker that takes full advantage of that. It's big, it's fancy, it has attention, and it's going to humble me a little.</p>
+  <p>Your two-tower is fast precisely because it keeps users and ads apart until the very end. But your ranker doesn't have that constraint. It only sees a few dozen candidates, so it can afford to let users and ads interact as much as it likes. Next time, we build a ranker that takes full advantage of that. It's big, it's fancy, it has attention, and it's about to get a reality check.</p>
   <h3>Key terms</h3>
   <div class="terms">
     <div><b>Two-tower model</b>Separate user and ad networks; score = dot product.</div>
-    <div><b>ANN index</b>Approximate nearest-neighbour search over precomputed ad vectors.</div>
+    <div><b>ANN index</b>Approximate nearest-neighbor search over precomputed ad vectors.</div>
     <div><b>Sampled softmax</b>The clicked ad vs. k sampled negatives; the standard retrieval loss.</div>
     <div><b>Negatives</b>Random, hard (shown but not clicked), or in-batch; they shape what's learned.</div>
     <div><b>Recall@K</b>Share of truly best items that make the top K.</div>

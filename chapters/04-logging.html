@@ -112,7 +112,7 @@
 
 <p>Here's a question you'll definitely hear in a meeting someday: why bother storing feature values in the impression log at all? Why not just recompute them at training time from the raw data? It's cheaper!</p>
 
-<p>Because <strong>features change</strong>. Take your stack's counting feature from Chapter 6: an ad's historical CTR. At serve time on day 3, the model saw that ad's CTR <em>as of day 3</em>. Recompute it at training time on day 10 and you get the CTR as of day 10, which includes clicks that happened <em>after</em> the impression. That's information from the future. Your model is basically reading tomorrow's newspaper.</p>
+<p>Because <strong>features change</strong>. Take the counting feature you'll build in Chapter 6: an ad's historical CTR. At serve time on day 3, the model saw that ad's CTR <em>as of day 3</em>. Recompute it at training time on day 10 and you get the CTR as of day 10, which includes clicks that happened <em>after</em> the impression. That's information from the future. Your model is basically reading tomorrow's newspaper.</p>
 
 <p>Training on recomputed features creates <dfn>train/serve skew</dfn>: the model learns from feature values it'll never see in production. Worse, because those recomputed values include the outcome period, they <dfn>leak</dfn> the label. The model looks amazing offline and disappoints online. Let's see how big the difference is in your logs.</p>
 

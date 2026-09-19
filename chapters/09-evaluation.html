@@ -124,7 +124,7 @@
   <p class="q">An A/B test shows CTR +6% (significant) but advertiser conversions −3% (significant). What's the most likely story?</p>
   <ul>
     <li data-why="Conversions dropping significantly isn't noise.">Measurement noise</li>
-    <li data-correct>The model favours ads that get clicked but don't convert, such as attention-grabbing creatives</li>
+    <li data-correct>The model favors ads that get clicked but don't convert, such as attention-grabbing creatives</li>
     <li data-why="More clicks usually means more conversions, unless the mix of ads changes.">Users clicked more, so they must have bought more</li>
     <li data-why="Advertisers' budgets aren't implied by these numbers.">Advertisers ran out of budget</li>
   </ul>
@@ -145,7 +145,7 @@
 <div class="reflect" data-id="ch9-r1">
   <p class="q">Write the one-paragraph launch recommendation for your logistic regression as you would for a Pebble launch review. Include the offline metrics, the online results with uncertainty, the slices you checked, and any risks.</p>
   <div class="model">
-    <p><em>Example structure (your numbers will differ):</em> "We recommend launching LR-v1 as the Pebble pCTR ranker. Offline, on held-out day 10, AUC improves from 0.64 to 0.74 and NE from 1.00 to 0.91, with calibration of 0.98 overall and within ±10% in every category slice except Travel (1.14, low volume). In a 3-day A/B test (≈2,000 users per arm), true revenue per request is +X% [CI a, b] and CTR +Y% [CI]. Advertiser conversion value is flat [CI], so there's no evidence the model trades conversions for clicks. Risks: the model was trained on logs with Z% exploration, so behaviour on rarely shown ads is less certain; new-ad calibration should be monitored for 2 weeks; the test was short, so long-run advertiser response is unmeasured. We'll keep a 5% holdout on the heuristic for 4 weeks."</p>
+    <p><em>Example structure (your numbers will differ):</em> "We recommend launching LR-v1 as the Pebble pCTR ranker. Offline, on held-out day 10, AUC improves from 0.64 to 0.74 and NE from 1.00 to 0.91, with calibration of 0.98 overall and within ±10% in every category slice except Travel (1.14, low volume). In a 3-day A/B test (≈2,000 users per arm), true revenue per request is +X% [CI a, b] and CTR +Y% [CI]. Advertiser conversion value is flat [CI], so there's no evidence the model trades conversions for clicks. Risks: the model was trained on logs with Z% exploration, so behavior on rarely shown ads is less certain; new-ad calibration should be monitored for 2 weeks; the test was short, so long-run advertiser response is unmeasured. We'll keep a 5% holdout on the heuristic for 4 weeks."</p>
   </div>
 </div>
 

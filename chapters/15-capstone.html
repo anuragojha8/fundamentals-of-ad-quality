@@ -39,7 +39,7 @@
 
 <p class="lead">Okay. Deep breath. You're the Ads Quality PM at Pebble, and the next quarter is yours.</p>
 
-<p>Everything you built in this book is now live: your eligibility filter, your auction, your features, your models, your retrieval, your quality penalty. All of it. Each simulated week, Pebble's world keeps moving: interests drift, new ads launch, budgets get spent, users get a little happier or a little more annoyed. You make the calls a real quality PM makes, and then you live with the results. Advertisers, users, and a finance team are all watching. No pressure. (Lots of pressure.)</p>
+<p>Everything you built in this book is now live: your eligibility filter, your auction, your features, your models, your retrieval, your quality penalty. All of it. Each simulated week, Pebble's world keeps moving: interests drift, new ads launch, budgets get spent, users get a little happier or a little more annoyed. You make the calls a real quality PM makes, and then you live with the results. Advertisers, users, and a finance team are all watching.</p>
 
 <h2 id="rules"><span class="sec">15.1</span>How the quarter works</h2>
 
@@ -47,7 +47,7 @@
   <li><strong>Each week</strong> is one simulated day of Pebble traffic, served by your stack with whatever levers you've set. The world jumps forward five days per week, so drift is very real.</li>
   <li><strong>Advertisers have budgets.</strong> They're sized from a pre-season week, so the bigger spenders will run into them. Once an advertiser's budget runs out, it stops bidding for the rest of the day, unless <strong>pacing</strong> spreads its spend out.</li>
   <li><strong>Advertisers leave</strong> if their return on ad spend (conversion value ÷ spend) stays below 0.85 for three weeks in a row. Overcharge people and they walk. Just like real life.</li>
-  <li><strong>Users react slowly.</strong> Pebble's active users grow about 1% a week on their own, and shrink with ad load and hides (the Chapter 14 toy model, with Pebble's estimated sensitivity: weekly loss = 0.4% × ad slots + 40% × hides per request). Fewer users next week means less traffic to monetize.</li>
+  <li><strong>Users react slowly.</strong> Pebble's active users grow about 1% a week on their own, and shrink with ad load and hides (a gentler version of the Chapter 14 toy model: weekly loss = 0.4% × ad slots + 40% × hides per request). Fewer users next week means less traffic to monetize.</li>
   <li><strong>You're graded against autopilot.</strong> A shadow Pebble runs the exact same weeks with the default levers (heuristic ranker, 3 ad slots, no pacing, no penalties). Your job: beat it on revenue, users, and advertiser value, without losing more advertisers than it does. It's the same logic as a long-term holdout, which you now know all about.</li>
   <li><strong>Everything is measured against the truth</strong>: expected revenue, conversions, and hides, not noisy coin flips. Real life will not be this kind to you. Enjoy it.</li>
 </ul>
@@ -62,7 +62,7 @@
 <p>How'd it go? However it went, every lever in that game is one you've studied, and almost all of them trade something now for something later. Here are some patterns strong players tend to find:</p>
 <ul>
   <li><strong>Calibration is an advertiser-retention problem.</strong> Switching to oCPM with a miscalibrated pCVR can juice revenue early and quietly lose you advertisers a few weeks later (Chapters 3 and 12).</li>
-  <li><strong>Budgets cap revenue.</strong> Once advertisers hit their budgets, a better ranker shows up more as advertiser value than as revenue. Pacing rarely hurts, and it helps most when budgets really bind (Chapter 2's thin evening markets).</li>
+  <li><strong>Budgets cap revenue.</strong> Once advertisers hit their budgets, a better ranker shows up more as advertiser value than as revenue. Pacing rarely hurts, and it helps most when budgets really bind (without it, big spenders drop out early and the rest of the day turns into one of Chapter 2's thin markets).</li>
   <li><strong>Stale models decay quietly.</strong> Warm-start retraining on recent weeks keeps your model honest as the world drifts (Chapter 13).</li>
   <li><strong>Ad load is a slow-motion tradeoff.</strong> An extra slot wins every single week-one revenue comparison, and sends the bill to user health (Chapter 14).</li>
   <li><strong>The first bit of quality penalty is often free</strong> (Chapter 14). And exploration is an investment whose returns only land if something learns from it (Chapter 5).</li>
@@ -88,7 +88,7 @@
   <h3>You built an ad system</h3>
   <p>Remember Chapter 1? A tiny auction house that opened and closed in 200 milliseconds, running on a hand-written guess. Look at it now: a retrained, calibrated, quality-aware, two-stage ranking stack with retrieval and conversion bidding. And you built every piece of it.</p>
   <p>More importantly, you know where each piece breaks, and how to tell. That's the actual job. Next time you're in a model review and someone says "calibration went up," you won't just write it down and hope nobody asks a follow-up question. You'll be the one asking it.</p>
-  <p>Appendix B collects every question from along the way, so you can bring them to your next review. Thanks for building this with me. Now go vibe with your marketplace. See ya!</p>
+  <p>Appendix B collects every question from along the way, so you can bring them to your next review. Thanks for building this with me. Now go break something on purpose, and measure what happens. See ya!</p>
 </div>
 
 </main>
