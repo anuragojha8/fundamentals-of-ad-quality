@@ -166,6 +166,85 @@
     stage(h,[['Before the request: encode each ad','Store vectors in a versioned, refreshed index.','b'],['At request time: encode the user once','Search the index using dot-product similarity.','g'],['Retrieve K candidates → ranking','Measure both index recall and relevance recall.','a'],['Cross tower: combine each user–ad pair','A fresh joint forward pass for each candidate.','v'],['That cost grows with candidate count','Cache invariant work; reserve joint work for K.','']], 'Two-tower retrieval precomputes ad vectors and searches with one user vector, while cross-tower ranking performs joint work for each retained candidate.');
   }
 
+  function animatedFunnel() {
+    var h = mount('w-request-funnel', 'One request. Twelve hopeful ads.',
+      'Follow the same ads through filtering, scoring and selection. This is a twelve-ad teaching example, not a sample of your saved stack. The animation slows the request down so you can see what changes.', true);
+    if (!h) return;
+    var candidates = [
+      {id:'A',bid:2,p:.03}, {id:'B',bid:5,p:.01,reason:'Wrong country'},
+      {id:'C',bid:1.5,p:.05}, {id:'D',bid:3,p:.012},
+      {id:'E',bid:4,p:.04,reason:'Not running'}, {id:'F',bid:1,p:.09},
+      {id:'G',bid:2.5,p:.02}, {id:'H',bid:2,p:.025,reason:'Budget spent'},
+      {id:'I',bid:.8,p:.04}, {id:'J',bid:1.8,p:.025},
+      {id:'K',bid:3,p:.06,reason:'Frequency cap'}, {id:'L',bid:1.2,p:.035}
+    ];
+    candidates.forEach(function(a){a.score=a.bid*a.p;});
+    var eligible = candidates.filter(function(a){return !a.reason;}),
+      excluded = candidates.filter(function(a){return !!a.reason;}),
+      ranked = eligible.slice().sort(function(a,b){return b.score-a.score;});
+    var descriptions = [
+      'Start: twelve ads enter the example. A high bid alone cannot get an ad shown.',
+      'Eligibility: B, E, H and K are filtered out. Eight remain. Targeting, campaign dates, budget and frequency caps are constraints, not model scores.',
+      'Rank: the same eight eligible ads are ordered by bid × pCTR. No ad disappears at this step. F leads with $0.090 per impression, ahead of C and A.',
+      'Select and serve: F, C and A fill the three slots. Five eligible ads lose this auction; four never qualified. The auction also sets prices, which Chapter 2 explains.'
+    ];
+    var controls=E('div',{class:'btn-row'});h.appendChild(controls);
+    var play=button(controls,'Play request',start), pause=button(controls,'Pause',stop),
+      next=button(controls,'Next stage',function(){stop();setStage(Math.min(3,current+1));}),
+      reset=button(controls,'Reset',function(){stop();setStage(0);});
+    var status=output(h);
+    var s=svg(h,625,'Twelve illustrative ads pass through eligibility, ranking and selection. Start the animation or use Next stage to follow their identities.');
+    var stages=[];
+    ['All ads','Eligible','Ranked','Shown'].forEach(function(name,i){
+      var x=20+i*186, g=S('g',{},s),y=20+i*8;
+      var shape=S('polygon',{points:x+','+y+' '+(x+160)+','+(y+8)+' '+(x+160)+','+(152-i*8)+' '+x+','+(160-i*8),class:'box'},g);
+      txt(g,x+80,77,name,'t-sm t-b').setAttribute('text-anchor','middle');
+      var count=txt(g,x+80,119,String([12,8,8,3][i]),'t-md t-b');count.setAttribute('text-anchor','middle');
+      stages.push(shape);
+      if(i<3)arrow(s,'M '+(x+164)+' 92 H '+(x+179));
+    });
+    var heading=txt(s,20,207,'12 candidates · before filtering','t-md t-b');
+    var tiles=candidates.map(function(a){
+      var g=S('g',{class:'aq-candidate'},s),rect=S('rect',{x:0,y:0,width:166,height:108,rx:10,class:'box'},g);
+      var name=txt(g,14,35,'Ad '+a.id,'t-md t-b'),detail=txt(g,14,68,'$'+a.bid.toFixed(2)+'/click','t-sm'),note=txt(g,14,94,'pCTR '+(a.p*100).toFixed(1)+'%','t-sm');
+      return {ad:a,g:g,rect:rect,name:name,detail:detail,note:note};
+    });
+    h.appendChild(E('p',{class:'w-sub',text:'Solid cards are still in contention; faded cards are out. Notice that ranking reorders the eight survivors—it does not shrink this candidate set. Your small stack scores every eligible ad; retrieval joins the funnel in Chapter 10.'}));
+    var current=0,timer=null,running=false,reduced=matchMedia('(prefers-reduced-motion: reduce)'),narrow=matchMedia('(max-width: 600px)');
+    function setStage(n){
+      current=n;
+      s.setAttribute('viewBox',narrow.matches?'0 0 760 1005':'0 0 760 625');
+      var order=n===0?candidates:n===1?eligible.concat(excluded):ranked.concat(excluded);
+      stages.forEach(function(shape,i){shape.setAttribute('class','box '+(i===n?(i===3?'g':'a'):i<n?'b':''));});
+      heading.textContent=['12 candidates · before filtering','8 eligible · 4 filtered out','8 scored · highest bid × pCTR first','3 winners · ready for the feed'][n];
+      tiles.forEach(function(t){
+        var a=t.ad,k=order.indexOf(a),out=n>0&&a.reason,win=n===3&&!a.reason&&k<3,loser=n===3&&!a.reason&&k>=3;
+        var cols=narrow.matches?2:4;
+        t.rect.setAttribute('width',narrow.matches?352:166);
+        t.g.style.transform='translate('+(20+(k%cols)*(narrow.matches?372:186))+'px,'+(232+Math.floor(k/cols)*128)+'px)';
+        t.g.style.opacity=out||loser?'0.32':'1';
+        t.rect.setAttribute('class','box '+(win?'g':n>=2&&!out?'b':''));
+        t.name.textContent=win?'Slot '+(k+1)+' · '+a.id:'Ad '+a.id;
+        t.detail.textContent=out?({B:'Country',E:'Inactive',H:'Budget',K:'Freq. cap'}[a.id]):n>=2?'$'+a.score.toFixed(3):'$'+a.bid.toFixed(2)+'/click';
+        t.note.textContent=out?'Filtered out':loser?'Not selected':n>=2?'bid × pCTR':'pCTR '+(a.p*100).toFixed(1)+'%';
+      });
+      status.textContent=descriptions[n];s.setAttribute('aria-label',descriptions[n]);
+      next.disabled=n===3;pause.disabled=!running;
+      play.textContent=reduced.matches?'Show result':n===3?'Replay request':n===0?'Play request':'Continue request';play.disabled=running;
+    }
+    function stop(){clearTimeout(timer);timer=null;running=false;pause.disabled=true;play.disabled=false;}
+    function advance(){if(!running)return;setStage(current+1);if(current===3){stop();setStage(3);}else timer=setTimeout(advance,1700);}
+    function start(){
+      stop();if(reduced.matches){setStage(3);return;}
+      if(current===3)setStage(0);
+      running=true;play.disabled=true;pause.disabled=false;timer=setTimeout(advance,current===0?900:300);
+    }
+    narrow.addEventListener('change',function(){setStage(current);});
+    reduced.addEventListener('change',function(){stop();setStage(current);});
+    document.addEventListener('visibilitychange',function(){if(document.hidden)stop();});
+    setStage(0);
+  }
+
   window.AQDiagrams={gsp:gsp,latency:latency};
-  document.addEventListener('DOMContentLoaded',function(){errors();gradient();feedback();auc();hashing();timeline();worlds();objective();levers();privacy();ann();});
+  document.addEventListener('DOMContentLoaded',function(){errors();gradient();feedback();auc();hashing();timeline();worlds();objective();levers();privacy();ann();animatedFunnel();});
 })();

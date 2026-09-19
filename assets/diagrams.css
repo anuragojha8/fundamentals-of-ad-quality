@@ -24,3 +24,13 @@
 .aq-diagram .w-sub { font:14px/1.65 var(--sans);color:var(--ink-2); }
 .aq-diagram .w-title { font-family:var(--sans);font-weight:700;font-size:16px; }
 .aq-diagram svg a:focus { outline:3px solid var(--accent);outline-offset:2px; }
+
+/* Candidate identities persist as they move through the request. */
+#w-request-funnel .aq-candidate { transition:transform 700ms cubic-bezier(.22,.68,.3,1),opacity 550ms ease; }
+#w-request-funnel .aq-status { min-height:6.4em; }
+#w-request-funnel .aq-candidate .t-sm { font-size:24px; }
+@media (prefers-reduced-motion:reduce) {
+  #w-request-funnel .aq-candidate { transition:none; }
+}
+
+@media (max-width:600px) { #w-request-funnel .aq-candidate .t-sm { font-size:28px; } }

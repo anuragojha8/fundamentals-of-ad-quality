@@ -56,26 +56,8 @@
   <li><strong>Log.</strong> Everything gets written down: which ads were candidates, what we predicted, what we showed, and later, what the user actually did. This is the raw material for every model in this book. Chapter 4.</li>
 </ol>
 
-<figure class="diagram">
-<svg viewBox="0 0 760 210" role="img" aria-label="Ad funnel: 340 ads, about 155 eligible, all scored, 3 shown">
-  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker></defs>
-  <polygon points="20,20 200,20 200,190 20,190" class="box" />
-  <polygon points="220,40 380,50 380,160 220,170" class="box b" />
-  <polygon points="400,60 540,75 540,135 400,150" class="box b" />
-  <polygon points="560,85 660,92 660,118 560,125" class="box a" />
-  <rect x="680" y="95" width="70" height="20" rx="4" class="box g"/>
-  <text x="110" y="95" text-anchor="middle" class="t-md t-b">All ads</text>
-  <text x="110" y="115" text-anchor="middle" class="t-sm">millions (real)</text>
-  <text x="110" y="131" text-anchor="middle" class="t-sm">~340 (your stack)</text>
-  <text x="300" y="100" text-anchor="middle" class="t-md t-b">Eligible</text>
-  <text x="300" y="118" text-anchor="middle" class="t-sm">targeting, dates, caps</text>
-  <text x="470" y="102" text-anchor="middle" class="t-md t-b">Ranked</text>
-  <text x="470" y="118" text-anchor="middle" class="t-sm">pCTR × bid</text>
-  <text x="610" y="109" text-anchor="middle" class="t-sm t-b">Auction</text>
-  <text x="715" y="109" text-anchor="middle" class="t-sm t-b">3 shown</text>
-</svg>
-<figcaption>The ad funnel. Each stage handles fewer candidates and can afford to spend more computation on each one. Your stack is small enough to score every eligible ad, so it skips retrieval until Chapter 10.</figcaption>
-</figure>
+<div id="w-request-funnel"></div>
+<noscript><p>The ad funnel: eligibility filters candidates; ranking scores the survivors; the auction selects and prices three winners. The small stack skips retrieval until Chapter 10.</p></noscript>
 
 <h2 id="budget"><span class="sec">1.2</span>Why a funnel? The latency budget</h2>
 

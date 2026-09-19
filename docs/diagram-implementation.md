@@ -49,3 +49,14 @@ This is Chrome layout/interaction verification, not a full assistive-technology 
 ## Editorial boundaries
 
 The proposed chapter corrections remain in [suggested-improvements.md](suggested-improvements.md). Diagrams use explicit assumptions and corrected arithmetic; the surrounding restored prose has not been comprehensively rewritten. In particular, the review's privacy, billing, ESMM and causal-inference changes still need an editorial pass.
+
+## Follow-up: animated Chapter 1 request funnel
+
+Replaced the original static funnel illustration in §1.1 with `#w-request-funnel` at the author's request. This is an additional diagram beyond the thirteen listed above.
+
+- Twelve fixed illustrative candidates retain their identities as four fail eligibility, eight are reordered by bid × pCTR, and three are selected. F, C and A win by their calculated scores. Ranking itself does not remove candidates in this example.
+- Native SVG cards animate their position and opacity. Playback starts only on request; Play/Continue, Pause, Next stage, Reset and Replay are supported. Playback stops when the page becomes hidden.
+- Reduced-motion preference removes transitions and replaces Play with an instant Show result; Next stage still explains each intermediate state.
+- A two-column mobile card layout replaces the four-column desktop layout. The stage counts, descriptive SVG label, live status and static no-JavaScript explanation preserve the mechanism without requiring motion.
+- The example is explicitly illustrative, does not read or change the learner's production state, and explains why retrieval is omitted until Chapter 10.
+- Verified no autoplay, pause stability, correct stage order and winners, replay/reset, reduced motion, 375px/1280px layouts, both themes, no horizontal overflow and no browser errors. Existing quick engine checks passed.
