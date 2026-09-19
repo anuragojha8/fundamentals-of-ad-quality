@@ -20,7 +20,8 @@
     { id: '13-privacy', n: '13', part: 'IV · The Models', title: 'Privacy and Measurement', blurb: 'Opt-outs, aggregated and noisy conversion reports, k-anonymity, differential privacy, and modeled conversions.' },
     { id: '14-pretrain-train-refresh', n: '14', part: 'IV · The Models', title: 'Pre-training, Fine-tuning, and Freshness', blurb: 'Foundation embeddings, warm starts, continuous training, distillation, and model staleness.' },
     { id: '15-beyond-the-click', n: '15', part: 'V · The Job', title: 'Quality Beyond the Click', blurb: 'Ad load, user experience, negative feedback, long-term value, and the objective function you actually own.' },
-    { id: '16-capstone', n: '16', part: 'V · The Job', title: 'Capstone: Run the Marketplace', blurb: 'A simulation game. Make the calls a real ads quality PM makes, and live with the results.' },
+    { id: '16-what-the-ad-caused', n: '16', part: 'V · The Job', title: 'What the Ad Actually Caused', blurb: 'Attribution windows as a label decision, view-through credit, incrementality, holdouts and ghost ads, and why lift is hard to measure.' },
+    { id: '17-capstone', n: '17', part: 'V · The Job', title: 'Capstone: Run the Marketplace', blurb: 'A simulation game. Make the calls a real ads quality PM makes, and live with the results.' },
     { id: 'appendix-a-glossary', n: 'A', part: 'Appendices', title: 'Glossary', blurb: 'Every term in the book, in one place.' },
     { id: 'appendix-b-question-bank', n: 'B', part: 'Appendices', title: 'The Model Review Question Bank', blurb: 'The questions to ask in a launch review, a metrics readout, or a roadmap debate.' }
   ];
@@ -40,7 +41,7 @@
   // number first so nothing is overwritten on the way.
   (function migrateChapter13Insert() {
     if (store.shifted13) return;
-    var ids = [['15-capstone', '16-capstone'], ['14-beyond-the-click', '15-beyond-the-click'], ['13-pretrain-train-refresh', '14-pretrain-train-refresh']];
+    var ids = [['15-capstone', '17-capstone'], ['14-beyond-the-click', '15-beyond-the-click'], ['13-pretrain-train-refresh', '14-pretrain-train-refresh']];
     ids.forEach(function (p) {
       if (store.required[p[0]] && !store.required[p[1]]) { store.required[p[1]] = store.required[p[0]]; delete store.required[p[0]]; }
     });
@@ -58,6 +59,23 @@
       });
     });
     store.shifted13 = true;
+    saveStore(store);
+  })();
+
+  // A second insert: Chapter 16 (What the Ad Actually Caused) pushed the capstone to 17.
+  (function migrateChapter16Insert() {
+    if (store.shifted16) return;
+    if (store.required['16-capstone'] && !store.required['17-capstone']) { store.required['17-capstone'] = store.required['16-capstone']; delete store.required['16-capstone']; }
+    [store.solved, store.notes, store.required].forEach(function (bag) {
+      Object.keys(bag).forEach(function (k) {
+        if (k.indexOf('ch16-') === 0 && !bag['ch17-' + k.slice(5)]) { bag['ch17-' + k.slice(5)] = bag[k]; delete bag[k]; }
+      });
+    });
+    Object.keys(store.required).forEach(function (chap) {
+      var req = store.required[chap];
+      if (Array.isArray(req)) store.required[chap] = req.map(function (id) { return id.indexOf('ch16-') === 0 ? 'ch17-' + id.slice(5) : id; });
+    });
+    store.shifted16 = true;
     saveStore(store);
   })();
 

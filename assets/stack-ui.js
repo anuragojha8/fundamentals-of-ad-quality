@@ -25,7 +25,8 @@
     { ch: 12, label: 'Conversion model', sub: 'delayed labels, ESMM' },
     { ch: 13, label: 'Privacy reporting', sub: 'aggregates & noise' },
     { ch: 14, label: 'Freshness', sub: 'drift & retraining' },
-    { ch: 15, label: 'Quality & ad load', sub: 'pHide, λ, slots' }
+    { ch: 15, label: 'Quality & ad load', sub: 'pHide, λ, slots' },
+    { ch: 16, label: 'Lift measurement', sub: 'holdouts & incrementality' }
   ];
 
   /* ---------------- progress & buttons ---------------- */

@@ -861,6 +861,41 @@
     }
   });
 
+  slot({
+    id: 'liftEstimate', chapter: 16, title: 'Incremental lift from a holdout',
+    starter: [
+      '// A holdout experiment: some users are eligible for the campaign and some',
+      '// are held out, and you count conversions in each group.',
+      '//   t = { users, conv }   treatment (ads eligible)',
+      '//   c = { users, conv }   control (held out)',
+      '// Return { lift, se }:',
+      '//   lift = incremental conversions per treated user (treatment rate minus control rate)',
+      '//   se   = standard error of that difference, using the normal approximation',
+      '//          sqrt( p(1-p)/n for each group, added together ).',
+      'function liftEstimate(t, c) {',
+      '  // TODO',
+      '  return { lift: 0, se: 0 };',
+      '}'
+    ].join('\n'),
+    reference: [
+      'function liftEstimate(t, c) {',
+      '  const pt = t.conv / t.users, pc = c.conv / c.users;',
+      '  const vt = pt * (1 - pt) / t.users, vc = pc * (1 - pc) / c.users;',
+      '  return { lift: pt - pc, se: Math.sqrt(vt + vc) };',
+      '}'
+    ].join('\n'),
+    tests: function (fn, T) {
+      var a = fn({ users: 10000, conv: 500 }, { users: 10000, conv: 400 }) || {};
+      T.close('5% vs 4% is a 1 point lift', a.lift, 0.01, 1e-9);
+      T.close('Standard error of that difference', a.se, Math.sqrt(0.05 * 0.95 / 10000 + 0.04 * 0.96 / 10000), 1e-9);
+      var b = fn({ users: 5000, conv: 250 }, { users: 5000, conv: 250 }) || {};
+      T.close('No difference means no lift', b.lift, 0, 1e-9);
+      T.check('A smaller sample has a bigger standard error', (fn({ users: 500, conv: 25 }, { users: 500, conv: 20 }) || {}).se > a.se, 'Fewer users should mean more uncertainty, not less.');
+      var d = fn({ users: 8000, conv: 300 }, { users: 2000, conv: 90 }) || {};
+      T.close('Handles unequal group sizes', d.lift, 300 / 8000 - 90 / 2000, 1e-12);
+    }
+  });
+
   /* ---------- compile & test ---------- */
   var FN_NAME = {};
   Object.keys(SLOTS).forEach(function (id) { FN_NAME[id] = id; });

@@ -71,3 +71,14 @@ Added **Chapter 13, Privacy and Measurement**, the biggest content gap: the book
 - Chapters 13-15 became 14-16. Old URLs redirect; reader progress migrates on first load.
 
 Still open from the gap review: attribution and incrementality (recommended next), ad review/policy and brand safety, invalid traffic, creative, bandits, and variance reduction.
+
+## Pass 4 — new chapter (Claude, 2026-09-19)
+
+Added **Chapter 16, What the Ad Actually Caused** (Part V; the capstone moved to 17). Scoped to ad quality rather than billing, per Anurag: attribution matters here because it defines the training label, and incrementality is a measurement problem, not a per-campaign dial.
+
+- §16.1 attribution as a label decision (window, view-through, multi-touch credit). Widget joins the same logs under 1/3/7/30-day windows: Finance CVR reads 0.3% at one day versus 5.9% at 30, while Gaming is unchanged at 42.4%. Training under the short window leaves the model under-calibrated (0.84 vs 1.15) and slightly worse at ranking.
+- §16.2 credit vs cause, retargeting, holdouts and ghost ads. Build step `liftEstimate()` returns lift plus standard error; the toy widget shows attributed CPA next to incremental CPA and whether the interval clears zero.
+- §16.3 what changes for a quality PM: models optimize predictability rather than persuasion; some launch "wins" are transfers of credit; holdouts matter more as privacy tightens.
+- Glossary gained 10 terms from chapters 13 and 16.
+
+Remaining gaps from the original review: ad review/policy and brand safety, invalid traffic, creative, bandits in Ch 5, variance reduction in Ch 9.

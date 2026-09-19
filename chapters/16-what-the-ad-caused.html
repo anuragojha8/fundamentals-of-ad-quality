@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What the Ad Actually Caused — Fundamentals of Ad Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/book.css">
+<script src="../assets/book.js"></script>
+<script src="../assets/world.js"></script>
+<script src="../assets/nn.js"></script>
+<script src="../assets/stack.js"></script>
+<script src="../assets/stack-ui.js"></script>
+</head>
+<body data-chapter="16-what-the-ad-caused">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 16 · Part V · The Job</div>
+  <h1>What the Ad Actually Caused</h1>
+  <p class="dek">In which I take credit for a purchase that was going to happen anyway.</p>
+</header>
+
+<div class="stack-panel" data-chapter="16"></div>
+
+<p class="lead">Your stack has been counting conversions since Chapter 4, and not once have we asked the rude question: would that person have bought the meal kit if we'd never shown them the ad?</p>
+
+<p>Two things stand between your model and that question. The first is <dfn>attribution</dfn>: the bookkeeping that decides which conversions get tied to which ad, and therefore what your model trains on. The second is <dfn>incrementality</dfn>: how many of those conversions the ads actually caused. The first one you control. The second one you can only measure by deliberately not showing ads to somebody.</p>
+
+<h2 id="labels"><span class="sec">16.1</span>Attribution is a label decision</h2>
+
+<p>Advertisers argue about attribution because it decides who gets billed. That's not our department. For you it matters for a different reason, and it's one you already know from Chapter 5: <strong>the attribution rule defines the label, and the label is what the model optimizes.</strong> Change the rule and you've changed what your ranker considers a good ad.</p>
+
+<p>Three knobs do most of the work:</p>
+<ul>
+  <li><strong>The window.</strong> How long after the click a conversion still counts. One hour, a day, a week, 30 days. Longer windows catch slow verticals and also catch more purchases that had nothing to do with you.</li>
+  <li><strong>Clicks versus views.</strong> Does a conversion count if the user saw the ad and never touched it? View-through conversions make your inventory look more valuable and are the least likely to be caused by the ad.</li>
+  <li><strong>Credit when several ads touched the user.</strong> Last click, first click, split evenly, or a fitted model. Inside one platform this decides which of <em>your</em> campaigns looks good.</li>
+</ul>
+
+<p>The window is the one your stack can feel right now. Your join takes <code>convWindowH</code>, so let's move it and watch the training labels change shape.</p>
+
+<div class="widget" id="w-window">
+  <div class="w-title">The window decides which advertisers look good</div>
+  <div class="w-sub">Your ten days of logs, joined with different attribution windows, then a pCVR model trained under the shortest and the longest. Graded on day 10 against the truth.</div>
+</div>
+
+<div class="callout intuition"><div class="label">Intuition</div>
+<p>A short window doesn't measure "conversions." It measures "fast conversions," and fast is a property of the <em>advertiser</em>, not of your ad's quality. Gaming installs land in minutes; a bank account takes days. Pick a one-day window and your model learns that games convert and banks don't, then your ranker quietly stops showing bank ads, and nobody in the room ever decided that. The decision was made by whoever set a number in the join config.</p>
+</div>
+
+<h2 id="cause"><span class="sec">16.2</span>Credit is not cause</h2>
+
+<p>Now the harder half. Attribution answers "which ad gets the credit for this conversion." It cannot answer "did the conversion need an ad at all," because the logs only contain the world where you showed ads.</p>
+
+<p>The clearest example is retargeting: show ads to people who already put something in their cart. The attributed numbers are gorgeous, since these are people who were mostly going to buy anyway. Every purchase that follows lands in your column. Do nothing at all and many of those purchases still happen, but now they're in nobody's column.</p>
+
+<p>Which is why the only honest measure of what ads did is a <dfn>holdout</dfn>: pick users at random, never show them the campaign, and compare. The difference is the <dfn>incremental</dfn> effect, and it's what a lift study, a geo experiment, or a ghost-ad test is doing under the hood.</p>
+
+<div class="code-cell" data-slot="liftEstimate"></div>
+
+<p>Now the part people underestimate. Conversions are rare, so the difference between two small conversion rates is buried in noise, and the experiment has to be big to see it. Play with an honest toy: choose how much of the campaign's conversion volume would have happened anyway, and see whether a holdout could tell.</p>
+
+<div class="widget" id="w-lift">
+  <div class="w-title">Could your holdout even see it?</div>
+  <div class="w-sub">A toy campaign, not your Pebble stack: one conversion rate for exposed users, one for held-out users, and your <code>liftEstimate()</code> with a 95% interval. Assumptions are all on the dials.</div>
+</div>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>Reading a lift test that couldn't have detected anything as proof that ads don't work. "Lift was +2%, not significant" often means the test was too small to resolve +2%, not that the true effect is zero. Before running one, compute the effect you'd need to detect and the sample it would take. After running one, report the interval, not just the point estimate. This is Chapter 9's noise floor in a more expensive outfit.</p>
+</div>
+
+<h2 id="job"><span class="sec">16.3</span>What this changes for a quality PM</h2>
+
+<p>You're not going to retune the auction around incrementality. In practice, advertisers set a goal (usually conversions at a target CPA or a return on ad spend), and your stack optimizes attributed conversions toward it, because that's the signal that arrives every day for every campaign. A handful of platforms offer incremental objectives, and they stay niche for exactly the reason the widget shows: the signal is expensive and noisy at the campaign level.</p>
+
+<p>But three parts of your job change once you've internalized the difference:</p>
+<ul>
+  <li><strong>Your model optimizes predictability, not persuasion.</strong> pCVR is trained to find people likely to convert after seeing an ad. People who were going to convert anyway are the easiest of all to find, so a model that gets "better" can be getting better at claiming credit. If conversions rise and the advertiser's total sales don't, that's what happened.</li>
+  <li><strong>Some launch wins are transfers.</strong> A ranking change can shift conversions between campaigns, between ad formats, or from organic content onto ads, and every one of those shows up as a gain in your dashboard. When a launch looks suspiciously good, ask what it might be taking credit from.</li>
+  <li><strong>Holdouts are the measurement of last resort, and sometimes the only one.</strong> They're how you sanity-check the whole system, and, as Chapter 13's privacy changes bite, increasingly the only way to measure anything causal at all. Keep one running for big surfaces, and never let "we need the traffic" quietly end it.</li>
+</ul>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>When an advertiser says your platform's numbers look better than their own, they're usually right, and it isn't a bug. Their analytics count sales; your reports count attributed conversions inside a window you chose. The useful response isn't a debate about whose number is correct. It's "let's run a holdout and find out what we're worth," which is the one measurement both sides can believe. Be ready for the answer to be smaller than your reports, especially for retargeting and for very broad campaigns.</p>
+</div>
+
+<div class="quiz" data-id="ch16-q1">
+  <p class="q">Your team shortens the conversion attribution window from 7 days to 1 day, to get fresher training labels. What's the most likely effect on the marketplace?</p>
+  <ul>
+    <li data-why="Labels get fresher, but not for everyone equally.">Nothing much: every advertiser loses the same share of conversions</li>
+    <li data-correct>Slow-converting verticals (finance, travel, big purchases) look worse to the model, lose delivery, and under-deliver against their targets</li>
+    <li data-why="A shorter window reduces counted conversions; it doesn't raise pCVR overall.">pCVR rises across the board</li>
+    <li data-why="Click behavior isn't what the conversion window changes.">Click-through rate falls</li>
+  </ul>
+  <div class="explain"><p>A window is a flat rule applied to advertisers with very different conversion speeds, so it cuts hardest where conversions are slowest. The model sees fewer positives for those advertisers, predicts lower pCVR, and stops showing their ads, which is a product decision disguised as a config value. If you do want fresher labels, correct for the delay (Chapter 12) instead of truncating it.</p></div>
+</div>
+
+<div class="quiz" data-id="ch16-q2">
+  <p class="q">A retargeting campaign reports a $4 cost per attributed conversion. A holdout test estimates incremental conversions at a third of the attributed count. What's the honest cost per incremental conversion, and what should you do about it?</p>
+  <ul>
+    <li data-why="Fewer real conversions makes the true cost higher, not lower.">About $1.30, and the campaign is better than it looked</li>
+    <li data-correct>About $12, and the advertiser should know before they scale it</li>
+    <li data-why="The attributed number is the one the holdout just corrected.">$4, since attributed conversions are what the advertiser pays for</li>
+    <li data-why="A holdout estimate is evidence, even with uncertainty around it.">Unknowable, so ignore the holdout</li>
+  </ul>
+  <div class="explain"><p>Same spend, a third as many conversions actually caused, so the cost per incremental conversion is about three times higher: roughly $12. That doesn't necessarily make the campaign bad, since $12 may still beat the advertiser's alternatives. It makes the <em>reported</em> number misleading, and an advertiser who scales on the strength of it will be disappointed later, usually right before they cut their budget.</p></div>
+</div>
+
+<div class="reflect" data-id="ch16-r1">
+  <p class="q">Pebble's biggest advertiser asks you to prove that its spend is worth it. Design the measurement: what you'd run, how big, what you'd report, and what you'd do if the answer is unflattering.</p>
+  <div class="model">
+    <ul>
+      <li><strong>Design:</strong> a randomized user holdout (or geo holdout where user-level randomization isn't possible), sized from the effect you need to detect. Use the campaign's conversion rate and the smallest lift worth acting on to compute the sample and duration <em>before</em> starting. Log the ads the holdout users would have seen (ghost ads), so you compare the right people with the right people.</li>
+      <li><strong>Run it long enough to cover the conversion delay</strong> (Chapter 12), or you'll measure speed rather than lift.</li>
+      <li><strong>Report the interval, not the point.</strong> "Incremental CPA $12, 95% CI [$8, $24]" is honest and actionable. A bare "$12" invites a decision the data can't support.</li>
+      <li><strong>Split where you expect differences:</strong> retargeting versus prospecting, new versus existing customers. Aggregate lift usually hides a campaign type that isn't pulling its weight.</li>
+      <li><strong>If it's unflattering, say so and offer the fix:</strong> shift budget from the non-incremental campaign toward prospecting, adjust the targeting that was harvesting people who'd already decided, and re-measure. An advertiser who learns this from you stays. One who learns it from their own analyst, after you argued with them for a quarter, does not.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you built</h3>
+  <p>A <strong>lift estimator</strong> with honest error bars, and a clear line between two things that get called the same word: the conversions your system takes <em>credit</em> for, and the conversions it <em>caused</em>. Attribution sets the first, and quietly sets what your models learn. Only an experiment measures the second.</p>
+  <p>That's the last idea in the book. You've built the stack, the models, the evaluation, the privacy machinery, and the objective. Next: run it all for a quarter, and find out what kind of PM you are.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Attribution window</b>How long after a click (or view) a conversion still counts; a label decision.</div>
+    <div><b>View-through conversion</b>Credit for a conversion after an ad was shown but never clicked.</div>
+    <div><b>Incrementality</b>Conversions the ads actually caused: exposed rate minus held-out rate.</div>
+    <div><b>Holdout / ghost ads</b>Randomly withholding ads (while logging what would have been shown) to measure cause.</div>
+    <div><b>Geo experiment</b>Randomizing whole regions when users can't be randomized individually.</div>
+    <div><b>Minimum detectable effect</b>The smallest lift a test of a given size could distinguish from zero.</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var el = Book.el, w = Stack.world();
+  var logP = null;
+  function logs(progress) {
+    if (!logP) logP = (async function () {
+      var tl = await Stack.trainingLog({ onProgress: function (p) { progress(p * 0.8, 'Collecting logs…'); } });
+      var ev = await Stack.evalLog({ onProgress: function (p) { progress(0.8 + p * 0.2, 'Collecting day 10…'); } });
+      return { tl: tl, ev: ev };
+    })();
+    return logP;
+  }
+  document.addEventListener('stackchange', function () { logP = null; });
+
+  /* ---------------- attribution window ---------------- */
+  (function () {
+    var host = document.getElementById('w-window');
+    var btnHost = el('div'); host.appendChild(btnHost);
+    var out = el('div'); host.appendChild(out);
+    var WINDOWS = [24, 72, 168, 720];
+    StackUI.asyncButton(btnHost, 'Try four windows', async function (progress) {
+      var d = await logs(progress);
+      var byWindow = WINDOWS.map(function (h) {
+        var rows = Stack.labeledRows(d.tl, { convWindowH: h });
+        var clicks = 0, convs = 0, byCat = {};
+        rows.forEach(function (r) {
+          if (!r.click) return;
+          clicks++; convs += r.conv;
+          var name = w.categories[r.cat].name, b = byCat[name] || (byCat[name] = { n: 0, c: 0 });
+          b.n++; b.c += r.conv;
+        });
+        return { h: h, rows: rows, clicks: clicks, convs: convs, byCat: byCat };
+      });
+      var widest = byWindow[byWindow.length - 1];
+      out.innerHTML = '';
+      // Show the categories the window changes most (slowest converters), plus the least affected one.
+      var shortest = byWindow[0];
+      function catRate(bucket) { return bucket && bucket.n ? bucket.c / bucket.n : 0; }
+      function kept(c) { return catRate(widest.byCat[c]) / (catRate(shortest.byCat[c]) || 1e-9); }
+      var cats = Object.keys(widest.byCat).filter(function (c) { return widest.byCat[c].n >= 50 && widest.byCat[c].c > 0; })
+        .sort(function (x, y) { return kept(y) - kept(x); });
+      StackUI.table(out, [{ label: 'Attribution window', get: function (r) { return r.h >= 168 ? (r.h / 24) + ' days' : r.h + ' hours'; } },
+        { label: 'Conversions counted', num: true, get: function (r) { return r.convs + ' (' + Book.pct(r.convs / widest.convs, 0) + ' of the 30-day count)'; } }
+      ].concat(cats.slice(0, 3).concat(cats.slice(-1)).map(function (c) {
+        return { label: c + ' CVR', num: true, get: function (r) { var b = r.byCat[c]; return b && b.n ? Book.pct(b.c / b.n, 1) : '—'; } };
+      })), byWindow);
+      progress(0.2, 'Training on a 1-day window…');
+      var shortM = await Stack.trainCVR({ rows: byWindow[0].rows, method: 'esmm', onProgress: function (p) { progress(0.2 + 0.35 * p, 'Training on a 1-day window…'); } });
+      var longM = await Stack.trainCVR({ rows: widest.rows, method: 'esmm', onProgress: function (p) { progress(0.55 + 0.4 * p, 'Training on a 30-day window…'); } });
+      var er = Stack.labeledRows(d.ev), tcv = d.ev.truth.map(function (t) { return t.pcvr; });
+      var clicked = er.map(function (r, i) { return r.click ? i : -1; }).filter(function (i) { return i >= 0; });
+      function grade(m) {
+        var p = Stack.cvrPredictRows(m, er), pc = clicked.map(function (i) { return p[i]; }), tc = clicked.map(function (i) { return tcv[i]; });
+        return { cal: Stack.sum(pc) / Stack.sum(tc), acc: Stack.pairOrderAcc(pc, tc) };
+      }
+      var gS = grade(shortM), gL = grade(longM);
+      out.appendChild(el('h3', { text: 'The same model, trained under two windows', style: 'font-size:14px;margin:14px 0 0' }));
+      StackUI.table(out, [
+        { label: 'Trained with', key: 'k' },
+        { label: 'Calibration vs. truth', num: true, get: function (x) { return x.cal.toFixed(2); } },
+        { label: 'Ranking accuracy vs. truth', num: true, get: function (x) { return Book.pct(x.acc, 1); } }
+      ], [{ k: '1-day window', cal: gS.cal, acc: gS.acc }, { k: '30-day window', cal: gL.cal, acc: gL.acc }]);
+      out.appendChild(el('p', { class: 'small', html: 'The short window doesn\'t just shrink the counts, it shrinks them <em>unevenly</em>: compare the per-category conversion rates in the first table. Slow verticals lose the most, so a model trained on the short window under-predicts them and their ads stop winning.' }));
+    });
+  })();
+
+  /* ---------------- could a holdout see it? ---------------- */
+  (function () {
+    var host = document.getElementById('w-lift');
+    var ctlHost = el('div'); host.appendChild(ctlHost);
+    var out = el('div'); host.appendChild(out);
+    var st = Book.stats(out, [
+      { key: 'att', label: 'Attributed CPA', sub: 'what the report shows' },
+      { key: 'inc', label: 'Incremental CPA', sub: 'what the holdout implies' },
+      { key: 'ci', label: '95% interval on lift', sub: 'per exposed user' },
+      { key: 'call', label: 'Verdict' }
+    ]);
+    var ctl = Book.controls(ctlHost, [
+      { key: 'users', label: 'Users in the test', min: 20000, max: 500000, step: 20000, value: 100000, fmt: function (v) { return Book.fmt(v / 1000, 0) + 'k'; } },
+      { key: 'hold', label: 'Share held out', min: 0.02, max: 0.5, step: 0.02, value: 0.1, fmt: function (v) { return Book.pct(v, 0); } },
+      { key: 'rate', label: 'Conversion rate of exposed users', min: 0.002, max: 0.05, step: 0.002, value: 0.01, fmt: function (v) { return Book.pct(v, 1); } },
+      { key: 'anyway', label: 'Share who would have converted anyway', min: 0, max: 1, step: 0.05, value: 0.6, fmt: function (v) { return Book.pct(v, 0); } },
+      { key: 'spend', label: 'Campaign spend', min: 1000, max: 100000, step: 1000, value: 20000, fmt: function (v) { return Book.money(v, 0); } }
+    ], draw);
+    function draw() {
+      var v = ctl.values;
+      var nC = Math.round(v.users * v.hold), nT = v.users - nC;
+      var pT = v.rate, pC = v.rate * v.anyway;                 // control converts at the "anyway" rate
+      var r = World.Rand(11);
+      var convT = 0, convC = 0, i;
+      // One simulated experiment, drawn once so the dials feel like a real (noisy) test.
+      for (i = 0; i < nT; i++) convT += r.next() < pT ? 1 : 0;
+      for (i = 0; i < nC; i++) convC += r.next() < pC ? 1 : 0;
+      var est = Stack.impl('liftEstimate')({ users: nT, conv: convT }, { users: nC, conv: convC });
+      var lo = est.lift - 1.96 * est.se, hi = est.lift + 1.96 * est.se;
+      var incConv = Math.max(est.lift, 0) * nT, attConv = convT;
+      var sig = lo > 0;
+      st({
+        att: Book.money(v.spend / Math.max(attConv, 1), 2),
+        inc: incConv > 0 ? { v: Book.money(v.spend / incConv, 2), tone: '' } : { v: '—', d: 'no measurable lift' },
+        ci: { v: '[' + (lo * 100).toFixed(3) + '%, ' + (hi * 100).toFixed(3) + '%]', d: 'true lift: ' + ((pT - pC) * 100).toFixed(3) + '%' },
+        call: sig ? { v: 'Detected', d: 'the interval clears zero', tone: 'good' } : { v: 'Not detected', d: 'the interval still contains zero', tone: 'bad' }
+      });
+    }
+    draw();
+    out.appendChild(el('p', { class: 'small', html: 'Everything here is a toy with its assumptions on the dials, not your Pebble stack. Try the realistic corner: a 1% conversion rate, 60% of it non-incremental, and a 10% holdout. Then watch how many users the test needs before the interval clears zero — and notice that a <em>bigger</em> holdout measures better and costs more revenue, which is the trade every lift study makes.' }));
+  })();
+})();
+</script>
+</body>
+</html>

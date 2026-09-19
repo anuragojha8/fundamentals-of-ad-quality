@@ -32,11 +32,12 @@
 <dt>A/B test <span class="ch">Ch. 9</span></dt><dd>A randomized experiment: users are split (usually by a hash of their ID) into control and treatment, and differences beyond chance are attributed to the change.</dd>
 <dt>A/A test <span class="ch">Ch. 9</span></dt><dd>An experiment where both arms are identical; its "lifts" show the noise floor a real effect must beat.</dd>
 <dt>Ad load <span class="ch">Ch. 15</span></dt><dd>How many ads are shown per unit of organic content; the largest short-term vs. long-term lever.</dd>
+<dt>Aggregate reporting <span class="ch">Ch. 13</span></dt><dd>Conversion counts published per campaign and period instead of per-person records; the form most privacy-preserving measurement takes.</dd>
 <dt>Attribution window <span class="ch">Ch. 4</span></dt><dd>How long after a click a conversion still counts toward that ad (e.g. 7 days).</dd>
 <dt>AUC <span class="ch">Ch. 9</span></dt><dd>Area under the ROC curve: the probability a random positive is scored above a random negative. Measures ranking only, and includes cross-user pairs the auction never compares.</dd>
 <dt>Autobidding <span class="ch">Ch. 2, 12</span></dt><dd>The platform bids on the advertiser's behalf toward a goal such as a target cost per conversion.</dd>
 <dt>Bid shading <span class="ch">Ch. 2</span></dt><dd>Bidding below one's true value, which is rational in first-price auctions.</dd>
-<dt>Budget pacing <span class="ch">Ch. 16</span></dt><dd>Spreading an advertiser's spend over the day, typically by throttling participation, so the budget isn't exhausted early.</dd>
+<dt>Budget pacing <span class="ch">Ch. 17</span></dt><dd>Spreading an advertiser's spend over the day, typically by throttling participation, so the budget isn't exhausted early.</dd>
 <dt>Calibration <span class="ch">Ch. 3</span></dt><dd>Predictions match observed rates: among impressions predicted at 2%, about 2% are clicked.</dd>
 <dt>Calibration layer <span class="ch">Ch. 3</span></dt><dd>A small post-model mapping (histogram binning, Platt scaling, isotonic regression) refitted often on recent outcomes.</dd>
 <dt>Calibration ratio <span class="ch">Ch. 3</span></dt><dd>Σ predicted / Σ actual. 1.0 overall can still hide large errors in slices.</dd>
@@ -53,6 +54,7 @@
 <dt>CTR / pCTR <span class="ch">Ch. 1</span></dt><dd>Click-through rate / its prediction, usually for the top slot.</dd>
 <dt>CVR / pCVR <span class="ch">Ch. 12</span></dt><dd>Conversion rate given a click / its prediction.</dd>
 <dt>Delayed feedback <span class="ch">Ch. 4, 12</span></dt><dd>Labels (especially conversions) arrive late, so recent examples look negative until they mature.</dd>
+<dt>Differential privacy <span class="ch">Ch. 13</span></dt><dd>A guarantee that a published result is almost as likely with or without any one person's data; ε sets the strength, and repeated queries spend a privacy budget.</dd>
 <dt>Distillation <span class="ch">Ch. 14</span></dt><dd>Training a small student model to imitate a larger teacher's predicted probabilities.</dd>
 <dt>Drift <span class="ch">Ch. 14</span></dt><dd>Changes in users, ads, and seasons that make a trained model stale.</dd>
 <dt>Early stopping <span class="ch">Ch. 7</span></dt><dd>Stopping training at the point where held-out loss is lowest.</dd>
@@ -69,24 +71,30 @@
 <dt>First-price / second-price auction <span class="ch">Ch. 2</span></dt><dd>The winner pays its own bid / the runner-up's bid. Second price makes bidding one's true value optimal (single slot).</dd>
 <dt>Frequency cap <span class="ch">Ch. 1</span></dt><dd>A limit on how often one user sees the same ad or advertiser.</dd>
 <dt>GAUC <span class="ch">Ch. 8, 9, 11</span></dt><dd>AUC computed within each request (or user) and averaged: closer to the decision the auction makes.</dd>
+<dt>Ghost ads <span class="ch">Ch. 16</span></dt><dd>Logging the ad a held-out user would have been shown, so the holdout and the exposed group can be compared like with like.</dd>
 <dt>Gradient descent / SGD <span class="ch">Ch. 7</span></dt><dd>Repeatedly nudging weights against the gradient of the loss; stochastic = one example or small batch per step.</dd>
 <dt>GSP <span class="ch">Ch. 2</span></dt><dd>Generalized second-price auction: rank by bid × pCTR, each winner pays the next score ÷ its own pCTR.</dd>
 <dt>Guardrail metric <span class="ch">Ch. 9, 14</span></dt><dd>A metric that must not degrade for a launch to proceed (e.g. hides, latency, advertiser value).</dd>
 <dt>Head <span class="ch">Ch. 8</span></dt><dd>A task-specific final layer on shared representations (pCTR head, pCVR head, pHide head).</dd>
 <dt>Holdout (long-term) <span class="ch">Ch. 15</span></dt><dd>A group of users kept on the old policy for months to measure slow effects like retention.</dd>
+<dt>Incrementality <span class="ch">Ch. 16</span></dt><dd>The conversions the ads caused: the exposed conversion rate minus the held-out rate. Distinct from attributed conversions.</dd>
 <dt>IPW <span class="ch">Ch. 5</span></dt><dd>Inverse propensity weighting: weight each observation by 1 / probability it was observed.</dd>
+<dt>k-anonymity threshold <span class="ch">Ch. 13</span></dt><dd>A minimum count below which an aggregate cell is withheld entirely, so a published number can never describe one person.</dd>
 <dt>Label <span class="ch">Ch. 5</span></dt><dd>The outcome a model learns to predict; its definition is a product decision.</dd>
 <dt>Latency budget <span class="ch">Ch. 1</span></dt><dd>The time the ad server has to respond; caps model cost × number of candidates.</dd>
 <dt>Leakage <span class="ch">Ch. 6</span></dt><dd>A feature that contains information about the label that won't exist at serve time.</dd>
 <dt>Learning rate <span class="ch">Ch. 7</span></dt><dd>The step size of gradient descent.</dd>
 <dt>Log loss <span class="ch">Ch. 7, 8</span></dt><dd>−[y log p + (1−y) log(1−p)]; the standard loss for calibrated probabilities.</dd>
 <dt>Logit <span class="ch">Ch. 7</span></dt><dd>The raw score z before the sigmoid; log-odds.</dd>
+<dt>Minimum detectable effect <span class="ch">Ch. 16</span></dt><dd>The smallest lift an experiment of a given size could tell apart from zero; compute it before running the test.</dd>
+<dt>Modeled conversions <span class="ch">Ch. 13</span></dt><dd>Estimates of conversions that can't be observed, built from consented data, aggregate totals, and experiments.</dd>
 <dt>Multi-task learning <span class="ch">Ch. 8</span></dt><dd>Several heads and losses trained on shared layers; task weights are tradeoffs.</dd>
 <dt>Negative downsampling <span class="ch">Ch. 4</span></dt><dd>Keeping a fraction w of negatives; correct predictions with q = p / (p + (1−p)/w).</dd>
 <dt>Negative transfer <span class="ch">Ch. 8</span></dt><dd>When tasks sharing layers degrade each other.</dd>
 <dt>Normalized entropy (NE) <span class="ch">Ch. 9</span></dt><dd>Log loss ÷ entropy of the base rate. Below 1 beats predicting the average; captures ranking and calibration.</dd>
 <dt>oCPM <span class="ch">Ch. 2, 12</span></dt><dd>Optimized CPM: the advertiser bids per conversion, and the platform prices with pCTR × pCVR.</dd>
 <dt>Offline–online gap <span class="ch">Ch. 9</span></dt><dd>Offline metrics on logged data disagree with online results, often because of exposure bias.</dd>
+<dt>Opt-in rate <span class="ch">Ch. 13</span></dt><dd>The share of users whose conversions are observable; varies by platform, country, and vertical, and moves over time.</dd>
 <dt>Oracle <span class="ch">Ch. 1</span></dt><dd>In this book: a simulator-only policy using the true probabilities, used to measure headroom.</dd>
 <dt>Overfitting <span class="ch">Ch. 7</span></dt><dd>Fitting noise: training loss falls while held-out loss rises.</dd>
 <dt>Pairwise loss <span class="ch">Ch. 8</span></dt><dd>A loss on the order of two items; good for ranking, useless for pricing on its own.</dd>
@@ -109,6 +117,7 @@
 <dt>Truthfulness <span class="ch">Ch. 2</span></dt><dd>An auction property: bidding one's true value is optimal.</dd>
 <dt>Two-tower model <span class="ch">Ch. 10</span></dt><dd>Separate user and ad networks whose outputs meet in a dot product; ad vectors can be precomputed and indexed.</dd>
 <dt>VCG <span class="ch">Ch. 2</span></dt><dd>Vickrey–Clarke–Groves: each winner pays the harm it causes others; truthful with multiple slots.</dd>
+<dt>View-through conversion <span class="ch">Ch. 16</span></dt><dd>A conversion credited after an ad was shown but never clicked; inflates counted volume and is the least likely to be caused by the ad.</dd>
 <dt>Warm start <span class="ch">Ch. 14</span></dt><dd>Continue training from existing weights on new data rather than from scratch.</dd>
 <dt>Wide &amp; Deep <span class="ch">Ch. 11</span></dt><dd>A linear model over engineered features plus a deep network, trained jointly.</dd>
 </dl>
