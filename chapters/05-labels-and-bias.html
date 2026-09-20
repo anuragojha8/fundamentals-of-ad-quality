@@ -109,7 +109,7 @@
 </div>
 
 <details class="callout deep"><summary><div class="label">Going deeper: position in the model itself</div></summary>
-<p>Production rankers usually handle position inside the model rather than through IPW. The slot is a feature during training, and it's pinned to a fixed value (slot 1) at serving time, so the model outputs relevance. Your Chapter 7 model does exactly this. A fancier version gives position its own small component that gets dropped at serving. YouTube's multitask ranking paper (2019) adds a <em>shallow tower</em>'s output to the main model's logit. Huawei's PAL (2019) multiplies a learned probability that the slot gets looked at by the main model's relevance prediction, which is the examination hypothesis from Section 5.2 built right into the network. Either way, the main model can't confuse "shown high" with "good." IPW is still the go-to tool for unbiased <em>evaluation</em> and for learning-to-rank losses.</p>
+<p>One approach includes slot as a training feature and sets it to a reference slot at serving, as your Chapter 7 model does. Other models separate examination and relevance components. But setting slot to 1 does not magically identify relevance: the logging policy placed stronger ads higher, and unshown ads still lack labels. Randomized shuffles, valid propensities with overlap, or stronger modeling assumptions are needed to separate those effects. IPW can help evaluation and training under those conditions; it is not a universal correction.</p>
 </details>
 
 <h2 id="loop"><span class="sec">5.5</span>Selection bias and the feedback loop</h2>
@@ -126,7 +126,7 @@
 </div>
 
 <div class="callout trap"><div class="label">Common trap</div>
-<p>Judging exploration by this quarter's revenue. Exploration usually <em>costs</em> money in the short term, because you're deliberately showing ads you think are worse. The payoff is <strong>information</strong>, and it arrives later, when models get trained on logs that contain it. Short tests will always make "no exploration" look like the winner. You'll see the payoff (or the lack of it) on your own stack in Chapter 9.</p>
+<p>Judging exploration only by this quarter's revenue. It can cost short-term revenue when you show ads with uncertain value; its possible payoff is better evidence for later models. A short test may favor no exploration because it misses those later benefits, but the result depends on the policy and traffic. You'll see the tradeoff on your own stack in Chapter 9.</p>
 </div>
 
 <div id="w-feedback-diagram"></div>

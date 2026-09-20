@@ -131,6 +131,7 @@
   <li><strong>Isotonic regression</strong>: the best monotone step function you can fit.</li>
 </ul>
 <p>Production systems often calibrate <em>per segment</em> (per country, surface, or ad type), because miscalibration is almost never uniform.</p>
+<p>A strictly increasing calibration map preserves the model's ordering. Histogram binning ties predictions in the same bucket, and noisy bucket rates can even reverse neighboring buckets unless constrained. Check ranking after fitting it, not just calibration.</p>
 
 <div class="code-cell" data-slot="fitCalibrator"></div>
 
@@ -304,7 +305,7 @@
       var st = Book.stats(R, [{ key: 'b', label: 'ECE before' }, { key: 'a', label: 'ECE after' }, { key: 'rb', label: 'Ratio before' }, { key: 'ra', label: 'Ratio after' }]);
       var eb = Stack.ece(d1.preds, d1.truth, 10), ea = Stack.ece(after, d1.truth, 10);
       st({ b: Book.pct(eb, 2), a: { v: Book.pct(ea, 2), tone: ea < eb ? 'good' : 'bad' }, rb: (Stack.sum(d1.preds) / Stack.sum(d1.truth)).toFixed(2), ra: (Stack.sum(after) / Stack.sum(d1.truth)).toFixed(2) });
-      R.appendChild(el('p', { class: 'small', style: 'margin-top:8px', text: 'Using ' + (Stack.implSource('fitCalibrator') === 'you' ? 'your fitCalibrator().' : 'the reference fitCalibrator(). Yours will be used once its tests pass.') + ' Notice the calibrator can\'t improve ranking: it maps every prediction in a bin to the same value.' }));
+      R.appendChild(el('p', { class: 'small', style: 'margin-top:8px', text: 'Using ' + (Stack.implSource('fitCalibrator') === 'you' ? 'your fitCalibrator().' : 'the reference fitCalibrator(). Yours will be used once its tests pass.') + ' Within a bin, predictions become ties. Noisy rates can reorder bins too; check ranking after calibration.' }));
       var ship = el('button', { type: 'button', class: 'btn accent', text: Stack.state.settings.calibrate ? '✓ Calibration layer is on in production' : 'Turn on the calibration layer in production' });
       ship.onclick = function () {
         var n = fitted.preds.length, step = Math.max(1, Math.floor(n / 4000)), sp = [], sl = [];

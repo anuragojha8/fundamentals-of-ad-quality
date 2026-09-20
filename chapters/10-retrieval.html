@@ -114,7 +114,7 @@
 </div>
 
 <div class="callout intuition"><div class="label">Intuition</div>
-<p>Did your hand-written heuristic just beat your fancy neural network? Don't feel bad. It's supposed to. Your logged clicks only exist for ads your old system chose to show, so a retrieval model trained on them learns a blurry copy of the old system's taste, blind spots included. Train the exact same architecture on unbiased data and it does way better. That gap is the price of <strong>exposure bias</strong> (Chapter 5, back to haunt us), and it's why real retrieval systems train on much broader signals than their own ad clicks: organic engagement, exploration traffic, and anywhere else the user tells you what they're into.</p>
+<p>If your hand-written heuristic beat the neural network here, inspect its training data before blaming the architecture. Logged clicks only exist for ads the old system showed, so a retrieval model can inherit its blind spots. Compare the same architecture on the simulator's broader, randomized data: if it improves, exposure bias is one plausible explanation. If your result differs, check recall, data volume and optimization rather than forcing a winner. Real retrieval systems also use broader signals such as organic engagement and exploration traffic.</p>
 </div>
 
 <h2 id="space"><span class="sec">10.5</span>Look inside the embedding space</h2>

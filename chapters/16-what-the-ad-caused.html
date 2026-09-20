@@ -64,7 +64,7 @@
 
 <p>The clearest example is retargeting: show ads to people who already put something in their cart. The attributed numbers are gorgeous, since these are people who were mostly going to buy anyway. Every purchase that follows lands in your column. Do nothing at all and many of those purchases still happen, but now they're in nobody's column.</p>
 
-<p>Which is why the only honest measure of what ads did is a <dfn>holdout</dfn>: pick users at random, never show them the campaign, and compare. The difference is the <dfn>incremental</dfn> effect, and it's what a lift study, a geo experiment, or a ghost-ad test is doing under the hood.</p>
+<p>A randomized <dfn>holdout</dfn> is a strong way to estimate what the campaign caused: assign eligible users to campaign access or no access, then compare average outcomes. The difference estimates <dfn>incremental</dfn> lift for that assignment under good randomization, comparable measurement and limited spillovers. It does not reveal whether any particular person's conversion was caused by an ad. Geo experiments and ghost-ad designs pursue the same causal question with different assignment and exposure details.</p>
 
 <div class="code-cell" data-slot="liftEstimate"></div>
 
@@ -89,11 +89,11 @@
 <ul>
   <li><strong>Your model optimizes predictability, not persuasion.</strong> pCVR is trained to find people likely to convert after seeing an ad. People who were going to convert anyway are the easiest of all to find, so a model that gets "better" can be getting better at claiming credit. If conversions rise and the advertiser's total sales don't, that's what happened.</li>
   <li><strong>Some launch wins are transfers.</strong> A ranking change can shift conversions between campaigns, between ad formats, or from organic content onto ads, and every one of those shows up as a gain in your dashboard. When a launch looks suspiciously good, ask what it might be taking credit from.</li>
-  <li><strong>Holdouts are the measurement of last resort, and sometimes the only one.</strong> They're how you sanity-check the whole system, and, as Chapter 13's privacy changes bite, increasingly the only way to measure anything causal at all. Keep one running for big surfaces, and never let "we need the traffic" quietly end it.</li>
+  <li><strong>Holdouts are a valuable system check.</strong> Under a sound design they test causal lift even when individual attribution weakens. They cost traffic and need mature outcomes; shared advertiser budgets and other marketplace spillovers can complicate interpretation. Keep a measurement plan for major surfaces.</li>
 </ul>
 
 <div class="callout pm"><div class="label">In your job</div>
-<p>When an advertiser says your platform's numbers look better than their own, they're usually right, and it isn't a bug. Their analytics count sales; your reports count attributed conversions inside a window you chose. The useful response isn't a debate about whose number is correct. It's "let's run a holdout and find out what we're worth," which is the one measurement both sides can believe. Be ready for the answer to be smaller than your reports, especially for retargeting and for very broad campaigns.</p>
+<p>When an advertiser says your platform's numbers look better than their own, compare definitions first: their analytics may count sales, while your report counts conversions attributed within a chosen window. A well-designed holdout can estimate incremental lift, with an interval and stated assumptions both sides can inspect. The estimate may be smaller than attributed conversions, especially in retargeting, but the data gets to answer that.</p>
 </div>
 
 <div class="quiz" data-id="ch16-q1">
@@ -108,23 +108,23 @@
 </div>
 
 <div class="quiz" data-id="ch16-q2">
-  <p class="q">A retargeting campaign reports a $4 cost per attributed conversion. A holdout test estimates incremental conversions at a third of the attributed count. What's the honest cost per incremental conversion, and what should you do about it?</p>
+  <p class="q">A retargeting campaign reports a $4 cost per attributed conversion. A holdout's <em>positive point estimate</em> of incremental conversions is a third of the attributed count. What's the corresponding point estimate of incremental CPA, and what must you check before acting?</p>
   <ul>
     <li data-why="Fewer real conversions makes the true cost higher, not lower.">About $1.30, and the campaign is better than it looked</li>
-    <li data-correct>About $12, and the advertiser should know before they scale it</li>
+    <li data-correct>About $12, but inspect the lift interval; if it reaches zero, incremental CPA has no stable finite upper bound</li>
     <li data-why="The attributed number is the one the holdout just corrected.">$4, since attributed conversions are what the advertiser pays for</li>
     <li data-why="A holdout estimate is evidence, even with uncertainty around it.">Unknowable, so ignore the holdout</li>
   </ul>
-  <div class="explain"><p>Same spend, a third as many conversions actually caused, so the cost per incremental conversion is about three times higher: roughly $12. That doesn't necessarily make the campaign bad, since $12 may still beat the advertiser's alternatives. It makes the <em>reported</em> number misleading, and an advertiser who scales on the strength of it will be disappointed later, usually right before they cut their budget.</p></div>
+  <div class="explain"><p>At the point estimate, the same spend divided by one-third as many incremental conversions gives roughly $12. If the lift interval includes zero, the ratio can become arbitrarily large or change sign, so a tidy $12 confidence interval would mislead. Show the lift interval and spend, then compare plausible outcomes with the advertiser's alternatives.</p></div>
 </div>
 
 <div class="reflect" data-id="ch16-r1">
   <p class="q">Pebble's biggest advertiser asks you to prove that its spend is worth it. Design the measurement: what you'd run, how big, what you'd report, and what you'd do if the answer is unflattering.</p>
   <div class="model">
     <ul>
-      <li><strong>Design:</strong> a randomized user holdout (or geo holdout where user-level randomization isn't possible), sized from the effect you need to detect. Use the campaign's conversion rate and the smallest lift worth acting on to compute the sample and duration <em>before</em> starting. Log the ads the holdout users would have seen (ghost ads), so you compare the right people with the right people.</li>
+      <li><strong>Design:</strong> choose user or geo randomization, size the test from the smallest lift worth acting on, and fix the primary outcome and duration before starting. Check split counts, mature labels and possible budget spillovers. If using a ghost-ad design, log eligible opportunities consistently; do not compare only people who actually saw an ad with a self-selected control group.</li>
       <li><strong>Run it long enough to cover the conversion delay</strong> (Chapter 12), or you'll measure speed rather than lift.</li>
-      <li><strong>Report the interval, not the point.</strong> "Incremental CPA $12, 95% CI [$8, $24]" is honest and actionable. A bare "$12" invites a decision the data can't support.</li>
+      <li><strong>Report lift and its interval first.</strong> Include spend and the point estimate of incremental CPA if lift is positive. If the lift interval reaches zero, say that incremental CPA has no stable finite upper bound instead of inventing a neat ratio interval.</li>
       <li><strong>Split where you expect differences:</strong> retargeting versus prospecting, new versus existing customers. Aggregate lift usually hides a campaign type that isn't pulling its weight.</li>
       <li><strong>If it's unflattering, say so and offer the fix:</strong> shift budget from the non-incremental campaign toward prospecting, adjust the targeting that was harvesting people who'd already decided, and re-measure. An advertiser who learns this from you stays. One who learns it from their own analyst, after you argued with them for a quarter, does not.</li>
     </ul>
@@ -247,9 +247,9 @@
       var sig = lo > 0;
       st({
         att: Book.money(v.spend / Math.max(attConv, 1), 2),
-        inc: incConv > 0 ? { v: Book.money(v.spend / incConv, 2), tone: '' } : { v: '—', d: 'no measurable lift' },
+        inc: incConv > 0 ? { v: Book.money(v.spend / incConv, 2), d: lo <= 0 ? 'point estimate; ratio unstable when lift includes zero' : 'point estimate' } : { v: '—', d: 'nonpositive lift estimate' },
         ci: { v: '[' + (lo * 100).toFixed(3) + '%, ' + (hi * 100).toFixed(3) + '%]', d: 'true lift: ' + ((pT - pC) * 100).toFixed(3) + '%' },
-        call: sig ? { v: 'Detected', d: 'the interval clears zero', tone: 'good' } : { v: 'Not detected', d: 'the interval still contains zero', tone: 'bad' }
+        call: sig ? { v: 'Detected', d: 'the interval clears zero', tone: 'good' } : { v: 'Inconclusive', d: 'the interval still contains zero' }
       });
     }
     draw();

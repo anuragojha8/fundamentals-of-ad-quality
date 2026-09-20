@@ -70,7 +70,7 @@
 <dt>Feedback loop <span class="ch">Ch. 5</span></dt><dd>Predictions decide what is shown, which decides the data the next model learns from.</dd>
 <dt>First-price / second-price auction <span class="ch">Ch. 2</span></dt><dd>The winner pays its own bid / the runner-up's bid. Second price makes bidding one's true value optimal (single slot).</dd>
 <dt>Frequency cap <span class="ch">Ch. 1</span></dt><dd>A limit on how often one user sees the same ad or advertiser.</dd>
-<dt>GAUC <span class="ch">Ch. 8, 9, 11</span></dt><dd>AUC computed within each request (or user) and averaged: closer to the decision the auction makes.</dd>
+<dt>GAUC <span class="ch">Ch. 8, 9, 11</span></dt><dd>Label AUC computed within defined groups (such as users or requests), excluding groups without both label classes, then averaged with stated weights. Distinct from ordering against a simulator's true probabilities.</dd>
 <dt>Ghost ads <span class="ch">Ch. 16</span></dt><dd>Logging the ad a held-out user would have been shown, so the holdout and the exposed group can be compared like with like.</dd>
 <dt>Gradient descent / SGD <span class="ch">Ch. 7</span></dt><dd>Repeatedly nudging weights against the gradient of the loss; stochastic = one example or small batch per step.</dd>
 <dt>GSP <span class="ch">Ch. 2</span></dt><dd>Generalized second-price auction: rank by bid × pCTR, each winner pays the next score ÷ its own pCTR.</dd>

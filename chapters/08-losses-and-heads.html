@@ -42,8 +42,8 @@
 <thead><tr><th>Loss</th><th>Formula (for one example)</th><th>Good for</th><th>Used in ads for</th></tr></thead>
 <tbody>
 <tr><td><b>Log loss</b> (binary cross-entropy)</td><td>−[y log p + (1−y) log(1−p)]</td><td>Calibrated probabilities</td><td>pCTR, pCVR: anything that feeds an auction</td></tr>
-<tr><td><b>MSE</b> (squared error)</td><td>(p − y)²</td><td>Continuous targets</td><td>Rarely for clicks; sometimes for values</td></tr>
-<tr><td><b>Poisson</b></td><td>λ − y log λ, with λ = e<sup>z</sup></td><td>Counts (0, 1, 2, …) and rates</td><td>Number of conversions, purchases, visits</td></tr>
+<tr><td><b>MSE</b> (Brier score for binary y)</td><td>(p − y)²</td><td>Probabilities and continuous targets</td><td>Sometimes for probabilities or values; optimizer behavior differs from log loss</td></tr>
+<tr><td><b>Poisson</b></td><td>μ − y log μ, with mean count μ = exposure × rate</td><td>Counts (0, 1, 2, …)</td><td>Number of conversions, purchases, visits over a stated exposure</td></tr>
 <tr><td><b>Pairwise</b> (RankNet / AUC surrogate)</td><td>log(1 + e<sup>−(z<sub>+</sub> − z<sub>−</sub>)</sup>)</td><td>Ordering items</td><td>Ranking within a request; organic ranking</td></tr>
 <tr><td><b>Softmax</b> (cross-entropy over choices)</td><td>−log( e<sup>z<sub>chosen</sub></sup> / Σ e<sup>z<sub>j</sub></sup> )</td><td>Picking one of many</td><td>Retrieval (Ch. 10)</td></tr>
 </tbody></table></div>
@@ -58,7 +58,7 @@
 </div>
 
 <div class="callout intuition"><div class="label">Intuition</div>
-<p>Log loss keeps pushing hard when the model is confidently wrong: predict 1% for something that actually happened, and the gradient is close to 1. MSE on a probability does the opposite. It <em>stops pushing</em> right there, because its gradient has a factor of p(1−p) that shrinks to zero. That's why MSE learns rare events so sluggishly. It basically shrugs at the click it predicted at 1%.</p>
+<p>Log loss keeps pushing hard when the model is confidently wrong: predict 1% for a click and the gradient with respect to the logit is close to 1. With a sigmoid output, squared error has an extra p(1−p) factor, so its logit gradient is much smaller there. That can make optimization of rare events sluggish <em>in this parameterization</em>. For binary outcomes, squared error is the Brier score and is still a proper probability loss; the issue here is the gradient shape, not that it cannot learn calibrated probabilities.</p>
 </div>
 
 <div class="exercise" data-id="ch8-e1" data-answer="4.605" data-tol="0.01">
@@ -69,7 +69,7 @@
 
 <h2 id="order"><span class="sec">8.3</span>Order vs. value: the pairwise loss</h2>
 
-<p>A <dfn>pairwise loss</dfn> takes two ads shown in the same request, one clicked and one not, and asks just one thing: did the clicked one score higher? It only depends on the <em>difference</em> between the scores, so if you add the same constant to every score, nothing changes. That's exactly what ranking needs.</p>
+<p>A <dfn>pairwise loss</dfn> takes two shown ads in the same request, one clicked and one not, and favors a higher score for the clicked one. It depends on the <em>difference</em> between scores, so a common shift changes nothing. Which requests yield such pairs, how ties are handled, and how pairs are sampled all affect what it learns; unshown candidates still lack labels.</p>
 
 <p>And it's also exactly why a pairwise model is useless for pricing. It has zero reason to put its scores on a probability scale. It'll happily tell you ad A beats ad B, and have no idea whether either one gets clicked 2% or 20% of the time.</p>
 
@@ -82,7 +82,7 @@
   <p class="q">A model trained only with a pairwise loss ranks ads within each request very well. Why can't your auction use its outputs directly as pCTR?</p>
   <ul>
     <li data-why="Pairwise models do rank; that's what they're trained for.">It can't rank ads</li>
-    <li data-correct>Its scores are only meaningful relative to each other, not as probabilities, so bid × score isn't expected revenue</li>
+    <li data-correct>Its scores are relative, not calibrated click probabilities, so bid × score is not Pebble's intended auction value</li>
     <li data-why="Training speed isn't the problem.">It's too slow to serve</li>
     <li data-why="Pairwise losses are used on click data all the time.">It needs conversion data</li>
   </ul>
@@ -91,9 +91,9 @@
 
 <h2 id="poisson"><span class="sec">8.4</span>Poisson: when the label is a count</h2>
 
-<p>Sometimes the label isn't yes-or-no, it's a count: purchases per click (some people buy twice), app opens in the week after an install, clicks per thousand impressions in an aggregated row. <dfn>Poisson loss</dfn> treats the model's output as a rate, \( \lambda = e^z \), and asks it to match the average count.</p>
+<p>Sometimes the label is a count: purchases per click, app opens in a week, or clicks in an aggregate row. <dfn>Poisson loss</dfn> models a mean count \(\mu = \text{exposure} \times \text{rate}\). The code slot takes one unit of exposure, so \(\mu = e^z\) there. For variable windows or numbers of impressions, include exposure (often as a log offset). A Poisson rate can exceed 1, unlike a probability, and overdispersed counts may need a different variance model.</p>
 
-<p>Two nice things about it. Its gradient, \( \lambda - y \), looks just like log loss's \( p - y \). And for rare events (rates well below 1), it behaves almost exactly like log loss. You'll see that for yourself in a second.</p>
+<p>For unit exposure its logit gradient, \(\mu-y\), looks like log loss's \(p-y\). With rare binary events and small predicted means, the two losses can behave similarly in this toy. That approximation does not turn a Poisson rate into a calibrated Bernoulli probability.</p>
 
 <h2 id="build"><span class="sec">8.5</span>Build: losses and their gradients</h2>
 

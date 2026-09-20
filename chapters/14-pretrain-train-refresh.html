@@ -60,14 +60,14 @@
 </div>
 
 <div class="quiz" data-id="ch14-q1">
-  <p class="q">Your model's AUC is stable week over week, but its calibration ratio drifts from 1.00 to 1.18 over three weeks. What's the cheapest effective fix?</p>
+  <p class="q">Your model's aggregate AUC is stable week over week, but its calibration ratio drifts from 1.00 to 1.18 over three weeks. What's a cheap first intervention while you investigate?</p>
   <ul>
-    <li data-why="A full retrain would fix it but isn't the cheapest option.">Retrain the full model daily</li>
-    <li data-correct>Refit the calibration layer frequently (e.g., hourly or daily) on recent outcomes</li>
-    <li data-why="Architecture isn't the problem; ranking is stable.">Switch to a deep model</li>
-    <li data-why="More features won't fix a moving base rate.">Add more features</li>
+    <li data-why="A full retrain may help, but the evidence does not justify making it the first move.">Retrain the full model daily</li>
+    <li data-correct>Check traffic and slice shifts, then try a calibration refit on mature recent outcomes</li>
+    <li data-why="Stable aggregate AUC does not identify an architecture problem.">Switch to a deep model</li>
+    <li data-why="First identify why the ratio moved; new features may or may not help.">Add more features</li>
   </ul>
-  <div class="explain"><p>Stable AUC means the ordering is still fine; only the scale moved. A calibration layer is just a handful of parameters, and it's cheap to refit on recent data. This is exactly the job it was born to do.</p></div>
+  <div class="explain"><p>Stable aggregate AUC does not prove every request ordering or slice is stable. Check composition and slice metrics, then a small calibration refit is often the cheapest intervention. Validate it on fresh data and monitor auction outcomes; a flexible histogram mapping can even change ranking unless constrained to be monotone.</p></div>
 </div>
 
 <h2 id="pretrain"><span class="sec">14.3</span>Pre-training and fine-tuning</h2>

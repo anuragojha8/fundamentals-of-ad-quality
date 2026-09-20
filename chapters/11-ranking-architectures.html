@@ -68,7 +68,7 @@
 <h3>Target attention over history</h3>
 <p>Your LR summarizes a user's history with counts, like "3 of the last 12 posts were Food." But which history items actually matter depends on the ad you're considering. For a Food ad, the Food posts matter. For a Gaming ad, the gaming posts. <dfn>Target attention</dfn> (DIN, the Deep Interest Network, Alibaba, 2018) uses the candidate ad as a <em>query</em>, scores every history item against it, and takes a weighted sum. DIN scores each pair with a small learned network, and it deliberately skips normalizing the weights, so their total can signal how strongly the ad matches the user's interests at all. Your stack uses the simpler scaled dot product from transformers:</p>
 \[ \text{score}_i = \frac{h_i \cdot q}{\sqrt{d}}, \qquad \alpha = \text{softmax}(\text{score}), \qquad \text{pooled} = \sum_i \alpha_i h_i \]
-<p>That's the same attention that powers transformers. Sequence models like BST (Alibaba, 2019) and HSTU (Meta's "generative recommenders," 2024) stack many layers of it over long user histories. Those histories can run to thousands of events, and serving them fast enough is one of the hardest infrastructure problems in ads right now.</p>
+<p>That weighted sum is one ingredient of a transformer, not the whole recipe. A sequence model also represents event order, masks future events during causal training, and uses normalization, residual paths and feed-forward transformations between attention layers. BST applies transformer-style sequence modeling to behavior histories. <a href="https://arxiv.org/html/2402.17152v3#S3.SS1">HSTU</a> takes a different route with pointwise aggregated attention rather than this softmax-normalized rule. Histories can run to thousands of events, making serving cost a real design constraint.</p>
 
 <div class="code-cell" data-slot="attentionWeights"></div>
 
@@ -93,7 +93,7 @@
 
 <h2 id="train"><span class="sec">11.4</span>Train your deep ranker</h2>
 
-<p>Okay, let's play. Switch the pieces on and off, train, and keep an eye on two numbers. <strong>Offline AUC</strong> is the headline number a model review would show you. <strong>Within-request accuracy against the truth</strong> is measured on the 30 candidates the model actually ranks in production. That second one is the number the auction actually feels. Your LR is the baseline to beat.</p>
+<p>Okay, let's play. Switch the pieces on and off, train, and keep an eye on two numbers. <strong>Offline AUC</strong> compares clicked and unclicked logged impressions across users. <strong>Within-request ordering against the simulator's true probabilities</strong> evaluates pairs among the 30 candidates the model ranks. The second is closer to an auction decision, but it is an oracle diagnostic, not label-based GAUC and not a revenue forecast; bids and calibration matter too. Your LR is the baseline to beat.</p>
 
 <div class="widget" id="w-train">
   <div class="w-title">Build and train a deep ranker</div>
@@ -101,7 +101,7 @@
 </div>
 
 <div class="callout trap"><div class="label">Common trap</div>
-<p>"The deep model has higher AUC, ship it!" Hold on. AUC compares every clicked impression with every non-clicked one, across <em>all</em> users. A model can raise it just by getting better at figuring out <em>which users click a lot</em> (ID embeddings are great at that), while getting no better, or even worse, at picking <em>which ad to show this particular user</em>. And the auction only ever makes that second decision. So always ask for within-request metrics (GAUC) right next to global AUC, and never, ever skip the A/B test.</p>
+<p>"The deep model has higher AUC, ship it!" Hold on. Global AUC compares clicked with unclicked impressions across users. A model can raise it by learning who clicks a lot while getting no better at selecting ads for a given user. Ask for a <dfn>GAUC</dfn> definition beside global AUC: choose request or user groups, compute label AUC only in groups with both outcomes, then state whether groups are weighted equally, by impressions or by pairs. In this widget the oracle within-request ordering metric uses true probabilities instead of labels, so it is <em>not</em> GAUC. Check calibration and run an A/B test too.</p>
 </div>
 
 <h2 id="attn"><span class="sec">11.5</span>What is attention looking at?</h2>
@@ -175,7 +175,7 @@
     <div><b>Target attention</b>History items weighted by similarity to the candidate ad.</div>
     <div><b>Cross tower</b>User and ad features interact early; accurate but not precomputable.</div>
     <div><b>Wide &amp; Deep</b>A linear model over engineered features plus a deep network, trained jointly.</div>
-    <div><b>GAUC</b>AUC computed within requests (or users), then averaged.</div>
+    <div><b>GAUC</b>Label AUC within defined request or user groups, averaged with stated weights; groups lacking both labels are undefined.</div>
   </div>
 </div>
 
@@ -238,7 +238,7 @@
         { label: 'NE', num: true, get: function (r) { return r.ne.toFixed(3); } },
         { label: 'Within-request accuracy vs. truth', num: true, get: function (r) { var better = !r.lr && r.within > results[0].within; return '<b class="' + (r.lr ? '' : better ? 'pos' : 'neg') + '">' + r.within.toFixed(3) + '</b>'; } }
       ], results, { rowClass: function (r) { return r.lr ? 'hl' : ''; } });
-      out.appendChild(el('p', { class: 'small', html: 'Offline AUC and within-request accuracy often disagree. The first includes cross-user comparisons; the second is what the auction feels. Train several variants to see which pieces help on your data.' }));
+      out.appendChild(el('p', { class: 'small', html: 'Global label AUC and oracle within-request ordering can disagree. The latter uses simulator truth on candidate pairs; it is not label GAUC or the auction\'s revenue. Train several variants to see which pieces help on your data.' }));
       var save = el('button', { type: 'button', class: 'btn accent', text: 'Save this deep ranker to your stack' });
       save.onclick = function () {
         Stack.putModel('deep', m, { source: Stack.implSource('attentionWeights') });

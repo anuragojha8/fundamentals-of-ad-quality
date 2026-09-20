@@ -113,11 +113,11 @@
 
 <h2 id="servetime"><span class="sec">4.4</span>Log features at serve time</h2>
 
-<p>Here's a question you'll definitely hear in a meeting someday: why bother storing feature values in the impression log at all? Why not just recompute them at training time from the raw data? It's cheaper!</p>
+<p>Here's a question you'll hear in a meeting someday: why store feature values in every impression log? Could we reconstruct them later from historical raw data?</p>
 
 <p>Because <strong>features change</strong>. Take the counting feature you'll build in Chapter 6: an ad's historical CTR. At serve time on day 3, the model saw that ad's CTR <em>as of day 3</em>. Recompute it at training time on day 10 and you get the CTR as of day 10, which includes clicks that happened <em>after</em> the impression. That's information from the future. Your model is basically reading tomorrow's newspaper.</p>
 
-<p>Training on recomputed features creates <dfn>train/serve skew</dfn>: the model learns from feature values it'll never see in production. Worse, because those recomputed values include the outcome period, they <dfn>leak</dfn> the label. The model looks amazing offline and disappoints online. Let's see how big the difference is in your logs.</p>
+<p>Naively recomputing from the day-10 state creates <dfn>train/serve skew</dfn> and can <dfn>leak</dfn> labels. Faithful point-in-time reconstruction is possible when you retain immutable historical events and use each feature's <em>availability time</em>, which may be later than its event time. The rule is to reproduce what serving actually knew, not necessarily to log every computed value. Let's see how badly the naive version fails.</p>
 
 <div class="widget" id="w-skew">
   <div class="w-title">Serve-time vs. recomputed features</div>
@@ -125,18 +125,18 @@
 </div>
 
 <div class="callout pm"><div class="label">In your job</div>
-<p>Serve-time feature logging is expensive, because it multiplies log volume. So there's constant pressure to cut it ("we can just recompute, it's fine"). Push back with the skew argument, or at the very least insist on measuring the skew before anyone flips a switch. The same logic applies to <em>everything else</em> you log: the model version (so you can tell which model did what), the <em>candidates that lost</em> (so you can study what you didn't show), and exploration flags and probabilities (Chapter 5). Data you didn't log is data you can never, ever learn from.</p>
+<p>Serve-time feature logging multiplies log volume. Before cutting it, prove that historical reconstruction reproduces serving values, including late arrivals, revisions and availability times. Compare a sample feature by feature and measure skew. Also retain model versions, candidate sets and exploration probabilities; without those, later evaluation has blind spots even if features can be reconstructed.</p>
 </div>
 
 <h2 id="sampling"><span class="sec">4.5</span>Downsampling, and undoing it</h2>
 
-<p>Real impression logs are enormous, and most of the rows are negatives: people scrolling right past. So training pipelines usually keep every positive but only a fraction \(w\) of the negatives. It's way cheaper, and it barely hurts ranking.</p>
+<p>Real impression logs are enormous, and most rows are negatives: people scrolling right past. A common training choice keeps every positive but only a known fraction \(w\) of negatives. It saves work, though effects on ranking depend on the model and sampling scheme.</p>
 
 <p>But there's a catch (there's always a catch). A model trained on downsampled data predicts on the downsampled scale, so its probabilities come out too high. You undo it with a correction that every ads engineer knows by heart, and that you should recognize when it pops up in a design doc:</p>
 
 \[ q = \frac{p}{p + (1-p)/w} \]
 
-<p>where \(p\) is the model's raw prediction and \(q\) is the corrected probability on real traffic.</p>
+<p>Here \(p\) is a probability fitted to the sampled distribution and \(q\) is the population probability. This formula assumes all positives are retained and negatives are sampled at the same known rate \(w\) regardless of features. If rates vary by feature, correct conditionally; if the training loss already accounts for sampling, do not correct twice. Check calibration on unsampled traffic.</p>
 
 <div class="exercise" data-id="ch4-e1" data-answer="0.0244" data-tol="0.0006">
   <p class="q">Your pCTR model was trained keeping all clicks but only 10% of non-clicks (\(w = 0.1\)). For some impression it outputs \(p = 0.2\). What's the calibrated CTR \(q\)? (Answer as a probability, e.g. 0.05.)</p>
