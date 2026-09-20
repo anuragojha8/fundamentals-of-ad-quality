@@ -75,6 +75,11 @@ body {
   margin: 0; background: var(--paper); color: var(--ink);
   font-family: var(--serif); font-size: 19px; line-height: 1.65;
   font-optical-sizing: auto;
+  /* The reading gutter lives here, not on `.page`, because `.page` is built by JS at
+     DOMContentLoaded — after the chapter's widget scripts have already measured their
+     containers to size charts (style guide §6). On `.page` it made every chart 32px too
+     wide on a phone. */
+  padding-inline: 16px;
 }
 a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { text-decoration-thickness: 2px; }
@@ -135,7 +140,7 @@ body.nav-open .scrim { display: block; position: fixed; inset: 52px 0 0 0; backg
   .page { margin-left: var(--sidebar-w); }
   #navToggle { display: none; }
 }
-.page { padding: 0 16px 80px; }
+.page { padding-bottom: 80px; }
 .chapter { max-width: var(--measure); margin: 0 auto; }
 .wide { max-width: 980px; margin-left: auto; margin-right: auto; }
 
