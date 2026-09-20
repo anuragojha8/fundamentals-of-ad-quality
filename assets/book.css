@@ -309,7 +309,12 @@ table.data tr.hl td { background: var(--accent-soft); }
 .chapter-nav a { min-width: 0; border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; text-decoration: none; color: var(--ink); background: var(--card); text-wrap: pretty; }
 .chapter-nav a:hover { border-color: var(--accent); }
 .chapter-nav a small { display: block; color: var(--ink-3); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-.chapter-nav a .t { display: block; margin-top: 4px; text-wrap: balance; }
+.chapter-nav a .t { display: block; margin-top: 4px; font-weight: 600; text-wrap: balance; }
+.chapter-nav a .blurb { display: block; margin-top: 6px; font-size: 13px; line-height: 1.45; color: var(--ink-3); }
+.chapter-nav a .foot { display: flex; gap: 10px; align-items: baseline; margin-top: 10px; font-size: 11.5px; color: var(--ink-3); }
+.chapter-nav a.next .foot { justify-content: flex-end; }
+.chapter-nav a .foot .ok { color: var(--green); font-weight: 600; }
+.cards .card .cmeta { margin-top: 10px; font-size: 11.5px; color: var(--ink-3); letter-spacing: .01em; }
 .completion { font-family: var(--sans); font-size: 14px; margin-top: 18px; padding: 12px 14px; border-radius: 10px; background: var(--paper-2); color: var(--ink-2); }
 .completion.done { background: var(--green-soft); color: var(--green); font-weight: 600; }
 

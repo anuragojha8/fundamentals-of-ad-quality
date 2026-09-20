@@ -4,26 +4,26 @@
   'use strict';
 
   var CHAPTERS = [
-    { id: '00-preface', n: '0', part: 'Start Here', title: 'How to Read This Book', blurb: 'Who this is for, the running example, and the map of the ad stack.' },
-    { id: '01-two-hundred-ms', n: '1', part: 'I · The Marketplace', title: 'Two Hundred Milliseconds', blurb: 'The life of an ad request: retrieval, ranking, auction, serving, logging — and the latency budget that shapes everything.' },
-    { id: '02-auction', n: '2', part: 'I · The Marketplace', title: 'The Auction', blurb: 'eCPM, second-price and GSP, reserve prices, bid types, and why auctions need predictions.' },
-    { id: '03-predictions-are-prices', n: '3', part: 'I · The Marketplace', title: 'Predictions Are Prices', blurb: 'Why a 10% miscalibration is a 10% pricing error, and ranking quality vs calibration.' },
-    { id: '04-logging', n: '4', part: 'II · Data', title: 'Logging: The Memory of the System', blurb: 'Impressions, events, joins, attribution windows, and why you log features at serve time.' },
-    { id: '05-labels-and-bias', n: '5', part: 'II · Data', title: 'Labels and the Biases Hiding in Them', blurb: 'Label design, position bias, selection bias, feedback loops, exploration, and inverse propensity weighting.' },
-    { id: '06-features', n: '6', part: 'II · Data', title: 'Features', blurb: 'Dense vs sparse, IDs and embeddings, hashing, counting features, crosses, sequences — and leakage.' },
-    { id: '07-how-models-learn', n: '7', part: 'III · Learning', title: 'How a Model Learns', blurb: 'Logistic regression from scratch, gradient descent, learning rates, overfitting, and regularization — trained live in your browser.' },
-    { id: '08-losses-and-heads', n: '8', part: 'III · Learning', title: 'Losses and Model Heads', blurb: 'Log loss, MSE, Poisson, pairwise/AUC loss, softmax, multi-task heads, and calibration layers.' },
-    { id: '09-evaluation', n: '9', part: 'III · Learning', title: 'Evaluation, Offline and Online', blurb: 'AUC, normalized entropy, calibration, slicing, the offline–online gap, and A/B testing.' },
-    { id: '10-retrieval', n: '10', part: 'IV · The Models', title: 'Retrieval', blurb: 'Two-tower models, embeddings, approximate nearest neighbours, negative sampling, and recall.' },
-    { id: '11-ranking-architectures', n: '11', part: 'IV · The Models', title: 'Towers, Crosses, and Transformers', blurb: 'The anatomy of a modern ranking model: embeddings, interaction layers, cross towers, multi-task, and attention over user history.' },
-    { id: '12-conversion-modeling', n: '12', part: 'IV · The Models', title: 'Conversion Modeling', blurb: 'pCVR, sparse and delayed labels, sample selection bias, ESMM, and value optimization.' },
-    { id: '13-privacy', n: '13', part: 'IV · The Models', title: 'Privacy and Measurement', blurb: 'Opt-outs, aggregated and noisy conversion reports, k-anonymity, differential privacy, and modeled conversions.' },
-    { id: '14-pretrain-train-refresh', n: '14', part: 'IV · The Models', title: 'Pre-training, Fine-tuning, and Freshness', blurb: 'Foundation embeddings, warm starts, continuous training, distillation, and model staleness.' },
-    { id: '15-beyond-the-click', n: '15', part: 'V · The Job', title: 'Quality Beyond the Click', blurb: 'Ad load, user experience, negative feedback, long-term value, and the objective function you actually own.' },
-    { id: '16-what-the-ad-caused', n: '16', part: 'V · The Job', title: 'What the Ad Actually Caused', blurb: 'Attribution windows as a label decision, view-through credit, incrementality, holdouts and ghost ads, and why lift is hard to measure.' },
-    { id: '17-capstone', n: '17', part: 'V · The Job', title: 'Capstone: Run the Marketplace', blurb: 'A simulation game. Make the calls a real ads quality PM makes, and live with the results.' },
-    { id: 'appendix-a-glossary', n: 'A', part: 'Appendices', title: 'Glossary', blurb: 'Every term in the book, in one place.' },
-    { id: 'appendix-b-question-bank', n: 'B', part: 'Appendices', title: 'The Model Review Question Bank', blurb: 'The questions to ask in a launch review, a metrics readout, or a roadmap debate.' }
+    { id: '00-preface', n: '0', part: 'Start Here', title: 'How to Read This Book', blurb: 'Who this is for, the running example, and the map of the ad stack.', mins: 7, builds: 0, runs: 0 },
+    { id: '01-two-hundred-ms', n: '1', part: 'I · The Marketplace', title: 'Two Hundred Milliseconds', blurb: 'The life of an ad request: retrieval, ranking, auction, serving, logging — and the latency budget that shapes everything.', mins: 12, builds: 2, runs: 4 },
+    { id: '02-auction', n: '2', part: 'I · The Marketplace', title: 'The Auction', blurb: 'eCPM, second-price and GSP, reserve prices, bid types, and why auctions need predictions.', mins: 10, builds: 1, runs: 3 },
+    { id: '03-predictions-are-prices', n: '3', part: 'I · The Marketplace', title: 'Predictions Are Prices', blurb: 'Why a 10% miscalibration is a 10% pricing error, and ranking quality vs calibration.', mins: 9, builds: 1, runs: 3 },
+    { id: '04-logging', n: '4', part: 'II · Data', title: 'Logging: The Memory of the System', blurb: 'Impressions, events, joins, attribution windows, and why you log features at serve time.', mins: 8, builds: 1, runs: 3 },
+    { id: '05-labels-and-bias', n: '5', part: 'II · Data', title: 'Labels and the Biases Hiding in Them', blurb: 'Label design, position bias, selection bias, feedback loops, exploration, and inverse propensity weighting.', mins: 9, builds: 1, runs: 5 },
+    { id: '06-features', n: '6', part: 'II · Data', title: 'Features', blurb: 'Dense vs sparse, IDs and embeddings, hashing, counting features, crosses, sequences — and leakage.', mins: 9, builds: 2, runs: 4 },
+    { id: '07-how-models-learn', n: '7', part: 'III · Learning', title: 'How a Model Learns', blurb: 'Logistic regression from scratch, gradient descent, learning rates, overfitting, and regularization — trained live in your browser.', mins: 9, builds: 1, runs: 3 },
+    { id: '08-losses-and-heads', n: '8', part: 'III · Learning', title: 'Losses and Model Heads', blurb: 'Log loss, MSE, Poisson, pairwise/AUC loss, softmax, multi-task heads, and calibration layers.', mins: 8, builds: 1, runs: 3 },
+    { id: '09-evaluation', n: '9', part: 'III · Learning', title: 'Evaluation, Offline and Online', blurb: 'AUC, normalized entropy, calibration, slicing, the offline–online gap, and A/B testing.', mins: 8, builds: 2, runs: 5 },
+    { id: '10-retrieval', n: '10', part: 'IV · The Models', title: 'Retrieval', blurb: 'Two-tower models, embeddings, approximate nearest neighbours, negative sampling, and recall.', mins: 7, builds: 1, runs: 3 },
+    { id: '11-ranking-architectures', n: '11', part: 'IV · The Models', title: 'Towers, Crosses, and Transformers', blurb: 'The anatomy of a modern ranking model: embeddings, interaction layers, cross towers, multi-task, and attention over user history.', mins: 8, builds: 1, runs: 3 },
+    { id: '12-conversion-modeling', n: '12', part: 'IV · The Models', title: 'Conversion Modeling', blurb: 'pCVR, sparse and delayed labels, sample selection bias, ESMM, and value optimization.', mins: 8, builds: 1, runs: 3 },
+    { id: '13-privacy', n: '13', part: 'IV · The Models', title: 'Privacy and Measurement', blurb: 'Opt-outs, aggregated and noisy conversion reports, k-anonymity, differential privacy, and modeled conversions.', mins: 10, builds: 1, runs: 2 },
+    { id: '14-pretrain-train-refresh', n: '14', part: 'IV · The Models', title: 'Pre-training, Fine-tuning, and Freshness', blurb: 'Foundation embeddings, warm starts, continuous training, distillation, and model staleness.', mins: 6, builds: 0, runs: 2 },
+    { id: '15-beyond-the-click', n: '15', part: 'V · The Job', title: 'Quality Beyond the Click', blurb: 'Ad load, user experience, negative feedback, long-term value, and the objective function you actually own.', mins: 6, builds: 0, runs: 3 },
+    { id: '16-what-the-ad-caused', n: '16', part: 'V · The Job', title: 'What the Ad Actually Caused', blurb: 'Attribution windows as a label decision, view-through credit, incrementality, holdouts and ghost ads, and why lift is hard to measure.', mins: 8, builds: 1, runs: 2 },
+    { id: '17-capstone', n: '17', part: 'V · The Job', title: 'Capstone: Run the Marketplace', blurb: 'A simulation game. Make the calls a real ads quality PM makes, and live with the results.', mins: 4, builds: 0, runs: 0 },
+    { id: 'appendix-a-glossary', n: 'A', part: 'Appendices', title: 'Glossary', blurb: 'Every term in the book, in one place.', mins: 8, builds: 0, runs: 0 },
+    { id: 'appendix-b-question-bank', n: 'B', part: 'Appendices', title: 'The Model Review Question Bank', blurb: 'The questions to ask in a launch review, a metrics readout, or a roadmap debate.', mins: 4, builds: 0, runs: 0 }
   ];
 
   var STORE_KEY = 'faq-book-v1';
@@ -146,13 +146,18 @@
   }
 
   /* ---------- chapter meta: what this chapter asks of you ---------- */
-  function chapterMeta(page) {
+  function chapterMeta(page, entry) {
     var head = page.querySelector('.chapter-head');
     if (!head || page.querySelector('.ch-meta')) return;
-    var words = (page.textContent.match(/\S+/g) || []).length;
-    var mins = Math.max(1, Math.round(words / 220));
-    var builds = page.querySelectorAll('.code-cell').length;
-    var runs = page.querySelectorAll('.widget').length;
+    // Prefer the numbers baked in by tools/chapter-stats.py: counting at runtime also
+    // counts widget labels and axis ticks, which a reader doesn't read.
+    var mins = entry && entry.mins, builds = entry && entry.builds, runs = entry && entry.runs;
+    if (mins == null) {
+      var words = (page.textContent.match(/\S+/g) || []).length;
+      mins = Math.max(1, Math.round(words / 220));
+      builds = page.querySelectorAll('.code-cell').length;
+      runs = page.querySelectorAll('.widget').length;
+    }
     var bits = [mins + ' min read'];
     if (builds) bits.push(builds + (builds === 1 ? ' build step' : ' build steps'));
     if (runs) bits.push(runs + (runs === 1 ? ' experiment' : ' experiments'));
@@ -607,7 +612,7 @@
     scrim.addEventListener('click', function () { body.classList.remove('nav-open'); });
     side.addEventListener('click', function (e) { if (e.target.closest('a')) body.classList.remove('nav-open'); });
 
-    chapterMeta(page);
+    chapterMeta(page, cur);
     body.appendChild(topbar); body.appendChild(side); body.appendChild(scrim); body.appendChild(page);
 
     // Chapter footer: completion + prev/next
@@ -617,8 +622,20 @@
       main.appendChild(completionEl);
       var navRow = el('div', { class: 'chapter-nav' });
       var prev = CHAPTERS[idx - 1], next = CHAPTERS[idx + 1];
-      if (prev) navRow.appendChild(el('a', { href: prev.id + '.html', class: 'prev' }, [el('small', { text: '← Previous' }), el('span', { class: 't', text: prev.title })]));
-      if (next) navRow.appendChild(el('a', { href: next.id + '.html', class: 'next' }, [el('small', { text: 'Next →' }), el('span', { class: 't', text: next.title })]));
+      function navCard(c, dir) {
+        var meta = [c.mins ? c.mins + ' min' : null, c.builds ? c.builds + ' build' : null].filter(Boolean).join(' · ');
+        return el('a', { href: c.id + '.html', class: dir }, [
+          el('small', { text: dir === 'prev' ? '← Previous' : 'Next →' }),
+          el('span', { class: 't', text: c.title }),
+          el('span', { class: 'blurb', text: c.blurb }),
+          el('span', { class: 'foot' }, [
+            el('span', { class: 'meta', text: meta }),
+            isChapterDone(c.id) ? el('span', { class: 'ok', text: '✓ done' }) : null
+          ].filter(Boolean))
+        ]);
+      }
+      if (prev) navRow.appendChild(navCard(prev, 'prev'));
+      if (next) navRow.appendChild(navCard(next, 'next'));
       main.appendChild(navRow);
     }
 
@@ -645,7 +662,12 @@
         grid.appendChild(el('a', { class: 'card', href: 'chapters/' + c.id + '.html' }, [
           el('span', { class: 'done', 'data-done-for': c.id }),
           el('div', { class: 'n', text: c.n.match(/^\d/) ? 'CHAPTER ' + c.n : 'APPENDIX ' + c.n }),
-          el('h3', { text: c.title }), el('p', { text: c.blurb })
+          el('h3', { text: c.title }), el('p', { text: c.blurb }),
+          el('div', { class: 'cmeta', text: [
+            c.mins ? c.mins + ' min' : null,
+            c.builds ? c.builds + (c.builds === 1 ? ' build step' : ' build steps') : null,
+            c.runs ? c.runs + (c.runs === 1 ? ' experiment' : ' experiments') : null
+          ].filter(Boolean).join(' · ') })
         ]));
       });
       refreshCompletion();

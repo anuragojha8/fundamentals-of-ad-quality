@@ -12,6 +12,13 @@ python3 tools/serve.py
 
 Then open http://localhost:8765. `tools/serve.py` disables caching so edits always show up. Opening the files directly (`file://`) mostly works, but code-cell tests then run on the page instead of in a sandboxed Web Worker.
 
+## Chapter numbers
+
+`tools/chapter-stats.py --write` measures every chapter (minutes to read, build steps,
+experiments) and writes the numbers into the `CHAPTERS` table in `assets/book.js`. The
+table of contents, the landing cards and the previous/next cards read them from there,
+since a page can only count its own words. Re-run it after adding or cutting prose.
+
 ## Deploying
 
 `tools/build.sh` copies the book into `dist/` and minifies the CSS and JS with esbuild
