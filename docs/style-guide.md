@@ -152,6 +152,10 @@ font sizes to compensate** — that is what made the previous pass look like a s
 because the inflated type then rendered at 30px on desktop. Re-lay-out into the narrow
 viewBox instead, and re-render on the breakpoint change.
 
+A diagram that does *not* get the full measure — `latency`, which draws in a
+`.w-grid.side` column — passes its host to `geom()` and is laid out at that width
+instead. The two constants above are for the full measure only.
+
 ### Geometry
 
 | Thing | Value |
@@ -190,10 +194,25 @@ stages. A diagram that needs a paragraph of explanation inside it is a table.
 
 Charts come from `Book.chart(container, opts)`.
 
-- **Pass `w` equal to the chart's real rendered width** — `VW` for a full-width chart,
-  ~`360` for one in a `.w-grid.two` column. Leave `h` between 180 and 260; taller charts
-  break the page rhythm.
+- **A chart's viewBox width is the width it really renders at.** `Book.chart` measures
+  its own container and sizes the viewBox to match, so one SVG unit is one CSS pixel and
+  tick text lands at its stated 11.5px. `w` is only the **fallback** for a container that
+  cannot be measured — one still detached, or inside a `display:none` panel. Pass the
+  container's desktop width: `746` for a full-width chart in a widget, `478` for a
+  `.w-grid.side` right column, `364` for a `.w-grid.two` column.
+- **A chart that starts life hidden should be built on first draw**, not up front. There
+  is no width to measure inside `display:none`, and the fallback is only right on a
+  desktop. Chapters 4 and 15 show the pattern.
+- Leave `h` between 180 and 260; taller charts break the page rhythm. `h` does **not**
+  scale with width — a chart is the same height on a phone as on a desktop, and gets
+  proportionally taller as it narrows.
+- Charts redraw themselves when their width changes, by replaying their drawing calls.
+  Anything drawn straight into `c.top` or `c.g` is not replayed and will be lost — go
+  through the api (`c.line`, `c.text`, …) instead.
 - Default margins are tuned for 11.5px tick text. Only widen `margin.l` for long y labels.
+  `margin` may be a **function of the measured width** when a chart needs more room once
+  its labels stop shrinking with the container — chapter 1's category chart uses this to
+  turn twelve names sideways below ~420px.
 - Gridlines `--grid`; axis line and ticks `--ink-3`; tick text 11.5px, axis titles
   (`.lbl`) 12px `--ink-2`.
 - Series use `--s1`…`--s6` in order. A single-series chart uses `--s1`.
