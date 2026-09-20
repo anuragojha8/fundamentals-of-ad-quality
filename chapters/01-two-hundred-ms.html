@@ -294,12 +294,26 @@
   (function () {
     var host = document.getElementById('w-prior');
     var w = Stack.world(), pr = Stack.prior();
-    var c = Book.chart(host, { w: 640, h: 220, x: [-0.5, 11.5], y: [0, Math.max.apply(null, pr.catCTR) * 1.15], xticks: [], yfmt: function (v) { return (v * 100).toFixed(1) + '%'; }, ylabel: 'Top-slot CTR', margin: { b: 44 } });
-    pr.catCTR.forEach(function (v, i) {
-      c.rect(i - 0.35, 0, i + 0.35, v, { fill: StackUI.CAT_COLORS[i] });
-      Book.sv('text', { x: c.sx(i), y: c.H - 30, 'text-anchor': 'middle', text: w.categories[i].name, style: 'font-size:10.5px' }, c.top);
-      c.text(i, v, (v * 100).toFixed(1) + '%', { anchor: 'middle', dy: -5, size: 10.5 });
-    });
+    var chartHost = el('div'); host.appendChild(chartHost);
+    /* Twelve category names no longer shrink with the chart, so on a phone they turn
+       sideways and the per-bar percentages drop out — the axis still carries them. */
+    function draw() {
+      chartHost.replaceChildren();
+      var c = Book.chart(chartHost, {
+        w: 746, h: 220, x: [-0.5, 11.5], y: [0, Math.max.apply(null, pr.catCTR) * 1.15], xticks: [],
+        yfmt: function (v) { return (v * 100).toFixed(1) + '%'; }, ylabel: 'Top-slot CTR',
+        margin: function (W) { return { b: W < 420 ? 74 : 44 }; }
+      });
+      var slot = (c.W - c.m.l - c.m.r) / 12, sideways = slot < 46;
+      pr.catCTR.forEach(function (v, i) {
+        c.rect(i - 0.35, 0, i + 0.35, v, { fill: StackUI.CAT_COLORS[i] });
+        c.text(i, 0, w.categories[i].name, sideways
+          ? { anchor: 'end', dx: 4, dy: 16, size: 10.5, rotate: -90, color: 'var(--ink-3)' }
+          : { anchor: 'middle', dy: 14, size: 10.5, color: 'var(--ink-3)' });
+        if (slot > 30) c.text(i, v, (v * 100).toFixed(1) + '%', { anchor: 'middle', dy: -5, size: 10.5 });
+      });
+    }
+    draw(); Book.onResize(draw);
     host.appendChild(el('p', { class: 'small muted', style: 'margin-top:6px', text: 'Overall: ' + Book.pct(pr.globalCTR, 2) + '. Notice how much categories differ. Gaming and Food ads get clicked far more than Finance.' }));
   })();
 

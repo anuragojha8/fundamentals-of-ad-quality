@@ -205,7 +205,7 @@
       out.innerHTML = '';
       var rate = function (x) { return x[1] ? x[0] / x[1] : 0; };
       var ys = naive.concat(corr, mat).map(rate);
-      var c = Book.chart(out, { w: 640, h: 250, x: [-0.5, 9.5], y: [0, Math.max.apply(null, ys) * 1.2], xticks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], xlabel: 'Day of click', ylabel: 'Post-click CVR', yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+      var c = Book.chart(out, { w: 746, h: 250, x: [-0.5, 9.5], y: [0, Math.max.apply(null, ys) * 1.2], xticks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], xlabel: 'Day of click', ylabel: 'Post-click CVR', yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
       c.line(mat.map(function (x, i) { return [i, rate(x)]; }), { color: 'var(--ink-3)', dash: '5 4' });
       c.line(naive.map(function (x, i) { return [i, rate(x)]; }), { color: 'var(--s2)' });
       c.line(corr.map(function (x, i) { return [i, rate(x)]; }), { color: 'var(--s1)' });

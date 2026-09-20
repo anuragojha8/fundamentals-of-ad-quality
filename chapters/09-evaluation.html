@@ -217,7 +217,7 @@
       var bins = Stack.reliability(lrP, t, 10), binsH = Stack.reliability(heurP, t, 10), mx = 0;
       bins.concat(binsH).forEach(function (b) { mx = Math.max(mx, b.pred, b.actual); });
       mx *= 1.1;
-      var c = Book.chart(L, { w: 420, h: 280, x: [0, mx], y: [0, mx], xlabel: 'Predicted', ylabel: 'True probability', xfmt: function (v) { return (v * 100).toFixed(0) + '%'; }, yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+      var c = Book.chart(L, { w: 364, h: 280, x: [0, mx], y: [0, mx], xlabel: 'Predicted', ylabel: 'True probability', xfmt: function (v) { return (v * 100).toFixed(0) + '%'; }, yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
       c.line([[0, 0], [mx, mx]], { color: 'var(--ink-3)', dash: '4 4', width: 1.2 });
       c.line(binsH.map(function (b) { return [b.pred, b.actual]; }), { color: 'var(--s2)' });
       c.line(bins.map(function (b) { return [b.pred, b.actual]; }), { color: 'var(--s1)' });

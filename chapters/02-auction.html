@@ -214,7 +214,7 @@
     }
     var ctl = Book.controls(L, [{ key: 'v', label: 'Your value per click', min: 0.8, max: 3, step: 0.05, value: 2, fmt: function (v) { return '$' + v.toFixed(2); } }], draw);
     var st = Book.stats(L, [{ key: 'sp', label: 'Best bid · 2nd price' }, { key: 'fp', label: 'Best bid · 1st price' }]);
-    var c = Book.chart(R, { w: 560, h: 260, x: [0, 3.5], y: [0, 1], xlabel: 'Your bid ($ per click)', ylabel: 'Expected surplus', xfmt: function (v) { return '$' + v; }, yfmt: function (v) { return '$' + v.toFixed(2); } });
+    var c = Book.chart(R, { w: 478, h: 260, x: [0, 3.5], y: [0, 1], xlabel: 'Your bid ($ per click)', ylabel: 'Expected surplus', xfmt: function (v) { return '$' + v; }, yfmt: function (v) { return '$' + v.toFixed(2); } });
     Book.legend(R, [{ label: 'Second price (pay the runner-up\'s bid)', color: 'var(--s1)' }, { label: 'First price (pay your own bid)', color: 'var(--s2)' }, { label: 'Your value', color: 'var(--ink-3)', dash: true }]);
     function surplus(b, v, rule) {
       var s = 0;
@@ -293,7 +293,7 @@
     var host = document.getElementById('w-reserve');
     var btnHost = el('div'); host.appendChild(btnHost);
     var chartHost = el('div'); host.appendChild(chartHost);
-    var c = Book.chart(chartHost, { w: 640, h: 260, x: [0, 45], y: [0, 1.05], xlabel: 'Reserve price ($ eCPM)', ylabel: 'Relative to no reserve', xfmt: function (v) { return '$' + v; }, yfmt: function (v) { return Math.round(v * 100) + '%'; } });
+    var c = Book.chart(chartHost, { w: 746, h: 260, x: [0, 45], y: [0, 1.05], xlabel: 'Reserve price ($ eCPM)', ylabel: 'Relative to no reserve', xfmt: function (v) { return '$' + v; }, yfmt: function (v) { return Math.round(v * 100) + '%'; } });
     Book.legend(chartHost, [{ label: 'Revenue', color: 'var(--s1)' }, { label: 'Fill rate', color: 'var(--s2)' }, { label: 'Advertiser conversions', color: 'var(--s3)' }]);
     var pick = el('div', { style: 'margin-top:10px;display:none' }); host.appendChild(pick);
     var reserves = [0, 3, 6, 10, 15, 20, 30, 45], results = null, market = 'thick';

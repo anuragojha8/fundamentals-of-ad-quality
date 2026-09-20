@@ -264,7 +264,7 @@
     var top = new Set(ttRetriever(m)(uv, elig, 30));
     var xs = pts.map(function (p) { return p[0]; }).concat([up[0]]), ys = pts.map(function (p) { return p[1]; }).concat([up[1]]);
     var pad = function (a) { var lo = Math.min.apply(null, a), hi = Math.max.apply(null, a), s = (hi - lo) * 0.08 || 1; return [lo - s, hi + s]; };
-    var c = Book.chart(spaceOut, { w: 640, h: 380, x: pad(xs), y: pad(ys), xticks: [], yticks: [], margin: { l: 16, b: 16 } });
+    var c = Book.chart(spaceOut, { w: 746, h: 380, x: pad(xs), y: pad(ys), xticks: [], yticks: [], margin: { l: 16, b: 16 } });
     pts.forEach(function (p, i) { var a = elig[i]; c.dots([[p[0], p[1], top.has(a) ? 6 : 4, StackUI.CAT_COLORS[w.ads[a].category]]], { stroke: top.has(a) ? 'var(--ink)' : 'none', opacity: top.has(a) ? 1 : 0.55 }); });
     c.text(up[0], up[1], '★', { anchor: 'middle', dy: 6, size: 22, color: 'var(--ink)' });
     var lg = el('div', { class: 'legend' });

@@ -275,7 +275,7 @@
         dark: { v: dark + ' of ' + list.length, d: 'every cell under k', tone: dark ? 'bad' : '' }
       });
       var c = Book.chart(out, {
-        w: 640, h: 260, x: [0, Math.max.apply(null, list.map(function (x) { return x.real; })) * 1.1 + 1], y: [0, Math.max.apply(null, list.map(function (x) { return Math.max(x.real, x.published); })) * 1.1 + 1],
+        w: 746, h: 260, x: [0, Math.max.apply(null, list.map(function (x) { return x.real; })) * 1.1 + 1], y: [0, Math.max.apply(null, list.map(function (x) { return Math.max(x.real, x.published); })) * 1.1 + 1],
         xlabel: 'Conversions that actually happened (10 days)', ylabel: 'Conversions reported'
       });
       c.line([[0, 0], [1e5, 1e5]], { color: 'var(--ink-3)', dash: '5 4' });

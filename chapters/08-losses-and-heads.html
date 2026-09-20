@@ -185,8 +185,8 @@
     Book.seg(top, [{ label: 'The user clicked (y = 1)', value: 1 }, { label: 'The user didn\'t (y = 0)', value: 0 }], 1, function (v) { y = v; draw(); });
     host.appendChild(top);
     var g = el('div', { class: 'w-grid two' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); host.appendChild(g);
-    var c1 = Book.chart(L, { w: 420, h: 250, x: [0, 1], y: [0, 5], xlabel: 'Predicted probability p', ylabel: 'Loss', xfmt: function (v) { return Math.round(v * 100) + '%'; } });
-    var c2 = Book.chart(R, { w: 420, h: 250, x: [0, 1], y: [0, 1.05], xlabel: 'Predicted probability p', ylabel: '|∂loss / ∂z|', xfmt: function (v) { return Math.round(v * 100) + '%'; } });
+    var c1 = Book.chart(L, { w: 364, h: 250, x: [0, 1], y: [0, 5], xlabel: 'Predicted probability p', ylabel: 'Loss', xfmt: function (v) { return Math.round(v * 100) + '%'; } });
+    var c2 = Book.chart(R, { w: 364, h: 250, x: [0, 1], y: [0, 1.05], xlabel: 'Predicted probability p', ylabel: '|∂loss / ∂z|', xfmt: function (v) { return Math.round(v * 100) + '%'; } });
     Book.legend(host, [{ label: 'Log loss', color: 'var(--s1)' }, { label: 'MSE', color: 'var(--s2)' }, { label: 'Poisson (λ = p)', color: 'var(--s3)', dash: true }]);
     function draw() {
       var ll = [], ms = [], po = [], gl = [], gm = [], gp = [];

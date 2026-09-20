@@ -8,9 +8,13 @@
 
   /* ---------- responsive geometry ---------- */
   var narrowMQ = matchMedia('(max-width: 600px)'), redraws = [];
-  function geom() {
-    var n = narrowMQ.matches;
-    return { W: n ? 400 : 760, pad: n ? 12 : 24, gut: n ? 28 : 48, narrow: n };
+  /* `host` is for a diagram that does not get the full measure — pass it and the layout
+     uses the width the picture really renders at instead of the full-width constant,
+     which is the same rule the charts follow (style guide section 6). */
+  function geom(host) {
+    var n = narrowMQ.matches, W = n ? 400 : 760;
+    if (host) { var hw = Math.round(host.getBoundingClientRect().width); if (hw > 40) W = hw; }
+    return { W: W, pad: n ? 12 : 24, gut: n ? 28 : 48, narrow: n };
   }
   function onResize(fn) { redraws.push(fn); }
   narrowMQ.addEventListener('change', function () {
@@ -37,9 +41,9 @@
   function chars(width, px) { return Math.max(8, Math.floor((width - 36) / (px * 0.52))); }
 
   /* ---------- primitives ---------- */
-  function svg(host, height, label) {
+  function svg(host, height, label, width) {
     var g = geom();
-    var s = S('svg', { viewBox: '0 0 ' + g.W + ' ' + height, role: 'img', 'aria-label': label, class: 'aq-svg' }, host);
+    var s = S('svg', { viewBox: '0 0 ' + (width || g.W) + ' ' + height, role: 'img', 'aria-label': label, class: 'aq-svg' }, host);
     var id = 'aq-arrow-' + (++serial), d = S('defs', {}, s);
     var m = S('marker', { id: id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, d);
     S('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: 'var(--ink-3)' }, m);
@@ -423,7 +427,7 @@
     var f = E('figure', { class: 'diagram aq-diagram aq-latency' });
     host.appendChild(f);
     f.appendChild(E('figcaption', { text: 'The chapter’s full request has a 200 ms reference budget. This widget models selection with a 100 ms timeout budget. Colored segments below use this widget’s actual stage costs; the budget lines are references, not extra work.' }));
-    var g = geom(), max = Math.max(220, lat * 1.1);
+    var g = geom(f), max = Math.max(220, lat * 1.1);
     var c = Book.chart(f, {
       w: g.W, h: 190, x: [0, max], y: [0, 1], xticks: [0, 100, 200], yticks: [],
       xlabel: 'Milliseconds · current selection path',
@@ -435,7 +439,7 @@
     c.vline(100, { color: 'var(--accent)' }); c.vline(200, { color: 'var(--ink-3)' });
     c.text(100, .92, '100', { anchor: 'middle', size: 11.5 });
     c.text(200, .92, '200', { anchor: 'middle', size: 11.5 });
-    var s = svg(f, 16 + segs.length * 20 + 8, 'Current latency in milliseconds for fixed overhead, retrieval, early ranking and late ranking.');
+    var s = svg(f, 16 + segs.length * 20 + 8, 'Current latency in milliseconds for fixed overhead, retrieval, early ranking and late ranking.', g.W);
     segs.forEach(function (r, i) {
       S('rect', { x: g.pad, y: 8 + i * 20, width: 9, height: 9, rx: 2, fill: r[2] }, s);
       txt(s, g.pad + 18, 16 + i * 20, r[0] + ': ' + r[1].toFixed(1) + ' ms', 't-sm');
