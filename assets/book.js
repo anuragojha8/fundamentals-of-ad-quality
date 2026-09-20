@@ -316,19 +316,27 @@
      stale. Widgets register their redraw here; `diagrams.js` keeps its own list for the
      same reason. Height changes (a chart redrawing, an accordion opening) must not fire
      this, so it watches the viewport width and ignores small jitter. */
-  var redraws = [], lastW = window.innerWidth, resizeT = null;
+  var redraws = [], lastW = document.documentElement.clientWidth, resizeT = null;
   // A handler that returns false has nothing left to draw (its container is gone) and
   // is dropped, so replaced widgets do not pile up.
   function onResize(fn) { redraws.push(fn); }
-  window.addEventListener('resize', function () {
+  function runRedraws() {
     clearTimeout(resizeT);
     resizeT = setTimeout(function () {
-      if (Math.abs(window.innerWidth - lastW) < 8) return;
-      lastW = window.innerWidth;
+      var w = document.documentElement.clientWidth;
+      if (Math.abs(w - lastW) < 8) return;
+      lastW = w;
       // One widget failing to redraw must not stop the rest of the page.
       redraws = redraws.filter(function (fn) { try { return fn() !== false; } catch (e) { return true; } });
     }, 160);
-  });
+  }
+  /* Both triggers, because neither is reliable alone: `resize` can arrive before the new
+     layout, and a ResizeObserver is not delivered while the page is not being rendered.
+     Either way the work is debounced and every handler re-measures, so an extra call
+     costs nothing. Only width changes get through, so a chart growing taller cannot
+     start a loop. */
+  if (window.ResizeObserver) new ResizeObserver(runRedraws).observe(document.documentElement);
+  window.addEventListener('resize', runRedraws);
 
   function niceTicks(a, b, n) {
     var span = b - a; if (span <= 0) return [a];
