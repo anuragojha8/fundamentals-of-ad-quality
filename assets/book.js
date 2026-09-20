@@ -317,6 +317,22 @@
   }
 
   /* ---------- chart ---------- */
+  /* Charts are drawn at the container's measured width, so a width change makes them
+     stale. Widgets register their redraw here; `diagrams.js` keeps its own list for the
+     same reason. Height changes (a chart redrawing, an accordion opening) must not fire
+     this, so it watches the viewport width and ignores small jitter. */
+  var redraws = [], lastW = window.innerWidth, resizeT = null;
+  function onResize(fn) { redraws.push(fn); }
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeT);
+    resizeT = setTimeout(function () {
+      if (Math.abs(window.innerWidth - lastW) < 8) return;
+      lastW = window.innerWidth;
+      // One widget failing to redraw must not stop the rest of the page.
+      redraws.forEach(function (fn) { try { fn(); } catch (e) { /* ignore */ } });
+    }, 160);
+  });
+
   function niceTicks(a, b, n) {
     var span = b - a; if (span <= 0) return [a];
     var step = Math.pow(10, Math.floor(Math.log10(span / n)));
@@ -326,12 +342,25 @@
     for (var x = s; x <= b + step * 1e-6; x += step) t.push(Math.round(x / step) * step);
     return t;
   }
+  /* Style guide §6: one SVG user unit is one CSS pixel, so the viewBox width has to be
+     the width the chart really renders at — otherwise `.chart text` at 11.5px comes out
+     at 11.5 × (rendered width / W). The holder is a plain block child, so measuring it
+     once it is in the document gives that width for any container and any viewport.
+     `w` is only the fallback for a container that is not laid out yet (display:none, or
+     still detached); call sites pass the desktop width of their container for that case. */
+  function chartWidth(holder, fallback) {
+    var w = Math.round(holder.getBoundingClientRect().width);
+    return w > 40 ? w : (fallback || 640);
+  }
   function chart(container, o) {
     o = o || {};
-    var W = o.w || 640, H = o.h || 300;
-    var m = Object.assign({ t: 14, r: 16, b: o.xlabel ? 44 : 28, l: o.ylabel ? 58 : 44 }, o.margin || {});
     var holder = el('div', { class: 'chart' });
     container.appendChild(holder);
+    var W = chartWidth(holder, o.w), H = o.h || 300;
+    /* Tick text no longer shrinks with the container, so a narrow chart needs fewer of
+       them or the x labels collide. */
+    var nx = o.nx || (W < 420 ? 4 : 6), ny = o.ny || (W < 420 ? 4 : 5);
+    var m = Object.assign({ t: 14, r: 16, b: o.xlabel ? 44 : 28, l: o.ylabel ? 58 : 44 }, o.margin || {});
     var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': o.label || 'chart' }, holder);
     var gAxes = sv('g', null, svg), gData = sv('g', null, svg), gTop = sv('g', null, svg);
     var X = o.x || [0, 1], Y = o.y || [0, 1];
@@ -347,12 +376,12 @@
       while (gAxes.firstChild) gAxes.removeChild(gAxes.firstChild);
       var xf = o.xfmt || function (v) { return +v.toFixed(6) + ''; };
       var yf = o.yfmt || function (v) { return +v.toFixed(6) + ''; };
-      var yt = o.yticks || niceTicks(Y[0], Y[1], o.ny || 5);
+      var yt = o.yticks || niceTicks(Y[0], Y[1], ny);
       yt.forEach(function (t) {
         sv('line', { x1: m.l, x2: W - m.r, y1: sy(t), y2: sy(t), class: 'gridline' }, gAxes);
         sv('text', { x: m.l - 6, y: sy(t) + 4, 'text-anchor': 'end', text: yf(t) }, gAxes);
       });
-      var xt = o.xticks || (xlog ? (function () { var r = []; for (var p = Math.ceil(Math.log10(X[0])); p <= Math.log10(X[1]); p++) r.push(Math.pow(10, p)); return r; })() : niceTicks(X[0], X[1], o.nx || 6));
+      var xt = o.xticks || (xlog ? (function () { var r = []; for (var p = Math.ceil(Math.log10(X[0])); p <= Math.log10(X[1]); p++) r.push(Math.pow(10, p)); return r; })() : niceTicks(X[0], X[1], nx));
       xt.forEach(function (t) {
         sv('line', { x1: sx(t), x2: sx(t), y1: H - m.b, y2: H - m.b + 4, stroke: 'var(--ink-3)' }, gAxes);
         sv('text', { x: sx(t), y: H - m.b + 16, 'text-anchor': 'middle', text: xf(t) }, gAxes);
@@ -682,7 +711,7 @@
     CHAPTERS: CHAPTERS, el: el, sv: sv, rng: rng, sigmoid: sigmoid, logit: logit, clamp: clamp,
     logloss: logloss, entropy: entropy, auc: auc, mean: mean, sum: sum,
     fmt: fmt, pct: pct, money: money, signed: signed,
-    controls: controls, seg: seg, stats: stats, chart: chart, legend: legend,
+    controls: controls, seg: seg, stats: stats, chart: chart, legend: legend, onResize: onResize,
     tex: tex, renderMath: renderMath,
     // Let other modules (code cells) register graded checks for chapter completion.
     requireCheck: function (id) { if (requiredIds.indexOf(id) < 0) requiredIds.push(id); refreshCompletion(); },
