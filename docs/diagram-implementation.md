@@ -65,7 +65,7 @@ Replaced the original static funnel illustration in §1.1 with `#w-request-funne
 
 Chapter 18, [When the Model Remembers](../chapters/18-when-the-model-remembers.html), adds four reader-controlled SVG explainers in `assets/extra-credit.js`:
 
-1. Long-term versus live preference signals. Three new camping actions update a toy recent score by `recent ← ½ recent + ½ new action`; the combined score uses 40% long-term and 60% recent. The arithmetic is illustrative, not learned from Pebble.
+1. Long-term versus live preference signals. An older race-plan → shoes → route sequence is summarized separately from the live campsite view. Three more camping actions (save a campsite, compare tents, open a packing list) update a toy recent score by `recent ← ½ recent + ½ new action`; the combined score uses 40% long-term and 60% recent. The arithmetic is illustrative, not learned from Pebble.
 2. Two-tower nearest-neighbor retrieval beside semantic-ID decoding. Both produce candidate ad IDs, and the learned ID tokens are not generated ad copy.
 3. Six candidate IDs through catalog, targeting, and budget/policy checks. Candidate identity remains visible as ineligible ads drop out. This is a fixed example, not the production filtering order.
 4. A hypothetical event, live-feature, ad-index and model-weight timeline. The separate clocks make it clear that fresh serving features do not require freshly trained weights.

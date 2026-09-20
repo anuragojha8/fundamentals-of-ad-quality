@@ -23,18 +23,24 @@
 
 <p class="lead">Okay, Pebble knows you love running. Months of shoe reviews, race routes, and training plans. Then this morning you start looking at campsites. Do we show you another pair of trainers, or the lantern you suddenly seem to need?</p>
 
-<p>A static user embedding can remember the runner. A sequence of recent actions can notice the camping trip. Neither clue is the whole person. Let's see how a system might combine them, then follow the candidate ads all the way to the auction. These four diagrams are <strong>illustrative mechanisms</strong>, not a new model trained on your Pebble logs. Pebble's actual history is only twelve items long, and its small ad catalog is searched exactly. It cannot honestly demonstrate the gains or serving costs of industrial sequence models.</p>
+<p>That one request contains two stories. Pebble's older history says this person keeps coming back to running; the actions arriving this morning say they may be planning a trip. We want the second story to reach the next ad request quickly without deciding that a single morning has erased the first. Here <em>long-term</em> means older user behavior, a different question from the long-term user outcomes in Chapter 15.</p>
+
+<p>We'll follow those histories through candidate generation and into the auction. The four diagrams are <strong>illustrative mechanisms</strong>, not a new model trained on your Pebble logs. Pebble's actual history is only twelve items long, and its small ad catalog is searched exactly. It cannot honestly demonstrate the gains or serving costs of industrial sequence models.</p>
 
 <h2 id="two-horizons"><span class="sec">18.1</span>Two time horizons, one person</h2>
 
-<p>Suppose the long-term representation says “80% running, 20% camping.” That is a toy preference score, not an observed probability. The live sequence begins at 60% running, 40% camping. Each new camping action moves the live score halfway toward camping. We blend 40% long-term and 60% live. Press Play and watch when the recommendation changes.</p>
+<p>A <dfn>behavior sequence</dfn> is an ordered list of actions with their times attached. Imagine this user's older history: a race plan saved in April, trail shoes viewed in June, running routes revisited in August. That's different from opening three shoe posts during one bored afternoon, even if a simple category count calls both histories “three running actions.” You could collapse the older actions into one slowly updated user vector, or let a larger model reach back to particular events when it scores an ad. The second option can preserve more detail, but reading thousands of events on every request costs time. Our first diagram uses the compressed version so you can see the two time horizons separately.</p>
+
+<p>Now look at the live session. At 9:02 the user opens a campsite page; at 9:04 they save a campsite; at 9:06 they compare tents. A user vector built overnight knows about the running but misses this morning entirely. If the new actions reach serving before the next request, a sequence model can read them in order and give the tent search more weight. Order can matter: <em>shoes → campsite</em> and <em>campsite → shoes</em> contain the same two categories, but may point to different immediate interests. Neither sequence proves the user wants to buy anything.</p>
+
+<p>Let's put numbers on that tension. Our long-term summary says “80% running, 20% camping,” while the live score starts at “60% running, 40% camping” after the first campsite view. These are toy preference scores, <em>not</em> observed click probabilities. Each additional camping action moves the live score halfway toward camping; the combined score gives 40% weight to the older summary and 60% to the live one. Press Play to add the campsite save, tent comparison, and packing-list view. Watch when camping pulls ahead without deleting the running history.</p>
 
 <div class="widget aq-diagram ec-widget" id="w-ec-history">
   <div class="w-title">A sudden camping trip</div>
   <div class="w-sub">Illustrative scores: recent ← ½ recent + ½ new action; combined = 40% long-term + 60% recent. Blue is running; orange is camping. No model is being trained here.</div>
 </div>
 
-<p>The important trick is not that particular blend. It is the separation of <em>memory</em> from <em>reaction</em>. You can update a recent-action feature as soon as an event arrives while keeping older interests in a slower representation. A ranking model can then learn how much each matters for a particular candidate. Pinterest described such a combination of recent actions and batch-built user embeddings in <a href="https://arxiv.org/abs/2306.00248">TransAct</a>; its later <a href="https://arxiv.org/abs/2506.02267">TransAct V2</a> explores much longer histories. These are recommendation examples, not claims that Pebble uses their architecture.</p>
+<p>The 40/60 blend is something I picked to make the crossing point visible; a real model would learn how to use these signals for a particular candidate. A running-shoe ad may still benefit from the months of older actions, while a tent ad may depend more on what happened ten minutes ago. You can update the recent-action input as events arrive while keeping the older representation on a slower schedule. Pinterest described a combination of recent actions and batch-built user embeddings in <a href="https://arxiv.org/abs/2306.00248">TransAct</a>; its later <a href="https://arxiv.org/abs/2506.02267">TransAct V2</a> explores much longer action sequences. These are recommendation examples, not claims that Pebble uses their architecture.</p>
 
 <div class="callout trap"><div class="label">Common trap</div>
 <p>“More history” is not automatically better. A long sequence can be expensive to read, noisy, and full of things you stopped caring about. Ask which events count, how old they can be, how the sequence is compressed, and whether the improvement survives a latency and cost budget.</p></div>
@@ -63,14 +69,16 @@
 
 <h2 id="four-clocks"><span class="sec">18.4</span>“Real time” has four clocks</h2>
 
-<p>One last wrinkle. A fresh user action, an updated user feature, a new ad in the retrieval index, and new model weights are different events. A system can react to your campsite search without retraining its weights. It can also have fresh weights and a stale ad index. Press Play to follow a deliberately simple launch day.</p>
+<p>What does “real time” mean in that live session? Suppose another campsite action happens at 10:02, right as an advertiser launches a lantern ad. Recording the action, making it available to the model at serving time, adding the lantern to the retrieval index, and updating model weights are four separate steps. Press Play to follow one hypothetical schedule for them.</p>
 
 <div class="widget aq-diagram ec-widget" id="w-ec-freshness">
   <div class="w-title">What is fresh, and when?</div>
   <div class="w-sub">Hypothetical clock times to separate four mechanisms. Your actual system might use very different cadences.</div>
 </div>
 
-<p>If the latest action is missing, inspect event delivery and online features. If a new ad never appears, inspect indexing and eligibility. If the model keeps preferring yesterday's pattern after seeing fresh features, inspect its training data and weights. “The model is stale” is a tempting diagnosis. It is also a fairly efficient way to page the wrong team.</p>
+<p>By 10:02:02 in this example, the next request can include the campsite action even though the model's weights are still yesterday's. The input changed, so its prediction <em>can</em> change; it depends on whether training taught the model to use recent actions. The new lantern has a separate problem: until the ad index refreshes, retrieval cannot propose it at all. When weights eventually update, they incorporate newly available training examples rather than somehow making earlier requests retroactively fresh.</p>
+
+<p>That gives you a more useful debugging path. If the latest action is missing, inspect event delivery and online features. If the new ad never appears, inspect indexing and eligibility. If the model sees the new action but keeps preferring yesterday's pattern, look at what its training taught it and when those weights were last updated. “The model is stale” is a tempting diagnosis. It is also a fairly efficient way to page the wrong team.</p>
 
 <div class="callout pm"><div class="label">In your job</div>
 <p>For a proposal to ship a long-sequence or generative retriever, ask for the baseline, eligible recall at a fixed candidate count, serving latency and cost, slice results for new ads and changing interests, and an online experiment. Keep the auction, calibration, budget delivery, and user-quality metrics in view. A better candidate generator does not get a free pass through the rest of the stack.</p></div>

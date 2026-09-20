@@ -81,7 +81,7 @@
     var host = document.getElementById('w-ec-history'), holder = E('div', { class: 'ec-drawing' });
     host.appendChild(holder);
     var view, control = player(host, 3, function (n) {
-      if (!view) return 'Before the new actions: the blended toy score still favors running.';
+      if (!view) return 'After one campsite view, the blended toy score still favors running.';
       var recentCamp = 1 - 0.6 * Math.pow(0.5, n), blendedCamp = 0.4 * 0.2 + 0.6 * recentCamp;
       var camps = [0.2, recentCamp, blendedCamp];
       view.bars.forEach(function (bar, i) {
@@ -92,17 +92,18 @@
         bar.num.textContent = Math.round(100 * (1 - camps[i])) + '% running  ·  ' + Math.round(100 * camps[i]) + '% camping';
       });
       view.dots.forEach(function (dot, i) { dot.setAttribute('class', i < n ? 'ec-event ec-on' : 'ec-event'); });
-      view.count.textContent = n + ' new camping ' + (n === 1 ? 'action' : 'actions');
-      return n === 0 ? 'The live signal leans slightly toward running; the combined score favors running too.'
-        : n === 1 ? 'One camping action brings the combined scores level: 50% each. An action can move a live feature without new model weights.'
-        : 'After ' + n + ' camping actions, the combined score favors camping (' + Math.round(100 * blendedCamp) + '%). The older running interest has not disappeared.';
+      view.count.textContent = n ? n + ' more camping ' + (n === 1 ? 'action' : 'actions') : 'Campsite view already seen';
+      return n === 0 ? 'After the campsite view, the live score is 40% camping, but the combined score still favors running (68%).'
+        : n === 1 ? 'Saving a campsite brings the combined scores level: 50% each. The live input changed; the model weights did not.'
+        : n === 2 ? 'Comparing tents brings the combined camping score to 59%. The older running interest remains in the blend.'
+        : 'Opening a packing list brings the combined camping score to ' + Math.round(100 * blendedCamp) + '%. This is still a toy score, not a predicted click rate.';
     });
     function build() {
       holder.replaceChildren();
       var d = makeSvg(holder, 320, 'Three toy preference bars compare long-term memory, recent actions, and their blended score.');
       var s = d.svg, w = d.w, x = 16, bw = w - 32, rows = [];
       label(s, x, 24, 'OLDER HISTORY', 't-sm t-b');
-      label(s, x, 46, 'Running · running · running', 't-md');
+      label(s, x, 46, 'Race plan → shoes → route', 't-md');
       label(s, x, 77, 'THIS MORNING', 't-sm t-b');
       var dots = [];
       for (var i = 0; i < 3; i++) dots.push(S('circle', { cx: x + 12 + i * 27, cy: 96, r: 8, class: 'ec-event' }, s));
