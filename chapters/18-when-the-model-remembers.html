@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>When the Model Remembers — Fundamentals of Ad Quality</title>
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/book.css">
+<link rel="stylesheet" href="../assets/diagrams.css">
+<script src="../assets/book.js"></script>
+<script defer src="../assets/extra-credit.js"></script>
+</head>
+<body data-chapter="18-when-the-model-remembers">
+<main class="chapter">
+
+<header class="chapter-head">
+  <div class="kicker">Chapter 18 · Extra Credit</div>
+  <h1>When the Model Remembers</h1>
+  <p class="dek">In which I remember your running shoes just as you start looking for a tent.</p>
+</header>
+
+<p class="lead">Okay, Pebble knows you love running. Months of shoe reviews, race routes, and training plans. Then this morning you start looking at campsites. Do we show you another pair of trainers, or the lantern you suddenly seem to need?</p>
+
+<p>A static user embedding can remember the runner. A sequence of recent actions can notice the camping trip. Neither clue is the whole person. Let's see how a system might combine them, then follow the candidate ads all the way to the auction. These four diagrams are <strong>illustrative mechanisms</strong>, not a new model trained on your Pebble logs. Pebble's actual history is only twelve items long, and its small ad catalog is searched exactly. It cannot honestly demonstrate the gains or serving costs of industrial sequence models.</p>
+
+<h2 id="two-horizons"><span class="sec">18.1</span>Two time horizons, one person</h2>
+
+<p>Suppose the long-term representation says “80% running, 20% camping.” That is a toy preference score, not an observed probability. The live sequence begins at 60% running, 40% camping. Each new camping action moves the live score halfway toward camping. We blend 40% long-term and 60% live. Press Play and watch when the recommendation changes.</p>
+
+<div class="widget aq-diagram ec-widget" id="w-ec-history">
+  <div class="w-title">A sudden camping trip</div>
+  <div class="w-sub">Illustrative scores: recent ← ½ recent + ½ new action; combined = 40% long-term + 60% recent. Blue is running; orange is camping. No model is being trained here.</div>
+</div>
+
+<p>The important trick is not that particular blend. It is the separation of <em>memory</em> from <em>reaction</em>. You can update a recent-action feature as soon as an event arrives while keeping older interests in a slower representation. A ranking model can then learn how much each matters for a particular candidate. Pinterest described such a combination of recent actions and batch-built user embeddings in <a href="https://arxiv.org/abs/2306.00248">TransAct</a>; its later <a href="https://arxiv.org/abs/2506.02267">TransAct V2</a> explores much longer histories. These are recommendation examples, not claims that Pebble uses their architecture.</p>
+
+<div class="callout trap"><div class="label">Common trap</div>
+<p>“More history” is not automatically better. A long sequence can be expensive to read, noisy, and full of things you stopped caring about. Ask which events count, how old they can be, how the sequence is compressed, and whether the improvement survives a latency and cost budget.</p></div>
+
+<h2 id="two-ways"><span class="sec">18.2</span>Two ways to propose a candidate</h2>
+
+<p>Chapter 10's two-tower retriever puts a user vector near ad vectors and searches an index for neighbors. Another approach predicts an item's identifier, token by token, from the action sequence. In <a href="https://arxiv.org/abs/2305.05065">TIGER</a>, those identifiers are learned semantic codes: generating <code>(4, 2, 7)</code> means looking up an item with that code. It does <em>not</em> mean writing a new ad or generating prose.</p>
+
+<div class="widget aq-diagram ec-widget" id="w-ec-retrieval">
+  <div class="w-title">The same request, two candidate sources</div>
+  <div class="w-sub">Step through a conceptual two-tower path and a semantic-ID decoding path. Their outputs are candidate IDs, not auction winners.</div>
+</div>
+
+<p>Why consider the second path? Sequential decoding can use the order of actions when proposing candidates, while nearest-neighbor search depends on what its embeddings and index represent. Whether that helps in ads is an empirical question. Compare recall against an appropriate reference, coverage of new ads, candidate diversity, latency, and compute cost on the same traffic. A hybrid may beat either source alone; it also costs more to serve.</p>
+
+<h2 id="eligible"><span class="sec">18.3</span>A generated ID is still just a suggestion</h2>
+
+<p>Here is where an ads system gets less romantic. An ID might refer to an ad that has been removed. A valid ad may target a different audience, have an exhausted budget, or fail a policy check. The auction can only rank candidates that make it through the gates. Watch six illustrative IDs get whittled down.</p>
+
+<div class="widget aq-diagram ec-widget" id="w-ec-eligibility">
+  <div class="w-title">Six IDs enter; two reach ranking</div>
+  <div class="w-sub">Fixed teaching example. Candidate identity stays visible across lookup, targeting and budget/policy checks. Real filtering order and rules vary by system.</div>
+</div>
+
+<p>For ads, this is a first-class serving problem, not a detail to bolt on after a retrieval paper. Recent <a href="https://arxiv.org/abs/2608.00938">research on generative ads retrieval</a> explicitly studies eligibility filtering and decoding cost. The PM question is simple: <em>how many eligible, useful ads do we get per millisecond and per dollar of serving cost?</em> Measure that before celebrating a better offline candidate score.</p>
+
+<h2 id="four-clocks"><span class="sec">18.4</span>“Real time” has four clocks</h2>
+
+<p>One last wrinkle. A fresh user action, an updated user feature, a new ad in the retrieval index, and new model weights are different events. A system can react to your campsite search without retraining its weights. It can also have fresh weights and a stale ad index. Press Play to follow a deliberately simple launch day.</p>
+
+<div class="widget aq-diagram ec-widget" id="w-ec-freshness">
+  <div class="w-title">What is fresh, and when?</div>
+  <div class="w-sub">Hypothetical clock times to separate four mechanisms. Your actual system might use very different cadences.</div>
+</div>
+
+<p>If the latest action is missing, inspect event delivery and online features. If a new ad never appears, inspect indexing and eligibility. If the model keeps preferring yesterday's pattern after seeing fresh features, inspect its training data and weights. “The model is stale” is a tempting diagnosis. It is also a fairly efficient way to page the wrong team.</p>
+
+<div class="callout pm"><div class="label">In your job</div>
+<p>For a proposal to ship a long-sequence or generative retriever, ask for the baseline, eligible recall at a fixed candidate count, serving latency and cost, slice results for new ads and changing interests, and an online experiment. Keep the auction, calibration, budget delivery, and user-quality metrics in view. A better candidate generator does not get a free pass through the rest of the stack.</p></div>
+
+<h2 id="takeaway"><span class="sec">18.5</span>What would you ship?</h2>
+
+<p>For Pebble, I would start with a small, fresh recent-action signal alongside the existing long-term features, measure where it changes candidates, and check that the extra serving work pays for itself. Generative retrieval would earn an experiment when the catalog and behavior histories are large enough for the existing retrievers to leave meaningful recall on the table. That is a roadmap hypothesis, not a result from our toy world.</p>
+
+<p>So: keep the running shoes in memory. Notice the campsite search. Then make the lantern prove it is eligible, useful, and worth the milliseconds. See ya back at the auction.</p>
+
+</main>
+</body>
+</html>

@@ -22,9 +22,9 @@ Completed 19 September 2026. Thirteen diagrams cover all Priority 1 and Priority
 
 ## Design and integration
 
-- Source: [assets/diagrams.js](../assets/diagrams.js), [assets/diagrams.css](../assets/diagrams.css), and small chapter insertion points. The diagrams are inline SVGs created in the page, not raster screenshots.
-- All SVGs have a 760-unit viewBox, descriptive accessible names, theme variables, and unique marker IDs. Existing `Book.chart` supplies axes for AUC, attribution and latency.
-- Large SVG type and predominantly vertical layouts keep labels legible on phones. Mirrored comparisons remain side by side with short labels.
+- Source: [assets/diagrams.js](../assets/diagrams.js), [assets/extra-credit.js](../assets/extra-credit.js), [assets/diagrams.css](../assets/diagrams.css), and small chapter insertion points. The diagrams are inline SVGs created in the page, not raster screenshots.
+- Generated SVG viewBoxes track their rendered width; layouts reflow on phones rather than shrinking desktop type. They use descriptive accessible names and theme variables. Existing `Book.chart` supplies axes for AUC, attribution and latency.
+- Figure labels use the book's 13.5/11.5px scale. See [style-guide.md](style-guide.md) for current geometry and motion rules.
 - Steps and samples are reader-triggered. No automatic or looping motion is introduced; reduced-motion users receive the same complete explanations.
 - No new book runtime dependency. Static diagrams initialize with the book's existing JavaScript; illustrative widgets do not write their choices into the learner's production policy.
 - A small existing navigation overflow was fixed in `assets/book.css` so the theme button remains inside the 375px viewport.
@@ -60,3 +60,14 @@ Replaced the original static funnel illustration in §1.1 with `#w-request-funne
 - A two-column mobile card layout replaces the four-column desktop layout. The stage counts, descriptive SVG label, live status and static no-JavaScript explanation preserve the mechanism without requiring motion.
 - The example is explicitly illustrative, does not read or change the learner's production state, and explains why retrieval is omitted until Chapter 10.
 - Verified no autoplay, pause stability, correct stage order and winners, replay/reset, reduced motion, 375px/1280px layouts, both themes, no horizontal overflow and no browser errors. Existing quick engine checks passed.
+
+## Extra credit: sequence and generative retrieval diagrams
+
+Chapter 18, [When the Model Remembers](../chapters/18-when-the-model-remembers.html), adds four reader-controlled SVG explainers in `assets/extra-credit.js`:
+
+1. Long-term versus live preference signals. Three new camping actions update a toy recent score by `recent ← ½ recent + ½ new action`; the combined score uses 40% long-term and 60% recent. The arithmetic is illustrative, not learned from Pebble.
+2. Two-tower nearest-neighbor retrieval beside semantic-ID decoding. Both produce candidate ad IDs, and the learned ID tokens are not generated ad copy.
+3. Six candidate IDs through catalog, targeting, and budget/policy checks. Candidate identity remains visible as ineligible ads drop out. This is a fixed example, not the production filtering order.
+4. A hypothetical event, live-feature, ad-index and model-weight timeline. The separate clocks make it clear that fresh serving features do not require freshly trained weights.
+
+All four use Play, Pause, Next stage, Reset and Replay; no motion starts on load. Reduced-motion Play jumps to the result while Next stage remains available. SVG viewBoxes use measured drawing width and the retrieval lanes stack on narrow screens. The examples do not read or modify saved learner state. Source links in the chapter point to the underlying research; the diagrams do not present toy scores as empirical results.

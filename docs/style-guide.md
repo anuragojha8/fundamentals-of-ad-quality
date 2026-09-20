@@ -274,7 +274,7 @@ Dark mode is the same layout with re-pointed tokens; there is no separate dark s
 ## Checklist before committing a visual change
 
 1. `node tests/run-tests.js --quick` passes.
-2. All 20 pages load with no console errors, and every `[id^="w-"]` element is non-empty.
+2. All 21 pages load with no console errors, and every `[id^="w-"]` element is non-empty.
 3. Light **and** dark mode.
 4. 375px wide with no horizontal scroll.
 5. No new hex colours: `grep -nE '#[0-9a-fA-F]{3,6}' assets/diagrams.css assets/diagrams.js`

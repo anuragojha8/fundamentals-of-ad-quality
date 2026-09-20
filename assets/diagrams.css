@@ -45,6 +45,25 @@ figure.aq-diagram { margin: 2em 0; padding: 0; background: none; border: 0; box-
 .aq-diagram svg a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .aq-diagram svg a:hover text { fill: var(--accent); }
 
+/* Extra-credit SVGs share the book's figure scale and semantic tones. */
+.ec-widget .ec-svg { display: block; width: 100%; height: auto; }
+.ec-widget .ec-svg .ec-center { text-anchor: middle; }
+.ec-widget .ec-svg .ec-heading { fill: var(--ink-2); }
+.ec-widget .ec-svg .ec-pending { opacity: .52; }
+.ec-widget .ec-svg .ec-connector { fill: none; stroke: var(--ink-3); stroke-width: 1.4; }
+.ec-widget .ec-svg .ec-bar-track { fill: var(--paper-2); }
+.ec-widget .ec-svg .ec-run { fill: var(--blue); }
+.ec-widget .ec-svg .ec-camp { fill: var(--accent); }
+.ec-widget .ec-svg .ec-event { fill: var(--paper-2); stroke: var(--rule); stroke-width: 1.2; }
+.ec-widget .ec-svg .ec-event.ec-on { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+.ec-widget .ec-svg .ec-excluded { opacity: .35; }
+.ec-widget .ec-svg .ec-muted { fill: var(--ink-3); text-decoration: line-through; }
+.ec-widget .ec-svg .box,
+.ec-widget .ec-svg .ec-event { transition: fill .5s cubic-bezier(.22,.68,.3,1), stroke .5s cubic-bezier(.22,.68,.3,1), opacity .5s ease; }
+.ec-widget .ec-svg .ec-run,
+.ec-widget .ec-svg .ec-camp { transition: width .55s cubic-bezier(.22,.68,.3,1), x .55s cubic-bezier(.22,.68,.3,1); }
+.ec-widget .aq-status { min-height: 4.8em; }
+
 /* Candidate identities persist as they move through the request (ch. 1). */
 #w-request-funnel .aq-candidate { transition: transform 700ms cubic-bezier(.22,.68,.3,1), opacity 550ms ease; }
 #w-request-funnel .aq-count { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
@@ -53,6 +72,10 @@ figure.aq-diagram { margin: 2em 0; padding: 0; background: none; border: 0; box-
   #w-request-funnel .aq-candidate { transition: none; }
   .aq-diagram svg a .box { transition: none; }
   .aq-stepper svg .box { transition: none; }
+  .ec-widget .ec-svg .box,
+  .ec-widget .ec-svg .ec-event,
+  .ec-widget .ec-svg .ec-run,
+  .ec-widget .ec-svg .ec-camp { transition: none; }
 }
 
 @media (max-width: 600px) {
