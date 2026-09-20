@@ -230,18 +230,24 @@ table.data tr.hl td { background: var(--accent-soft); }
 .tag.g { background: var(--green-soft); color: var(--green); } .tag.r { background: var(--red-soft); color: var(--red); } .tag.b { background: var(--blue-soft); color: var(--blue); } .tag.a { background: var(--accent-soft); color: var(--accent); }
 
 /* ---------- Diagrams ---------- */
+/* One SVG user unit = one CSS pixel; figure type is 13.5/11.5 like figcaption and
+   chart ticks. See docs/style-guide.md §5. */
+/* `.aq-diagram` (assets/diagrams.css) is listed alongside `.diagram` because a generated
+   diagram may be hosted in a `.widget` and so cannot also carry `.diagram`. */
 .diagram { margin: 2em 0; }
 .diagram svg { width: 100%; height: auto; display: block; }
-.diagram svg text { font-family: var(--sans); fill: var(--ink); }
-.diagram .box { fill: var(--card); stroke: var(--ink-3); stroke-width: 1.2; }
-.diagram .box.a { fill: var(--accent-soft); stroke: var(--accent); }
-.diagram .box.b { fill: var(--blue-soft); stroke: var(--blue); }
-.diagram .box.g { fill: var(--green-soft); stroke: var(--green); }
-.diagram .box.v { fill: var(--violet-soft); stroke: var(--violet); }
-.diagram .arrow { stroke: var(--ink-3); stroke-width: 1.4; fill: none; marker-end: url(#arr); }
-.diagram .t-sm { font-size: 11px; fill: var(--ink-3); }
-.diagram .t-md { font-size: 13px; }
-.diagram .t-b { font-weight: 700; }
+.diagram svg text, .aq-diagram svg text { font-family: var(--sans); fill: var(--ink); }
+.diagram .box, .aq-diagram .box { fill: var(--card); stroke: var(--ink-3); stroke-width: 1.2; }
+.diagram .box.a, .aq-diagram .box.a { fill: var(--accent-soft); stroke: var(--accent); }
+.diagram .box.b, .aq-diagram .box.b { fill: var(--blue-soft); stroke: var(--blue); }
+.diagram .box.g, .aq-diagram .box.g { fill: var(--green-soft); stroke: var(--green); }
+.diagram .box.v, .aq-diagram .box.v { fill: var(--violet-soft); stroke: var(--violet); }
+/* The one current/selected shape in a picture. */
+.diagram .box.cur, .aq-diagram .box.cur { stroke-width: 2; }
+.diagram .arrow, .aq-diagram .arrow { stroke: var(--ink-3); stroke-width: 1.4; fill: none; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arr); }
+.diagram .t-sm, .aq-diagram .t-sm { font-size: 11.5px; fill: var(--ink-3); }
+.diagram .t-md, .aq-diagram .t-md { font-size: 13.5px; }
+.diagram .t-b, .aq-diagram .t-b { font-weight: 700; }
 
 /* ---------- Quizzes & exercises ---------- */
 .quiz, .exercise, .reflect {

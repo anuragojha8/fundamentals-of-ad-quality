@@ -1,68 +1,55 @@
+/* Mechanism diagrams (assets/diagrams.js).
+   See docs/style-guide.md §5. These reuse the book's .diagram / .widget language:
+   one SVG user unit is one CSS pixel, and the viewBox narrows on a phone instead of
+   scaling the whole picture down. Nothing here introduces a new colour or a new radius. */
 
-/* Mechanism diagrams: generous SVG type remains legible on a phone. */
 .aq-diagram { min-width: 0; }
-.aq-diagram svg { display:block; width:100%; height:auto; overflow:hidden; }
-.aq-diagram svg text { font-family:var(--sans); fill:var(--ink); }
-.aq-diagram .box { fill:var(--card);stroke:var(--ink-3);stroke-width:1.2; }
-.aq-diagram .box.a { fill:var(--accent-soft);stroke:var(--accent); }
-.aq-diagram .box.b { fill:var(--blue-soft);stroke:var(--blue); }
-.aq-diagram .box.g { fill:var(--green-soft);stroke:var(--green); }
-.aq-diagram .box.v { fill:var(--violet-soft);stroke:var(--violet); }
-.aq-diagram .arrow { fill:none;stroke:var(--ink-3);stroke-width:2.5; }
-.aq-diagram svg .t-md { font-size:30px; }
-.aq-diagram svg .t-sm { font-size:28px;fill:var(--ink-2); }
-.aq-diagram svg .t-b { font-weight:700; }
-.aq-diagram .chart svg text { font-size:27px; }
-.aq-diagram .chart svg .lbl { font-size:28px; }
-.aq-diagram .w-sub,.aq-diagram figcaption { line-height:1.65; }
-.aq-diagram .aq-status { font-size:14px;line-height:1.6;min-height:1.6em; }
-.aq-diagram .btn-row { flex-wrap:wrap;gap:10px;margin-bottom:16px; }
-.aq-diagram .aq-check { display:flex;align-items:center;gap:8px;margin:12px 0 20px; }
-.aq-diagram input[type=text] { max-width:100%;width:100%;box-sizing:border-box; }
-@media (max-width:480px) { .widget.aq-diagram { padding:16px 10px; } }
+.aq-diagram svg.aq-svg { display: block; width: 100%; height: auto; overflow: hidden; }
+.aq-diagram svg text { font-family: var(--sans); fill: var(--ink); }
 
-.aq-diagram .w-sub { font:14px/1.65 var(--sans);color:var(--ink-2); }
-.aq-diagram .w-title { font-family:var(--sans);font-weight:700;font-size:16px; }
-.aq-diagram svg a:focus { outline:3px solid var(--accent);outline-offset:2px; }
+/* Tone classes and type sizes are inherited from .diagram in book.css.
+   A static aq diagram is a figure, not a card: no border, no background, no shadow. */
+figure.aq-diagram { margin: 2em 0; padding: 0; background: none; border: 0; box-shadow: none; }
 
-/* Candidate identities persist as they move through the request. */
-#w-request-funnel .aq-candidate { transition:transform 700ms cubic-bezier(.22,.68,.3,1),opacity 550ms ease; }
-#w-request-funnel .aq-status { min-height:6.4em; }
-#w-request-funnel .aq-candidate .t-sm { font-size:24px; }
-@media (prefers-reduced-motion:reduce) {
-  #w-request-funnel .aq-candidate { transition:none; }
+/* Figure label: a widget title without the INTERACTIVE badge. */
+.diagram.aq-diagram > .w-title {
+  font-family: var(--sans); font-weight: 700; font-size: 15px; line-height: 1.35;
+  color: var(--ink); margin-bottom: 6px;
+}
+/* Standfirst above the picture, and any trailing note, share the caption style. */
+.aq-diagram .w-sub { font: 13.5px/1.55 var(--sans); color: var(--ink-3); margin: 0 0 14px; }
+.aq-diagram figcaption.w-sub { margin-bottom: 14px; }
+.aq-diagram > .w-sub:last-child { margin: 12px 0 0; }
+
+/* Live region. Always holds a sentence; height is reserved so nothing jumps. */
+.aq-diagram .aq-status {
+  font: 13.5px/1.6 var(--sans); color: var(--ink-2);
+  background: var(--paper-2); border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0; padding: 10px 12px; margin: 14px 0 0; min-height: 1.6em;
+}
+.aq-diagram .btn-row { flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.aq-diagram .aq-check { display: flex; align-items: center; gap: 8px; margin: 10px 0 14px; font-size: 14px; color: var(--ink-2); }
+.aq-diagram label { font-size: 14px; color: var(--ink-2); }
+.aq-diagram input[type=text] { width: 100%; max-width: 360px; margin-left: 8px; }
+
+/* Clickable shapes (the capstone lever map) get a real affordance. */
+.aq-diagram svg a { cursor: pointer; }
+.aq-diagram .t-link { fill: var(--accent); font-weight: 600; }
+.aq-diagram svg a .box { transition: stroke .15s, fill .15s; }
+.aq-diagram svg a:hover .box { stroke: var(--accent); stroke-width: 2; }
+.aq-diagram svg a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.aq-diagram svg a:hover text { fill: var(--accent); }
+
+/* Candidate identities persist as they move through the request (ch. 1). */
+#w-request-funnel .aq-candidate { transition: transform 700ms cubic-bezier(.22,.68,.3,1), opacity 550ms ease; }
+#w-request-funnel .aq-count { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+#w-request-funnel .aq-status { min-height: 4.8em; }
+@media (prefers-reduced-motion: reduce) {
+  #w-request-funnel .aq-candidate { transition: none; }
+  .aq-diagram svg a .box { transition: none; }
 }
 
-@media (max-width:600px) { #w-request-funnel .aq-candidate .t-sm { font-size:28px; } }
-
-/* Editorial diagram palette: tinted paper, quiet borders and clear accents. */
-.aq-diagram {
-  --aq-border:color-mix(in srgb,var(--ink-3) 32%,var(--card));
-}
-.widget.aq-diagram {
-  border:1px solid var(--aq-border);border-radius:22px;
-  background:linear-gradient(145deg,var(--card),var(--paper-2));
-  box-shadow:0 8px 28px color-mix(in srgb,var(--ink) 5%,transparent);
-}
-figure.aq-diagram:not(.aq-gsp):not(.aq-latency) {
-  padding:22px;border:1px solid var(--aq-border);border-radius:22px;
-  background:linear-gradient(145deg,var(--card),var(--paper-2));
-}
-.aq-diagram .w-title { font-size:18px;letter-spacing:-.025em;line-height:1.35; }
-.aq-diagram .aq-svg { border-radius:18px; }
-.aq-diagram .box {
-  fill:var(--aq-fill-base,var(--card));stroke:var(--aq-border);stroke-width:1.5;
-}
-.aq-diagram .box.a { fill:var(--aq-fill-a,var(--accent-soft));stroke:color-mix(in srgb,var(--accent) 50%,var(--card)); }
-.aq-diagram .box.b { fill:var(--aq-fill-b,var(--blue-soft));stroke:color-mix(in srgb,var(--blue) 45%,var(--card)); }
-.aq-diagram .box.g { fill:var(--aq-fill-g,var(--green-soft));stroke:color-mix(in srgb,var(--green) 55%,var(--card)); }
-.aq-diagram .box.v { fill:var(--aq-fill-v,var(--violet-soft));stroke:color-mix(in srgb,var(--violet) 45%,var(--card)); }
-.aq-diagram .arrow { stroke:color-mix(in srgb,var(--ink-3) 70%,var(--card));stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
-.aq-diagram .aq-status { padding:12px 14px;border-left:3px solid var(--accent);background:var(--paper-2);border-radius:0 12px 12px 0; }
-.aq-diagram .btn { border-radius:10px; }
-#w-request-funnel .aq-count { font-size:48px;letter-spacing:-.04em; }
-#w-request-funnel .aq-candidate .box.g { stroke-width:2.5; }
-#w-request-funnel .aq-candidate .box { filter:drop-shadow(0 3px 3px color-mix(in srgb,var(--ink) 7%,transparent)); }
-@media (max-width:480px) {
-  figure.aq-diagram:not(.aq-gsp):not(.aq-latency) { padding:16px 8px; }
+@media (max-width: 600px) {
+  .widget.aq-diagram { padding: 16px 12px; }
+  .aq-diagram input[type=text] { margin: 6px 0 0; max-width: none; }
 }
