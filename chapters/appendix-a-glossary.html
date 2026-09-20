@@ -34,7 +34,7 @@
 <dt>Ad load <span class="ch">Ch. 15</span></dt><dd>How many ads are shown per unit of organic content; the largest short-term vs. long-term lever.</dd>
 <dt>Aggregate reporting <span class="ch">Ch. 13</span></dt><dd>Conversion counts published per campaign and period instead of per-person records; the form most privacy-preserving measurement takes.</dd>
 <dt>Attribution window <span class="ch">Ch. 4</span></dt><dd>How long after a click a conversion still counts toward that ad (e.g. 7 days).</dd>
-<dt>AUC <span class="ch">Ch. 9</span></dt><dd>Area under the ROC curve: the probability a random positive is scored above a random negative. Measures ranking only, and includes cross-user pairs the auction never compares.</dd>
+<dt>AUC <span class="ch">Ch. 9</span></dt><dd>Area under the ROC curve: the probability a random positive scores above a random negative, with half credit for ties. Measures ranking only and includes cross-user pairs the auction never compares.</dd>
 <dt>Autobidding <span class="ch">Ch. 2, 12</span></dt><dd>The platform bids on the advertiser's behalf toward a goal such as a target cost per conversion.</dd>
 <dt>Bid shading <span class="ch">Ch. 2</span></dt><dd>Bidding below one's true value, which is rational in first-price auctions.</dd>
 <dt>Budget pacing <span class="ch">Ch. 17</span></dt><dd>Spreading an advertiser's spend over the day, typically by throttling participation, so the budget isn't exhausted early.</dd>
@@ -45,8 +45,8 @@
 <dt>Cold start <span class="ch">Ch. 1, 6, 13</span></dt><dd>New ads, advertisers, or users with no history; ID features are untrained, and counting features are empty.</dd>
 <dt>Confidence interval <span class="ch">Ch. 9</span></dt><dd>The range of effects consistent with the data; if it contains zero, the effect isn't detectable.</dd>
 <dt>Counting feature <span class="ch">Ch. 6</span></dt><dd>A historical rate (e.g. an ad's CTR so far) supplied as a feature; must be computed only from data available at serve time.</dd>
-<dt>CPA / target CPA <span class="ch">Ch. 12</span></dt><dd>Cost per acquisition (conversion); in oCPM the advertiser states the CPA it is willing to pay.</dd>
-<dt>CPA adherence <span class="ch">Ch. 12</span></dt><dd>Whether advertisers' actual cost per conversion matches their target, the core promise of conversion bidding.</dd>
+<dt>CPA / target CPA <span class="ch">Ch. 12</span></dt><dd>Actual CPA is spend divided by conversions; target CPA is an optimization goal, not necessarily a per-conversion charge or guaranteed cap.</dd>
+<dt>CPA adherence <span class="ch">Ch. 12</span></dt><dd>Comparison of actual spend per conversion with a target; interpret alongside delivery, measurement and budget use.</dd>
 <dt>CPC / CPM <span class="ch">Ch. 2</span></dt><dd>Cost per click / cost per thousand impressions: what the advertiser pays for.</dd>
 <dt>Cross feature <span class="ch">Ch. 6</span></dt><dd>A feature for a combination of values (e.g. hour × category) so a linear model can learn interactions.</dd>
 <dt>Cross layer (DCN) <span class="ch">Ch. 11</span></dt><dd>x₀ ⊙ (W xₗ + b) + xₗ: a layer that learns explicit feature interactions.</dd>
@@ -58,11 +58,11 @@
 <dt>Distillation <span class="ch">Ch. 14</span></dt><dd>Training a small student model to imitate a larger teacher's predicted probabilities.</dd>
 <dt>Drift <span class="ch">Ch. 14</span></dt><dd>Changes in users, ads, and seasons that make a trained model stale.</dd>
 <dt>Early stopping <span class="ch">Ch. 7</span></dt><dd>Stopping training at the point where held-out loss is lowest.</dd>
-<dt>eCPM <span class="ch">Ch. 2</span></dt><dd>Expected revenue per thousand impressions: bid × pCTR × 1000 for CPC, CPA × pCTR × pCVR × 1000 for oCPM.</dd>
+<dt>eCPM <span class="ch">Ch. 2</span></dt><dd>Here, bid-weighted auction score per thousand impressions: CPC bid × pCTR × 1000, or target CPA × pCTR × pCVR × 1000 in Pebble's toy controller. Clearing prices and true outcomes determine realized revenue.</dd>
 <dt>Eligibility <span class="ch">Ch. 1</span></dt><dd>Hard filters applied before any model: flight dates, targeting, budgets, frequency caps, policy.</dd>
 <dt>Embedding <span class="ch">Ch. 10, 11</span></dt><dd>A learned vector representing an ID; similar entities end up close together.</dd>
 <dt>Epoch <span class="ch">Ch. 7</span></dt><dd>One pass over the training data. Large CTR models often overfit after one.</dd>
-<dt>ESMM <span class="ch">Ch. 12</span></dt><dd>Entire Space Multi-task Model: trains pCTR × pCVR on all impressions so pCVR is learned where it's used.</dd>
+<dt>ESMM <span class="ch">Ch. 12</span></dt><dd>Entire Space Multi-task Model: jointly trains click probability and click-and-conversion probability on logged impressions. It does not recover unshown ads or unobserved conversions.</dd>
 <dt>Examination hypothesis <span class="ch">Ch. 5</span></dt><dd>P(click) = P(user examines the slot) × P(click | examined).</dd>
 <dt>Exploration (ε) <span class="ch">Ch. 5</span></dt><dd>Traffic deliberately spent on uncertain choices to gather information the system otherwise never sees.</dd>
 <dt>Exposure bias <span class="ch">Ch. 5, 9, 10</span></dt><dd>Models trained only on what the old system showed can't judge what it didn't; the main cause of the offline–online gap.</dd>
@@ -79,7 +79,7 @@
 <dt>Holdout (long-term) <span class="ch">Ch. 15</span></dt><dd>A group of users kept on the old policy for months to measure slow effects like retention.</dd>
 <dt>Incrementality <span class="ch">Ch. 16</span></dt><dd>The conversions the ads caused: the exposed conversion rate minus the held-out rate. Distinct from attributed conversions.</dd>
 <dt>IPW <span class="ch">Ch. 5</span></dt><dd>Inverse propensity weighting: weight each observation by 1 / probability it was observed.</dd>
-<dt>k-anonymity threshold <span class="ch">Ch. 13</span></dt><dd>A minimum count below which an aggregate cell is withheld entirely, so a published number can never describe one person.</dd>
+<dt>Conversion-count suppression <span class="ch">Ch. 13</span></dt><dd>Pebble omits report cells below a conversion-count threshold. A person may contribute several conversions; this toy rule is not k-anonymity or a privacy guarantee.</dd>
 <dt>Label <span class="ch">Ch. 5</span></dt><dd>The outcome a model learns to predict; its definition is a product decision.</dd>
 <dt>Latency budget <span class="ch">Ch. 1</span></dt><dd>The time the ad server has to respond; caps model cost × number of candidates.</dd>
 <dt>Leakage <span class="ch">Ch. 6</span></dt><dd>A feature that contains information about the label that won't exist at serve time.</dd>

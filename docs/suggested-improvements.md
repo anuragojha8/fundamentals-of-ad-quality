@@ -2,6 +2,8 @@
 
 Review date: 19 September 2026. Baseline: `a2765fa` (restored book, including privacy and incrementality chapters).
 
+Implementation status and Claude handoff: [review-fixes.md](review-fixes.md). This review describes the original baseline; consult that log before acting on an item.
+
 ## Editorial verdict
 
 The central teaching idea works: the reader builds one marketplace, and earlier decisions become later model failures. Keep the progression **auction → data → learning → architectures → operating the marketplace**. This is already a substantial technical book, not an outline that needs starting over.

@@ -36,11 +36,11 @@
 
 <h2 id="objective"><span class="sec">15.1</span>The objective you actually own</h2>
 
-<p>A healthy ads marketplace keeps three parties reasonably happy: <strong>advertisers</strong> (value for their money), <strong>users</strong> (a good experience), and <strong>the platform</strong> (revenue, both now and later). Lots of large platforms rank ads by some version of <dfn>total value</dfn>:</p>
+<p>A healthy ads marketplace keeps three parties reasonably happy: <strong>advertisers</strong> (value for their money), <strong>users</strong> (a good experience), and <strong>the platform</strong> (revenue, both now and later). Pebble uses a simplified <dfn>total value</dfn> score. Both terms have units of dollars per impression:</p>
 
-\[ \text{score} = \underbrace{\text{bid} \times \text{pCTR} \,(\times \text{pCVR})}_{\text{advertiser value}} \;+\; \underbrace{\text{quality}}_{\text{user value}} \;-\; \underbrace{\lambda \cdot \text{pHide} \cdot c}_{\text{user cost}} \]
+\[ \text{score (\$/impression)} = \underbrace{\text{CPC bid (\$/click)} \times \text{pCTR}}_{\text{bid-weighted value}} \;-\; \underbrace{\lambda\;(\$/\text{hide}) \times \text{pHide}}_{\text{user-cost penalty}} \]
 
-<p>Now look closely, because two numbers in that formula aren't predictions at all. They're <strong>policy</strong>: the weight \(\lambda\) on user cost, and how many ad slots to show in the first place (<dfn>ad load</dfn>). No model can learn those from clicks. They encode how much short-term revenue Pebble is willing to trade for long-term user health. Setting them well is one of the most consequential things you'll ever do as an ads quality PM. No pressure. (Okay, a lot of pressure.)</p>
+<p>The weight \(\lambda\) prices a predicted hide in dollars. How many ad slots to show (<dfn>ad load</dfn>) is a separate allocation constraint, outside the score. Both are policy choices about user experience and short-term auction value; click data alone cannot choose them. No pressure. (Okay, a lot of pressure.)</p>
 
 <figure id="d-objective"></figure>
 
@@ -57,7 +57,7 @@
 
 <h2 id="lambda"><span class="sec">15.3</span>Pricing annoyance into the auction</h2>
 
-<p>Now let's add the penalty. Each ad's score becomes bid × pCTR − λ · pHide. Your stack does this by handing the auction a quality-adjusted pCTR, so the penalty affects both who wins and what they pay. Sweep λ and take a look at the frontier.</p>
+<p>Now let's add the penalty. Each ad's score becomes bid × pCTR − λ · pHide. Your stack passes an adjusted score through the auction's pCTR input so it can change ranking and clearing prices. That adjusted number is an implementation device, <em>not</em> a calibrated click probability. Sweep λ and look at the frontier.</p>
 
 <div class="widget" id="w-lambda">
   <div class="w-title">The quality frontier</div>
@@ -143,7 +143,7 @@
       var m = await Stack.trainLR({ rows: rows, epochs: 2, label: 'hide', onProgress: function (p) { progress(0.6 + 0.4 * p, 'Training…'); } });
       var e = Stack.evaluate(Stack.lrPredictRows(m, er), er.map(function (r) { return r.hide; }), ev.truth.map(function (t) { return t.phide; }));
       out.innerHTML = '';
-      var st = Book.stats(out, [{ key: 'n', label: 'Hides in your logs' }, { key: 'a', label: 'AUC', sub: 'truth ceiling: ' + e.oracleAuc.toFixed(3) }, { key: 'c', label: 'Calibration vs. truth' }]);
+      var st = Book.stats(out, [{ key: 'n', label: 'Hides in your logs' }, { key: 'a', label: 'AUC', sub: 'oracle benchmark: ' + e.oracleAuc.toFixed(3) }, { key: 'c', label: 'Calibration vs. truth' }]);
       st({ n: rows.filter(function (r) { return r.hide; }).length.toLocaleString(), a: e.auc.toFixed(3), c: e.calibrationVsTruth.toFixed(2) });
       Stack.putModel('phide', m, { source: 'you' });
       out.appendChild(el('p', { class: 'small', text: 'Saved to your stack as the pHide model. Rare labels make it noisier than your pCTR model, a common situation for negative-feedback models.' }));

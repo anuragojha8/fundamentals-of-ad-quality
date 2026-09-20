@@ -817,10 +817,10 @@
   });
 
   slot({
-    id: 'privacyReport', chapter: 13, title: 'A privacy-safe conversion report',
+    id: 'privacyReport', chapter: 13, title: 'An aggregate conversion report with suppression',
     starter: [
-      '// Aggregate conversions into a report that can be shared without exposing',
-      '// any one person. Group the rows by (advertiser, day) and count conversions.',
+      '// Illustrate small-cell suppression; this is not a privacy guarantee.',
+      '// Group the rows by (advertiser, day) and count conversions.',
       '//   rows:  [{ adv, day, conv }]   conv is 0 or 1',
       '//   opts:  { k }                  the minimum count that may be reported',
       '// Return an object keyed by adv + ":" + day, holding the conversion count.',
@@ -841,7 +841,7 @@
       '  }',
       '  const out = {};',
       '  for (const key in counts) if (counts[key] >= opts.k) out[key] = counts[key];',
-      '  return out;                       // small cells never leave the building',
+      '  return out;                       // omit cells below the conversion threshold',
       '}'
     ].join('\n'),
     tests: function (fn, T) {

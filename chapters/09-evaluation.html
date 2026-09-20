@@ -42,9 +42,9 @@
 
 <h2 id="auc"><span class="sec">9.1</span>AUC: can the model rank?</h2>
 
-<p><dfn>AUC</dfn> (area under the ROC curve) has a definition that sounds scary and a meaning that's actually simple. <strong>Pick a random clicked impression and a random non-clicked one. AUC is the probability that the model scored the clicked one higher.</strong> A coin flip gets 0.5. A perfect ranker gets 1.0. And fun fact: even Pebble's own truth only gets about 0.85, because clicks are random even when you know the exact probabilities. Nobody gets a perfect score. That's just how probability works.</p>
+<p><dfn>AUC</dfn> (area under the ROC curve) has a definition that sounds scary and a meaning that's actually simple. <strong>Pick a random clicked impression and a random non-clicked one. AUC is the chance the clicked one scores higher, with half credit for a tie.</strong> A coin flip gets about 0.5. A perfect ranking of the observed labels gets 1.0. Even scoring with Pebble's true click probabilities usually falls short, because clicks are random. On a finite sample, a learned model can happen to beat that truth score; treat it as a benchmark, not an inviolable ceiling.</p>
 
-<p>There are two reasons AUC is so popular: it completely ignores calibration (only the order matters), and it doesn't care about the base rate. And there are two reasons it's dangerous: it completely ignores calibration, and it averages over <em>every</em> pair, including pairs the auction never actually compares, like two different users at two different times. Yes, I listed "ignores calibration" twice. That's the whole problem.</p>
+<p>AUC ignores calibration (only the order matters), and changing the positive/negative mix alone does not change it <em>if their score distributions stay the same</em>. A traffic shift can change those distributions and AUC. It also averages over <em>every</em> positive-negative pair, including pairs the auction never compares, like different users at different times.</p>
 
 <div class="code-cell" data-slot="auc"></div>
 
@@ -52,7 +52,7 @@
 
 <h2 id="ne"><span class="sec">9.2</span>Normalized entropy: are the numbers right?</h2>
 
-<p>Log loss measures how good the probabilities are, but its raw value depends on the base rate. A dataset with a 1% CTR has lower log loss than one with 10%, no matter how good the model is, which makes raw log loss hard to compare. <dfn>Normalized entropy</dfn> (NE), popularized by Facebook's ads team (He et al., 2014), fixes that by dividing the model's log loss by the log loss of the laziest honest model possible: one that always predicts the average CTR.</p>
+<p>Log loss measures how good the probabilities are, but raw values are hard to compare across datasets with different base rates. The constant predictor for a 1% CTR dataset has lower log loss than the constant predictor for a 10% dataset; a good model on the latter can still beat a bad model on the former. <dfn>Normalized entropy</dfn> (NE), popularized by Facebook's ads team (He et al., 2014), divides the model's log loss by the loss from always predicting that dataset's average CTR.</p>
 
 \[ \text{NE} = \frac{-\frac{1}{N}\sum_i \big[y_i \log \hat p_i + (1-y_i)\log(1-\hat p_i)\big]}{-\big[\bar y \log \bar y + (1-\bar y)\log(1-\bar y)\big]} \]
 
@@ -68,7 +68,7 @@
 
 <h2 id="dashboard"><span class="sec">9.3</span>Your model's report card</h2>
 
-<p>Here's the offline evaluation a model review would ask for, computed with <em>your</em> metric functions on held-out day 10. And because this is a simulation, there's a bonus column you will never, ever get at work: the same metrics for a model that knew the true probabilities. That's the ceiling. The best any model could possibly do.</p>
+<p>Here's the offline evaluation a model review would ask for, computed with <em>your</em> metric functions on held-out day 10. Because this is a simulation, there is a bonus column you cannot get from ordinary production logs: metrics for a model that knows the true probabilities. It is an oracle benchmark. Its empirical AUC and calibration still depend on sampled outcomes.</p>
 
 <div class="widget" id="w-report">
   <div class="w-title">Offline evaluation: heuristic vs. your model vs. the truth</div>
@@ -206,7 +206,7 @@
       var lrP = Stack.lrPredictRows(m, d.er);
       var eH = Stack.evaluate(heurP, y, t), eL = Stack.evaluate(lrP, y, t), eT = Stack.evaluate(t, y, t);
       StackUI.table(out, [
-        { label: 'Metric', key: 'k' }, { label: 'Heuristic', num: true, key: 'h' }, { label: 'Your LR', num: true, key: 'l' }, { label: 'Truth (ceiling)', num: true, key: 't' }
+        { label: 'Metric', key: 'k' }, { label: 'Heuristic', num: true, key: 'h' }, { label: 'Your LR', num: true, key: 'l' }, { label: 'Oracle benchmark', num: true, key: 't' }
       ], [
         { k: 'AUC (your auc())', h: eH.auc.toFixed(3), l: '<b>' + eL.auc.toFixed(3) + '</b>', t: eT.auc.toFixed(3) },
         { k: 'NE (your normalizedEntropy())', h: eH.ne.toFixed(3), l: '<b>' + eL.ne.toFixed(3) + '</b>', t: eT.ne.toFixed(3) },
@@ -223,7 +223,10 @@
       c.line(bins.map(function (b) { return [b.pred, b.actual]; }), { color: 'var(--s1)' });
       c.dots(bins.map(function (b) { return [b.pred, b.actual, 4, 'var(--s1)']; }));
       Book.legend(L, [{ label: 'Your LR', color: 'var(--s1)' }, { label: 'Heuristic', color: 'var(--s2)' }, { label: 'Perfect', color: 'var(--ink-3)', dash: true }]);
-      R.appendChild(el('p', { class: 'small', html: 'Your model closes <b>' + Book.pct((eL.auc - eH.auc) / (eT.auc - eH.auc), 0) + '</b> of the AUC gap between the heuristic and the truth, and ' + Book.pct((eH.ne - eL.ne) / (eH.ne - eT.ne), 0) + ' of the NE gap. ' + (Math.abs(eL.calibration - 1) < 0.1 ? 'It\'s well calibrated overall.' : 'Its overall calibration is off by ' + Book.pct(Math.abs(eL.calibration - 1), 0) + '.') + '<br><br>Metric code: ' + (Stack.implSource('auc') === 'you' ? 'your auc() ✓' : 'reference auc()') + ', ' + (Stack.implSource('normalizedEntropy') === 'you' ? 'your normalizedEntropy() ✓' : 'reference normalizedEntropy()') + '.' }));
+      var aucGap = eT.auc - eH.auc, neGap = eH.ne - eT.ne;
+      var aucNote = aucGap > 0.01 ? Book.pct((eL.auc - eH.auc) / aucGap, 0) + ' of the heuristic-to-oracle AUC gap' : 'AUC gap percentage unavailable (benchmark gap too small)';
+      var neNote = neGap > 0.01 ? Book.pct((eH.ne - eL.ne) / neGap, 0) + ' of the heuristic-to-oracle NE gap' : 'NE gap percentage unavailable (benchmark gap too small)';
+      R.appendChild(el('p', { class: 'small', html: 'Your model closes <b>' + aucNote + '</b> and ' + neNote + '. These sampled percentages can exceed 100%. ' + (Math.abs(eL.calibration - 1) < 0.1 ? 'It\'s well calibrated overall.' : 'Its overall calibration is off by ' + Book.pct(Math.abs(eL.calibration - 1), 0) + '.') + '<br><br>Metric code: ' + (Stack.implSource('auc') === 'you' ? 'your auc() ✓' : 'reference auc()') + ', ' + (Stack.implSource('normalizedEntropy') === 'you' ? 'your normalizedEntropy() ✓' : 'reference normalizedEntropy()') + '.' }));
     });
   })();
 

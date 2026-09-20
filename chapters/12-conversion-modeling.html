@@ -34,20 +34,20 @@
 
 <p class="lead">Every ad your stack has served so far was sold per click. And for eleven chapters, we've acted like clicks were the whole point. They're not. A click is just a means to an end. Sprout wants meal-kit subscriptions. Nimbus wants bank accounts. Orbit wants installs. Nobody's out there celebrating a really great click.</p>
 
-<p>So modern ad platforms let advertisers bid for the outcome they actually want, and the platform takes on the job of predicting it. In this chapter we build the conversion model (<dfn>pCVR</dfn>) your stack needs to do that. And I'll warn you now: conversions are harder than clicks in every single way. They're <strong>rare</strong>, they're <strong>late</strong>, and they <strong>only exist for people who clicked first</strong>. Three problems, one chapter. Let's go.</p>
+<p>So modern ad platforms let advertisers optimize for the outcome they actually want, and the platform takes on the job of predicting it. In this chapter we build the post-click conversion model (<dfn>pCVR</dfn>) your stack needs. These labels are <strong>rare</strong>, <strong>late</strong>, and, in Pebble's simulator, recorded only after a click. View-through conversions exist elsewhere; this chapter doesn't model them. Three problems, one chapter. Let's go.</p>
 
 <h2 id="ocpm"><span class="sec">12.1</span>Bidding for outcomes</h2>
 
-<p>With <dfn>oCPM</dfn> (optimized CPM), or conversion bidding, an advertiser just states a <strong>target cost per acquisition</strong> (CPA): "I'll pay up to $40 for each new customer." The platform turns that into an auction score by predicting both steps, the click and then the conversion:</p>
+<p>With conversion optimization, an advertiser can state a <strong>target cost per acquisition</strong> (CPA): "Aim for $40 in spend per customer." Pebble's simplified controller turns that goal into an effective maximum CPC, target CPA × predicted post-click CVR. The auction then scores the ad using both predictions:</p>
 
 \[ \text{eCPM} = \text{CPA}_{\text{target}} \times \text{pCTR} \times \text{pCVR} \times 1000 \]
 
-<p>where pCVR = P(conversion | click). The nice part for advertisers is they don't need to know their own conversion rate anymore. The platform is effectively bidding on their behalf, which is the whole idea behind <dfn>autobidding</dfn>. The catch for the platform: your predictions now directly decide how much the advertiser pays <em>per conversion</em>. Predict too high and they overpay. Predict too low and they under-deliver, get frustrated, and leave. It's Chapter 3 all over again, except now there's twice as much prediction to get wrong.</p>
+<p>Here pCVR = P(conversion | click). The score is a bid-weighted value, not Pebble's expected revenue. Pebble still charges the clearing <em>CPC</em> in this toy auction. Predictions affect which ads win and the prices they may face, while realized CPA also depends on competition, budgets, actual conversions, and the controller. A target is not a guarantee.</p>
 
 <div class="exercise" data-id="ch12-e1" data-answer="40" data-tol="0.05" data-unit="$ eCPM">
   <p class="q">Sprout's target CPA is $40. For some impression, pCTR = 2% and pCVR = 5%. What's the eCPM?</p>
   <details class="hint"><summary>Hint</summary><p>40 × 0.02 × 0.05 × 1000.</p></details>
-  <div class="explain"><p>40 × 0.02 × 0.05 × 1000 = <strong>$40</strong>. So each impression of Sprout's ad is worth about 4 cents to Pebble: a 1-in-1,000 shot at a conversion worth $40. And notice that eCPM is the <em>product</em> of two predictions, so if each one is 20% off, the errors compound to about 44%. Fun!</p></div>
+  <div class="explain"><p>40 × 0.02 × 0.05 × 1000 = <strong>$40</strong> eCPM, or 4 cents of auction score per impression. The effective maximum CPC is $40 × 0.05 = $2; the clearing CPC can be lower. The score multiplies two predictions, so if both are 20% too high, it is 44% too high. Fun!</p></div>
 </div>
 
 <h2 id="sparse"><span class="sec">12.2</span>Sparse labels</h2>
@@ -81,7 +81,7 @@
 
 <p>Okay, here's the sneakiest problem of the three. pCVR is defined as P(conversion | click). So the obvious way to train it is on clicked impressions only, right? That's where the conversions are!</p>
 
-<p>But the auction needs pCVR for <em>every candidate</em>, clicked or not, because it multiplies pCTR × pCVR before anybody has clicked anything. And clicked impressions are not a random sample of candidates. People who click a lot, and creatives designed to grab clicks, are over-represented. In Pebble's world (and, honestly, in the real one), <strong>clicky users and clickbait creatives convert less</strong>. So a model trained only on clicks learns the conversion rate of the click-happy crowd, and then gets applied to everyone. That's called <dfn>sample selection bias</dfn>.</p>
+<p>But the auction needs pCVR for <em>every candidate</em> before a click happens. Clicked impressions are a selected subset of logged impressions, and the logs themselves omit ads never shown. In Pebble's simulation, click-prone users and creatives have different post-click conversion rates, so a clicked-only model may extrapolate badly where clicks are rare. A correctly specified conditional model with enough support could still work; selection alone does not prove bias. The risk is learning in one region and serving in another.</p>
 
 <figure class="diagram">
 <svg viewBox="0 0 760 240" role="img" aria-label="Impression space contains click space which contains conversions. Naive pCVR trains on click space; ESMM trains pCTR and pCTCVR on impression space">
@@ -96,10 +96,10 @@
   <text x="420" y="160" class="t-sm">(also on all impressions)</text>
   <text x="420" y="188" class="t-md">pCVR is never trained on clicks alone</text>
 </svg>
-<figcaption>The Entire Space Multi-task Model trains on the full impression space, so pCVR gets learned where it'll actually be used.</figcaption>
+<figcaption>ESMM trains on logged impressions, a broader population than clicks but still only the ads the logger showed.</figcaption>
 </figure>
 
-<p><dfn>ESMM</dfn> (Ma et al., 2018) fixes this with a clever multi-task trick straight out of Chapter 8. It has two heads, pCTR and pCVR, and it <em>never</em> trains pCVR by itself. Instead, it trains the <em>product</em>, pCTR × pCVR = P(click and convert), against the conversion label over <strong>all</strong> impressions. So pCVR ends up being whatever makes that product right everywhere, not just on the clicked subset. Sneaky problem, sneaky solution.</p>
+<p><dfn>ESMM</dfn> (<a href="https://arxiv.org/abs/1804.07931">Ma et al., 2018</a>) addresses this with a multi-task model. It trains pCTR on clicks and the product pCTR × pCVR = P(click and post-click conversion | x), also called pCTCVR, on conversion labels across <strong>logged impressions</strong>. That shared evidence can help pCVR outside the clicked subset. It cannot identify outcomes for ads never shown, recover unobserved conversions, or guarantee calibration where click support is tiny; <a href="https://arxiv.org/abs/2204.05125">later work</a> studies remaining estimation bias. View-through conversions are a different label.</p>
 
 <div class="widget" id="w-esmm">
   <div class="w-title">Naive pCVR vs. ESMM, graded against the truth</div>
@@ -114,35 +114,35 @@
     <li data-why="Calibration on clicks doesn't imply calibration elsewhere, but this isn't about sample size.">It has too few conversions</li>
     <li data-why="pCTR errors are separate; this is about pCVR's training population.">pCTR is miscalibrated</li>
   </ul>
-  <div class="explain"><p>Calibrated on the data you trained on doesn't mean calibrated on the data you serve on. The mismatch here is selection: training only saw clicks. ESMM fixes it, and so does reweighting clicked examples by the inverse of their click probability (IPW, our old friend from Chapter 5).</p></div>
+  <div class="explain"><p>Calibration on clicked logs does not establish calibration for every candidate slice. In this simulation ESMM uses joint click-and-conversion labels across logged impressions to reduce that gap. Inverse propensity weighting can help only with valid click propensities and overlap; it cannot conjure labels for unshown ads or missing consent.</p></div>
 </div>
 
 <h2 id="ship"><span class="sec">12.5</span>Switch on conversion bidding</h2>
 
-<p>Time to change how Pebble sells ads. In the treatment arm, every advertiser bids their target CPA, and your stack computes CPA × pCTR × pCVR. But for conversion bidding, the metric that matters most isn't revenue. It's <dfn>CPA adherence</dfn>. Did advertisers actually pay about what they asked to pay per conversion? If they paid 30% more than their target, Pebble broke its promise. If they paid way less, Pebble under-delivered. Either way, somebody's writing an angry email.</p>
+<p>Time to change how Pebble optimizes ads. In the treatment arm, each advertiser supplies a target CPA and your stack computes target CPA × pCTR × pCVR as its score. Check <dfn>CPA adherence</dfn>: actual spend divided by actual conversions compared with the target. A high CPA calls for investigation; a low one does not by itself prove under-delivery. Read it alongside conversion volume, spend, budget use, and advertiser value.</p>
 
 <div class="widget" id="w-ocpm">
   <div class="w-title">A/B: CPC bidding vs. oCPM with your pCVR</div>
-  <div class="w-sub">Same pCTR model in both arms. Treatment prices every ad with CPA × pCTR × pCVR.</div>
+  <div class="w-sub">Same pCTR model in both arms. Treatment scores each ad with target CPA × pCTR × pCVR; winners still pay a clearing CPC.</div>
 </div>
 
 <div class="quiz" data-id="ch12-q2">
-  <p class="q">After launching oCPM, revenue is up 20%, but advertisers' actual CPA is 35% above their targets. What's the most likely model issue, and the risk?</p>
+  <p class="q">After launching conversion optimization, revenue is up 20%, but advertisers' actual CPA is 35% above target. Which model issue would you investigate first, and what else must you check?</p>
   <ul>
-    <li data-correct>pCVR is over-predicted, so bids and prices are inflated. Advertisers overpay per conversion and will cut budgets</li>
-    <li data-why="An under-prediction would make CPA come in below target.">pCVR is under-predicted</li>
-    <li data-why="pCTR errors would show up in CPC campaigns too.">pCTR is too low</li>
-    <li data-why="A 20% revenue gain that breaks CPA promises is a problem, not a success.">No issue: revenue is up</li>
+    <li data-correct>Check pCVR overprediction, then compare clearing prices, budget use, conversion measurement and controller behavior</li>
+    <li data-why="Underprediction could reduce bids, but CPA alone cannot diagnose the model.">pCVR must be under-predicted</li>
+    <li data-why="A single aggregate CPA does not isolate pCTR error either.">pCTR must be too low</li>
+    <li data-why="Higher revenue does not settle advertiser outcomes.">No issue: revenue is up</li>
   </ul>
-  <div class="explain"><p>Under oCPM, the platform prices using its own predictions, so over-predicting is literally overcharging. Revenue goes up this month, and advertisers notice when they look at their bills. Real autobidding systems usually add a feedback controller that nudges bids per campaign when actual CPA drifts from target. But that controller is only as good as the calibration it's correcting.</p></div>
+  <div class="explain"><p>Overpredicted pCVR can inflate effective bids and raise spend per conversion, so start with calibration on mature labels. But a target miss is not proof: competition, budgets, conversion measurement and the controller can produce the same symptom. Advertisers pay clearing CPC here, not the predicted conversion price.</p></div>
 </div>
 
 <div class="reflect" data-id="ch12-r1">
   <p class="q">Nimbus (a bank, where conversions take ~5 days) reports that under oCPM they get 40% fewer conversions than their budget should buy, while their actual CPA is well <em>below</em> target. What's happening, and what do you propose?</p>
   <div class="model">
     <ul>
-      <li><strong>Diagnosis:</strong> CPA below target plus under-delivery means pCVR is <em>under</em>-predicted for Nimbus. Their effective bids are too low, so they keep losing auctions. The prime suspect is delayed feedback: with ~5-day delays and daily training, a big chunk of recent Nimbus clicks get labeled as non-conversions.</li>
-      <li><strong>Evidence to pull:</strong> Nimbus's pCVR calibration by <em>label age</em> (recent vs. matured), and the actual delay distribution of their conversions.</li>
+      <li><strong>Hypothesis:</strong> delayed labels may make Nimbus's pCVR look too low, lowering effective bids and losing auctions. Low CPA plus under-delivery does not prove it; budget pacing, competition, eligibility and measurement could also explain the pattern.</li>
+      <li><strong>Evidence to pull:</strong> pCVR calibration by <em>label age</em> (recent vs. matured), conversion delay, win rate, clearing CPC, budget use and measured conversion volume.</li>
       <li><strong>Fixes:</strong> delay correction or delayed-feedback modeling for slow advertisers; excluding immature negatives from training; a calibration layer segmented by vertical; and, in the short term, letting the autobidder's CPA controller raise Nimbus's bids.</li>
       <li><strong>Why it matters:</strong> systematically under-delivering for long-cycle verticals is both a revenue problem and a fairness problem. Finance and travel advertisers are often among the most valuable ones on the platform.</li>
     </ul>
@@ -151,16 +151,16 @@
 
 <div class="recap">
   <h3>What you built</h3>
-  <p>A <strong>conversion model</strong> (naive and ESMM), a <strong>delay correction</strong> using your <code>observedFraction()</code>, and <strong>conversion bidding</strong> in your auction, judged by whether advertisers actually paid what they asked to pay.</p>
+  <p>A <strong>conversion model</strong> (naive and ESMM), a <strong>delay correction</strong> using your <code>observedFraction()</code>, and <strong>conversion optimization</strong> in your auction, judged by spend, conversions, CPA and advertiser value against the stated goal.</p>
   <p>There's a catch, though, and it's a big one. This whole chapter assumed every conversion comes back to you as a neat little record with a user attached to it. Out in the world, users say no to tracking, browsers drop cookies, and conversions arrive as coarse, noisy, delayed aggregates instead. Next time, we find out what your beautiful pCVR model is worth when the data stops being so generous.</p>
   <h3>Key terms</h3>
   <div class="terms">
     <div><b>pCVR</b>P(conversion | click); rare, delayed, observed only after clicks.</div>
-    <div><b>oCPM / target CPA</b>The advertiser bids per outcome; eCPM = CPA × pCTR × pCVR.</div>
+    <div><b>Target CPA</b>An optimization goal; Pebble's toy controller scores with target CPA × pCTR × pCVR and bills clicks.</div>
     <div><b>Delayed feedback</b>Recent negatives aren't final; correct with the delay distribution.</div>
     <div><b>Sample selection bias</b>Training on clicks, serving on all impressions.</div>
-    <div><b>ESMM</b>Train pCTR × pCVR on all impressions so pCVR learns where it's used.</div>
-    <div><b>CPA adherence</b>Actual cost per conversion vs. target; the oCPM promise.</div>
+    <div><b>ESMM</b>Train pCTR and pCTR × pCVR on logged impressions; benefits depend on support and observed labels.</div>
+    <div><b>CPA adherence</b>Actual spend per conversion vs. target, interpreted with delivery and measurement.</div>
   </div>
 </div>
 

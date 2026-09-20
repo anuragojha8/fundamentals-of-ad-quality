@@ -71,18 +71,18 @@
 
 <h2 id="ecpm"><span class="sec">2.2</span>Ranking by expected value: eCPM</h2>
 
-<p>Now let's drop the unrealistic part. Ads are <em>not</em> equally likely to be clicked. And here's the wrinkle: Pebble charges per <em>click</em> (that's <dfn>CPC</dfn> bidding), but what it actually sells is <em>impressions</em>, a slot in someone's feed. An ad bidding $5 per click that nobody ever clicks earns Pebble a grand total of zero dollars. So the auction ranks by <strong>expected revenue per impression</strong>:</p>
+<p>Now let's drop the unrealistic part. Ads are <em>not</em> equally likely to be clicked. Pebble charges per <em>click</em> (that's <dfn>CPC</dfn> billing), but allocates <em>impressions</em>. An ad bidding $5 per click that nobody clicks is worth nothing in the auction. For this simplified CPC auction, rank by <strong>bid-weighted expected value per impression</strong>:</p>
 
 \[ \text{score} = \text{bid} \times \text{pCTR}, \qquad \text{eCPM} = \text{bid} \times \text{pCTR} \times 1000 \]
 
-<p><dfn>eCPM</dfn> ("effective cost per mille," because the ad industry loves Latin) is the same score expressed per thousand impressions. It's the common currency that lets you compare an ad bidding per click with one bidding per impression or per conversion.</p>
+<p><dfn>eCPM</dfn> ("effective cost per mille," because the ad industry loves Latin) expresses that auction score per thousand impressions. It is <em>not</em> a revenue forecast: a GSP winner may pay less than its bid, and realized clicks may differ from pCTR.</p>
 
 <p>And this, right here, is the moment <strong>predictions enter the auction</strong>. From now on, Pebble's revenue and every advertiser's position depend on pCTR just as much as on bids. Remember that. It's going to haunt us.</p>
 
 <div class="exercise" data-id="ch2-e1" data-answer="30" data-tol="0.01" data-unit="$ eCPM">
   <p class="q">Sprout bids $1.20 per click and its predicted CTR is 2.5%. What's its eCPM?</p>
   <details class="hint"><summary>Hint</summary><p>bid × pCTR × 1000, with pCTR as a probability (0.025).</p></details>
-  <div class="explain"><p>1.20 × 0.025 × 1000 = <strong>$30</strong>. Pebble expects to earn $30 for every thousand times it shows this ad.</p></div>
+  <div class="explain"><p>1.20 × 0.025 × 1000 = <strong>$30</strong> of bid-weighted auction value per thousand impressions. If the clearing CPC is $0.80 and the true CTR is 2.5%, expected platform revenue is $0.80 × 0.025 × 1000 = $20 instead.</p></div>
 </div>
 
 <h2 id="gsp"><span class="sec">2.3</span>Many slots: the generalized second-price auction</h2>
@@ -154,18 +154,18 @@
 
 <h2 id="bidtypes"><span class="sec">2.6</span>What advertisers actually bid for</h2>
 
-<p>So far everyone bids per click. Real platforms offer a whole menu, and each option is really a promise about what the advertiser pays for:</p>
+<p>So far everyone has bid and paid per click. Real platforms also take campaign goals and turn them into bids. Keep the advertiser's goal, the controller's bid, the auction score, and the billing event separate:</p>
 
 <div class="table-wrap"><table class="data">
-<thead><tr><th>Bid type</th><th>Advertiser pays per…</th><th>eCPM (the auction score)</th><th>Predictions needed</th></tr></thead>
+<thead><tr><th>Advertiser goal</th><th>Bid or controller output</th><th>Auction score</th><th>Billing and realized cost</th></tr></thead>
 <tbody>
-<tr><td><b>CPM</b></td><td>thousand impressions</td><td>bid</td><td>none (for pricing)</td></tr>
-<tr><td><b>CPC</b></td><td>click</td><td>bid × pCTR × 1000</td><td>pCTR</td></tr>
-<tr><td><b>CPA / oCPM</b></td><td>conversion (or impression, optimized for conversions)</td><td>bid × pCTR × pCVR × 1000</td><td>pCTR and pCVR</td></tr>
-<tr><td><b>Value / ROAS</b></td><td>impression, optimized for purchase value</td><td>bid × pCTR × pCVR × E[value] × 1000</td><td>all of the above, plus predicted value</td></tr>
+<tr><td><b>CPM</b>: buy impressions</td><td>$10 per thousand impressions</td><td>$10 eCPM</td><td>Pay the clearing CPM for impressions served.</td></tr>
+<tr><td><b>CPC</b>: buy clicks</td><td>$1.20 maximum per click</td><td>$1.20 × 0.025 × 1000 = $30 eCPM</td><td>At $0.80 clearing CPC and 2.5% true CTR: $20 expected revenue per thousand impressions.</td></tr>
+<tr><td><b>Target CPA</b>: aim for $40 per conversion</td><td>In our toy controller: $40 × 0.05 pCVR = $2 maximum per click</td><td>$2 × 0.02 pCTR × 1000 = $40 eCPM</td><td>Still billed per click. At $1.20 clearing CPC, 2% true CTR and 5% true post-click CVR: $0.024 spend and 0.001 conversions per impression, or $24 realized CPA.</td></tr>
+<tr><td><b>Target ROAS</b>: aim for value / spend = 4</td><td>For $8 predicted conversion value per click, a toy value bid is $8 / 4 = $2 per click</td><td>$2 × pCTR × 1000</td><td>Billing can still be CPC; realized ROAS depends on clearing price and actual value.</td></tr>
 </tbody></table></div>
 
-<p>Notice the pattern? As you go down the table, the advertiser takes on less risk and Pebble takes on more. <strong>Every step down needs another accurate prediction.</strong> Your stack runs on CPC for now. In Chapter 12, you'll build a conversion model and flip on oCPM.</p>
+<p>The target is a steering goal, not a per-conversion invoice or a guaranteed cap. Competition, budgets, model error, and the bid controller can all move realized CPA or ROAS. Your stack runs on CPC for now. In Chapter 12, you'll build a conversion model and add a simple target-CPA controller.</p>
 
 <div class="reflect" data-id="ch2-r1">
   <p class="q">Two weeks after your team launched a new pCTR model, Lumen's account manager escalates: Lumen's cost per click rose 20%, even though their bids didn't change. Nothing else changed in the marketplace. Using the GSP price formula, give two different explanations, and say what data you'd pull to tell them apart.</p>
