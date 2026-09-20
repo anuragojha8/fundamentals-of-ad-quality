@@ -88,14 +88,14 @@
 
   /* A vertical stack of bands. Returns the svg, with band boxes on `_bands`. */
   function stage(host, rows, label) {
-    var g = geom(), x = g.pad, w = g.W - x - g.gut;
+    var g = geom(host), x = g.pad, w = g.W - x - g.gut;
     var laid = rows.map(function (r) {
       var tl = wrap(r[0], chars(w, 13.5)), dl = wrap(r[1], chars(w, 11.5));
       return { r: r, tl: tl, dl: dl, h: bandHeight(tl.length, dl.length) };
     });
     var y = 12;
     laid.forEach(function (L) { L.y = y; y += L.h + GAP; });
-    var s = svg(host, y - GAP + 12, label);
+    var s = svg(host, y - GAP + 12, label, g.W);
     laid.forEach(function (L, i) {
       band(s, L.y, L.r[0], L.r[1], L.r[2], x, w);
       if (i < laid.length - 1) down(s, L.y + L.h, x + w / 2);
@@ -118,6 +118,85 @@
     b.addEventListener('click', fn); host.appendChild(b); return b;
   }
   function source(id) { return Stack.implSource(id) === 'you' ? 'your ' + id + '()' : 'reference ' + id + '() (you have not built this slot yet)'; }
+
+  /* Reader-controlled stage playback shared by the new mechanism explainers. */
+  function stepper(host, last, render) {
+    host.classList.add('aq-stepper');
+    var controls = E('div', { class: 'btn-row' }); host.appendChild(controls);
+    var stage = 0, timer = null, running = false,
+      reduced = matchMedia('(prefers-reduced-motion: reduce)');
+    var play = button(controls, 'Play', start),
+      pause = button(controls, 'Pause', stop, true),
+      next = button(controls, 'Next stage', function () { stop(); set(Math.min(last, stage + 1)); }, true),
+      reset = button(controls, 'Reset', function () { stop(); set(0); }, true);
+    function sync() {
+      play.disabled = running;
+      pause.disabled = !running;
+      next.disabled = stage === last;
+      play.textContent = reduced.matches ? 'Show result' : stage === last ? 'Replay' : stage === 0 ? 'Play' : 'Continue';
+    }
+    function set(n) { stage = n; render(n); sync(); }
+    function stop() { clearTimeout(timer); timer = null; running = false; sync(); }
+    function advance() {
+      if (!running) return;
+      set(Math.min(last, stage + 1));
+      if (stage === last) stop(); else timer = setTimeout(advance, 1700);
+    }
+    function start() {
+      stop();
+      if (reduced.matches) { set(last); return; }
+      if (stage === last) set(0);
+      running = true; sync();
+      timer = setTimeout(advance, stage === 0 ? 900 : 300);
+    }
+    reduced.addEventListener('change', function () { stop(); set(stage); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); });
+    sync();
+    return { set: set, stop: stop, redraw: function () { render(stage); }, manual: function () { stop(); stage = 0; sync(); } };
+  }
+
+  /* ---------- ch.2 · score, clearing price, revenue ---------- */
+  function auctionExplainer() {
+    var h = mount('w-auction-explainer', 'One auction, three different numbers',
+      'A one-slot teaching example. Change Sprout’s predicted CTR, then follow the score, winner, click price and expected revenue. True CTR stays at 2.5%; the rival’s bid and pCTR stay fixed.', true);
+    if (!h) return;
+    var label = E('label', { text: 'Sprout predicted CTR: ' }), value = E('strong', { text: '4.0%' });
+    var range = E('input', { type: 'range', min: '1', max: '6', step: '0.5', value: '4', 'aria-label': 'Sprout predicted click-through rate in percent' });
+    label.appendChild(value); h.appendChild(label); h.appendChild(range);
+    var controller = stepper(h, 3, draw), out = E('div'); h.appendChild(out);
+    var status = output(h), panel = null, data = null;
+    function build() {
+      out.replaceChildren();
+      var p = +range.value / 100, score = 1.2 * p, rival = 1.6 * .02,
+        sproutWins = score > rival,
+        price = sproutWins ? rival / p : score / .02,
+        trueCTR = sproutWins ? .025 : .02,
+        revenue = price * trueCTR;
+      value.textContent = (+range.value).toFixed(1) + '%';
+      var rows = [
+        ['1 · Inputs', 'Sprout: $1.20 × ' + (+range.value).toFixed(1) + '%; rival: $1.60 × 2.0%', ''],
+        ['2 · Auction scores', 'Sprout: $' + score.toFixed(3) + '; rival: $' + rival.toFixed(3) + ' per impression', ''],
+        ['3 · Winner and clearing CPC', (sproutWins ? 'Sprout' : 'Rival') + ' wins; price = next score ÷ winner pCTR = $' + price.toFixed(2), ''],
+        ['4 · Expected platform revenue', '$' + price.toFixed(2) + ' clearing CPC × ' + (trueCTR * 100).toFixed(1) + '% true CTR = $' + revenue.toFixed(3) + '/impression', '']
+      ];
+      panel = stage(out, rows, 'Auction inputs lead to bid-weighted scores, a winner, a clearing CPC, then platform revenue using true CTR.');
+      data = { score: score, rival: rival, winner: sproutWins ? 'Sprout' : 'Rival', price: price, revenue: revenue };
+    }
+    function draw(n) {
+      if (!panel) build();
+      var d = data, boxes = panel.querySelectorAll('rect.box');
+      boxes.forEach(function (b, i) { b.setAttribute('class', 'box ' + (i === n ? 'a cur' : i < n ? 'b' : 'aq-pending')); });
+      status.textContent = [
+        'Start with bids and predicted CTRs. Sprout’s true CTR is fixed at 2.5%; the rival’s true CTR is 2.0%.',
+        'Scores are bid-weighted dollars per impression: Sprout $' + d.score.toFixed(3) + ', rival $' + d.rival.toFixed(3) + '.',
+        d.winner + ' wins and pays $' + d.price.toFixed(2) + ' per click, below its own bid.',
+        'At the winner’s true CTR, expected platform revenue is $' + d.revenue.toFixed(3) + ' per impression. That is distinct from the winning auction score.'
+      ][n];
+      panel.setAttribute('aria-label', status.textContent);
+    }
+    range.addEventListener('input', function () { controller.stop(); panel = null; controller.set(0); });
+    onResize(function () { panel = null; controller.redraw(); }); controller.set(0);
+  }
 
   /* ---------- ch.2 · generalized second price ---------- */
   function gsp(host, ads, cands, res, rankBy) {
@@ -208,26 +287,45 @@
 
   /* ---------- ch.5 · the feedback loop ---------- */
   function feedback() {
-    var h = mount('w-feedback-diagram', 'The loop that keeps its own secrets', 'This switch changes the illustration, not your production exploration setting. Exploration gives eligible, previously overlooked ads a chance to supply labels; it does not guarantee a click.', true);
+    var h = mount('w-feedback-diagram', 'The loop that keeps its own secrets', 'Follow one overlooked eligible ad from selection to the next model. The switch changes this illustration, not your production setting. Exploration creates a chance to observe an outcome, not a guaranteed click.', true);
     if (!h) return;
     var label = E('label', { class: 'aq-check' }), input = E('input', { type: 'checkbox' });
     label.append(input, document.createTextNode(' Give overlooked ads a chance'));
     h.appendChild(label);
-    var out = E('div'); h.appendChild(out);
-    function draw() {
+    var controller = stepper(h, 3, draw), out = E('div'); h.appendChild(out);
+    var status = output(h), panel = null;
+    function build() {
       out.replaceChildren();
       var on = input.checked;
-      var s = stage(out, [
-        ['Show ads selected by the current policy', 'Selection decides which outcomes can be logged.', 'a'],
-        ['Log outcomes from shown ads', 'Clicks and non-clicks both become labels.', 'b'],
-        ['Train the next model', 'Learn from the examples the policy collected.', 'g'],
-        [on ? 'Explore other eligible ads' : 'The missing arm: never shown', on ? 'Some receive exposure → observed outcomes.' : 'No exposure → no outcome label.', 'v']
-      ], 'Exposure produces logged labels that train the next selection model; exploration adds a path for overlooked eligible ads.');
-      var b = s._bands, right = s._x + s._w, left = s._x;
-      arrow(s, 'M ' + right + ' ' + (b[2].y + b[2].h / 2) + ' H ' + (right + 26) + ' V ' + (b[0].y + b[0].h / 2) + ' H ' + (right + 4));
-      if (on) arrow(s, 'M ' + left + ' ' + (b[3].y + b[3].h / 2) + ' H ' + (left - 8) + ' V ' + (b[0].y + b[0].h / 2) + ' H ' + (left - 4));
+      panel = stage(out, [
+        ['1 · Eligible ad', 'Low initial prediction; still allowed to compete.', ''],
+        ['2 · Selection', on ? 'Exploration sometimes shows this ad.' : 'Current ranker leaves this ad unseen.', ''],
+        ['3 · Logged evidence', on ? 'If shown, its click or non-click is observed.' : 'No impression, so no click label is observed.', ''],
+        ['4 · Next model', on ? 'Can learn from those shown examples.' : 'Keeps the blind spot unless other evidence arrives.', '']
+      ], 'An eligible ad receives labels only if shown. Exploration may expose it, creating evidence for the next model.');
+      var b = panel._bands, right = panel._x + panel._w;
+      arrow(panel, 'M ' + right + ' ' + (b[3].y + b[3].h / 2) + ' H ' + (right + 26) + ' V ' + (b[1].y + b[1].h / 2) + ' H ' + (right + 4));
     }
-    input.addEventListener('change', draw); draw(); onResize(draw);
+    function draw(n) {
+      if (!panel) build();
+      panel.querySelectorAll('rect.box').forEach(function (b, i) {
+        b.setAttribute('class', 'box ' + (i === n ? 'a cur' : i < n ? 'b' : 'aq-pending'));
+      });
+      status.textContent = (input.checked ? [
+        'An eligible ad has a low starting prediction. Follow what exploration changes.',
+        'The exploration policy sometimes shows this overlooked ad; eligibility alone never guaranteed delivery.',
+        'When shown, its outcome becomes a logged click or non-click. A conversion is still not guaranteed.',
+        'The next model can use the new shown examples. Exploration expands support, but does not fix every bias.'
+      ] : [
+        'An eligible ad has a low starting prediction. Follow what happens without exploration.',
+        'The current ranker does not show this ad in this example.',
+        'No impression means no click label for this ad-user pair.',
+        'The next model learns from what was shown and may keep this blind spot.'
+      ])[n];
+      panel.setAttribute('aria-label', status.textContent);
+    }
+    input.addEventListener('change', function () { controller.stop(); panel = null; controller.set(0); });
+    onResize(function () { panel = null; controller.redraw(); }); controller.set(0);
   }
 
   /* ---------- ch.9 · AUC one pair at a time ---------- */
@@ -347,16 +445,20 @@
 
   /* ---------- ch.16 · attribution window ---------- */
   function timeline() {
-    var h = mount('w-timeline-diagram', 'Same window. Different clocks.', 'Two illustrative users: each sees an impression 15 minutes before clicking at hour 0. One converts at hour 2; the other at hour 120. Move the post-click window. This changes the illustration; use the next widget to compare windows on your logs.', true);
+    var h = mount('w-timeline-diagram', 'Credit moves. Lift does not.', 'Two illustrative clicked users convert at hour 2 and hour 120. Change the post-click attribution window and watch reported credit. The separate randomized-population example holds causal lift at 4 percentage points.', true);
     if (!h) return;
-    var label = E('label', { text: 'Attribution window: ' }), range = E('input', { type: 'range', min: '0', max: '168', step: '1', value: '24', 'aria-label': 'Attribution window in hours' });
-    label.appendChild(range); h.appendChild(label);
+    var windows = [1, 24, 72, 168];
+    var controller = stepper(h, 3, function (n) { range.value = String(windows[n]); draw(); });
+    var label = E('label', { text: 'Attribution window: ' }), value = E('strong', { text: '1 hour' }),
+      range = E('input', { type: 'range', min: '0', max: '168', step: '1', value: '24', 'aria-label': 'Attribution window in hours' });
+    label.appendChild(value); h.appendChild(label);
+    h.appendChild(range);
     var out = E('div'); h.appendChild(out);
     var status = output(h);
     function draw() {
       var v = +range.value, g = geom();
+      value.textContent = v + (v === 1 ? ' hour' : ' hours');
       out.replaceChildren();
-      stage(out, [['Impression → click', '−0.25 hours → hour 0 (both users)', 'b']], 'Both users see an impression a quarter hour before clicking at hour zero.');
       var c = Book.chart(out, {
         w: g.W, h: 210, x: [-12, 180], y: [0, 1], xticks: [0, 24, 72, 120, 168], yticks: [.25, .75],
         yfmt: function (y) { return y === .75 ? 'fast' : 'slow'; }, xlabel: 'Hours after click',
@@ -369,9 +471,15 @@
         c.line([[0, r[1]], [168, r[1]]], { color: 'var(--ink-3)', width: 1 });
         c.dots([[0, r[1], 4, 'var(--blue)'], [r[0], r[1], 6.5, r[0] <= v ? 'var(--green)' : 'var(--accent)']]);
       });
-      status.textContent = 'Window: ' + v + ' hours. Fast conversion at 2h: ' + (v >= 2 ? 'counted' : 'outside') + '. Slow conversion at 120h: ' + (v >= 120 ? 'counted' : 'outside') + '. Boundary rule: event time ≤ cutoff.';
+      var counted = (v >= 2 ? 1 : 0) + (v >= 120 ? 1 : 0);
+      stage(out, [
+        ['Attributed in this two-user story', counted + ' of 2 conversions inside the ' + v + '-hour window.', 'a'],
+        ['Causal lift in a separate holdout example', '10% assigned ads − 6% held out = 4 percentage points.', 'g']
+      ], 'Changing the attribution window changes credited events in a two-user story; a separate randomized population estimate stays at four percentage points.');
+      status.textContent = 'Window: ' + v + (v === 1 ? ' hour' : ' hours') + '; ' + counted + ' of 2 example conversions get credit. The separate holdout’s 4 percentage-point lift is unchanged. Attribution and lift use different evidence.';
     }
-    range.addEventListener('input', draw); draw(); onResize(draw);
+    range.addEventListener('input', function () { controller.manual(); draw(); });
+    onResize(draw); controller.set(0);
   }
 
   /* ---------- ch.16 · two worlds ---------- */
@@ -639,7 +747,7 @@
 
   window.AQDiagrams = { gsp: gsp, latency: latency };
   document.addEventListener('DOMContentLoaded', function () {
-    errors(); gradient(); feedback(); auc(); hashing(); timeline();
+    auctionExplainer(); errors(); gradient(); feedback(); auc(); hashing(); timeline();
     worlds(); objective(); levers(); privacy(); ann(); animatedFunnel();
   });
 })();

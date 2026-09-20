@@ -99,6 +99,8 @@
 
 <p>Read that formula again, slowly. <strong>Your price depends on your own pCTR.</strong> If the model thinks your ad is more clickable, you pay <em>less</em> per click for the same slot. That's on purpose: it rewards relevant ads. But it also means that when the model is wrong about your ad, your price is wrong too. Which is, conveniently, the entire plot of Chapter 3.</p>
 
+<div id="w-auction-explainer"></div>
+
 <div class="widget" id="w-gsp">
   <div class="w-title">A GSP auction you can edit</div>
   <div class="w-sub">Five advertisers, three slots. Edit bids and pCTRs. Slot click rates fall with position: 100%, 62%, 41% of slot 1's.</div>
@@ -187,7 +189,7 @@
   <h3>Key terms</h3>
   <div class="terms">
     <div><b>Second-price auction</b>Winner pays the runner-up's bid; bidding true value is optimal.</div>
-    <div><b>eCPM</b>Expected revenue per thousand impressions: bid × pCTR × 1000 for CPC.</div>
+    <div><b>eCPM</b>Here, bid-weighted auction score per thousand impressions: bid × pCTR × 1000 for CPC. Clearing price and true clicks determine revenue.</div>
     <div><b>GSP</b>Multi-slot auction: rank by bid × pCTR, pay the next score ÷ own pCTR.</div>
     <div><b>Reserve price</b>Minimum eCPM to be shown; trades fill rate for price.</div>
     <div><b>Bid shading</b>Bidding below value, needed in first-price auctions.</div>

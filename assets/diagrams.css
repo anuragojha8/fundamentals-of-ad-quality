@@ -31,6 +31,9 @@ figure.aq-diagram { margin: 2em 0; padding: 0; background: none; border: 0; box-
 .aq-diagram .aq-check { display: flex; align-items: center; gap: 8px; margin: 10px 0 14px; font-size: 14px; color: var(--ink-2); }
 .aq-diagram label { font-size: 14px; color: var(--ink-2); }
 .aq-diagram input[type=text] { width: 100%; max-width: 360px; margin-left: 8px; }
+.aq-diagram input[type=range] { width: min(100%, 360px); display: block; margin: 8px 0 14px; accent-color: var(--accent); }
+.aq-stepper svg .box { transition: fill .5s cubic-bezier(.22,.68,.3,1), stroke .5s cubic-bezier(.22,.68,.3,1), opacity .5s ease; }
+.aq-stepper svg .box.aq-pending { opacity: .58; }
 
 /* Clickable shapes (the capstone lever map) get a real affordance. */
 .aq-diagram svg a { cursor: pointer; }
@@ -49,6 +52,7 @@ figure.aq-diagram { margin: 2em 0; padding: 0; background: none; border: 0; box-
 @media (prefers-reduced-motion: reduce) {
   #w-request-funnel .aq-candidate { transition: none; }
   .aq-diagram svg a .box { transition: none; }
+  .aq-stepper svg .box { transition: none; }
 }
 
 @media (max-width: 600px) {

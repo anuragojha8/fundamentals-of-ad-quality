@@ -234,6 +234,12 @@ Charts come from `Book.chart(container, opts)`.
   CSS sets `transition: none`, and the JS play button jumps straight to the final state
   and relabels itself (*Show result*). The reader must still be able to reach every stage
   via the non-animated controls.
+- For a mechanism explainer, use the shared `stepper()` in `assets/diagrams.js`. Keep a
+  sentence in `.aq-status` for every stage, including the initial one. Chapters 2, 5,
+  and 16 show the pattern: auction score → clearing price → revenue; exposure → labels
+  → next model; attribution credit beside a separately measured holdout lift. State
+  which numbers are illustrative and which come from the reader's stack. Keep a stage
+  SVG mounted when advancing only changes emphasis; redraw charts when their data change.
 
 ## 8. Mobile rules (≤600px, test at 375px)
 
