@@ -242,7 +242,7 @@
       { key: 'seed', label: 'Random draw', min: 1, max: 20, step: 1, value: 1 }
     ], draw);
     L.appendChild(el('p', { class: 'small muted', html: 'True CTR ' + (trueCtr * 100) + '%, prior ' + (prior * 100).toFixed(1) + '% (the global CTR). m = 0 is the raw ratio.' }));
-    var c = Book.chart(R, { w: 520, h: 250, x: [0, 1000], y: [0, 0.15], xlabel: 'Impressions so far', ylabel: 'Estimated CTR', yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+    var c = Book.chart(R, { w: 478, h: 250, x: [0, 1000], y: [0, 0.15], xlabel: 'Impressions so far', ylabel: 'Estimated CTR', yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
     Book.legend(R, [{ label: 'Raw clicks / impressions', color: 'var(--s2)' }, { label: 'Smoothed', color: 'var(--s1)' }, { label: 'True CTR', color: 'var(--ink-3)', dash: true }]);
     function draw() {
       var r = Book.rng(ctl.values.seed * 7919), m = ctl.values.m, sm = Stack.impl('smoothedCTR'), clicks = 0, raw = [], smo = [];

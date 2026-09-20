@@ -190,7 +190,7 @@
     var ctl = Book.controls(L, [{ key: 'lr', label: 'Learning rate η', min: -1, max: 2, step: 0.05, value: 0.7, fmt: function (v) { return Math.pow(10, v).toFixed(2); } }], draw);
     var st = Book.stats(L, [{ key: 'l', label: 'Loss after 60 steps' }, { key: 'p0', label: 'σ(b)', sub: 'target 5%' }, { key: 'p1', label: 'σ(b + w)', sub: 'target 20%' }]);
     var B = [-6, 1], Wr = [-1.5, 4];
-    var c = Book.chart(R, { w: 520, h: 330, x: B, y: Wr, xlabel: 'bias b', ylabel: 'feature weight w' });
+    var c = Book.chart(R, { w: 478, h: 330, x: B, y: Wr, xlabel: 'bias b', ylabel: 'feature weight w' });
     var cells = [], N = 36, mn = Infinity, mx = -Infinity;
     for (var i = 0; i < N; i++) for (var j = 0; j < N; j++) {
       var b = B[0] + (i + 0.5) * (B[1] - B[0]) / N, wt = Wr[0] + (j + 0.5) * (Wr[1] - Wr[0]) / N, l = Math.log(loss(b, wt));
@@ -229,7 +229,7 @@
       { key: 'l2', label: 'L2 strength', min: 0, max: 4, step: 1, value: 1, fmt: function (v) { return l2s[v] ? l2s[v].toExponential(0) : '0'; } }
     ], function () {});
     var btnHost = el('div', { style: 'margin-top:10px' }); L.appendChild(btnHost);
-    var c1 = Book.chart(R, { w: 520, h: 200, x: [0, 2], y: [0.1, 0.2], xlabel: 'Epoch', ylabel: 'Running train loss', yfmt: function (v) { return v.toFixed(3); } });
+    var c1 = Book.chart(R, { w: 478, h: 200, x: [0, 2], y: [0.1, 0.2], xlabel: 'Epoch', ylabel: 'Running train loss', yfmt: function (v) { return v.toFixed(3); } });
     var c2host = el('div'); R.appendChild(c2host);
     var out = el('div'); host.appendChild(out);
     var data = null;
@@ -260,7 +260,7 @@
       var heur = Stack.evaluate(data.ev.impressions.map(function (i) { return i.pctr * w.cfg.examine[i.slot]; }), ey, et);
       c2host.innerHTML = '';
       var ys = []; perEpoch.forEach(function (p) { ys.push(p.train, p.held); });
-      var c2 = Book.chart(c2host, { w: 520, h: 190, x: [0.8, E + 0.2], y: [Math.min.apply(null, ys) * 0.98, Math.max.apply(null, ys) * 1.02], xticks: perEpoch.map(function (p) { return p.e; }), xlabel: 'After epoch', ylabel: 'Log loss', yfmt: function (v) { return v.toFixed(3); } });
+      var c2 = Book.chart(c2host, { w: 478, h: 190, x: [0.8, E + 0.2], y: [Math.min.apply(null, ys) * 0.98, Math.max.apply(null, ys) * 1.02], xticks: perEpoch.map(function (p) { return p.e; }), xlabel: 'After epoch', ylabel: 'Log loss', yfmt: function (v) { return v.toFixed(3); } });
       c2.line(perEpoch.map(function (p) { return [p.e, p.train]; }), { color: 'var(--s1)' });
       c2.line(perEpoch.map(function (p) { return [p.e, p.held]; }), { color: 'var(--s2)' });
       c2.dots(perEpoch.map(function (p) { return [p.e, p.held, 4, 'var(--s2)']; }).concat(perEpoch.map(function (p) { return [p.e, p.train, 4, 'var(--s1)']; })));
@@ -301,7 +301,7 @@
     var mL = Stack.mean(learned.map(function (p) { return p[1]; })), mT = Stack.mean(truth.map(function (p) { return p[1]; }));
     var L2 = learned.map(function (p) { return [p[0], p[1] - mL]; }), T2 = truth.map(function (p) { return [p[0], p[1] - mT]; });
     var all = L2.concat(T2).map(function (p) { return p[1]; });
-    var c = Book.chart(insideOut, { w: 640, h: 240, x: [0, 23], y: [Math.min.apply(null, all) - 0.1, Math.max.apply(null, all) + 0.1], xlabel: 'Hour of day', ylabel: 'Effect on log-odds', xticks: [0, 3, 6, 9, 12, 15, 18, 21], xfmt: function (v) { return v + ':00'; }, yfmt: function (v) { return v.toFixed(1); } });
+    var c = Book.chart(insideOut, { w: 746, h: 240, x: [0, 23], y: [Math.min.apply(null, all) - 0.1, Math.max.apply(null, all) + 0.1], xlabel: 'Hour of day', ylabel: 'Effect on log-odds', xticks: [0, 3, 6, 9, 12, 15, 18, 21], xfmt: function (v) { return v + ':00'; }, yfmt: function (v) { return v.toFixed(1); } });
     c.line(T2, { color: 'var(--ink-3)', dash: '5 4' }); c.line(L2, { color: 'var(--s2)' }); c.dots(L2.map(function (p) { return [p[0], p[1], 3, 'var(--s2)']; }));
     Book.legend(insideOut, [{ label: 'Your model\'s learned weights (centred)', color: 'var(--s2)' }, { label: 'True effect in the simulator (centred)', color: 'var(--ink-3)', dash: true }]);
     insideOut.appendChild(el('p', { class: 'small', text: 'Both are centred on zero because only the shape matters: a constant shift is absorbed by other weights. Peaks at lunch and dinner were learned from clicks alone. The wiggles are noise; some hours have little Food traffic.' }));

@@ -207,9 +207,9 @@
       out.innerHTML = '';
       var g = el('div', { class: 'w-grid two' }), L = el('div'), R2 = el('div'); g.appendChild(L); g.appendChild(R2); out.appendChild(g);
       var all = []; res.forEach(function (r) { r.curve.forEach(function (c) { all.push(c.auc); }); });
-      var c1 = Book.chart(L, { w: 420, h: 240, x: [D0, D1 - 1], y: [Math.min.apply(null, all) - 0.01, Math.max.apply(null, all) + 0.01], xlabel: 'Day', ylabel: 'Ranking accuracy vs. truth', yfmt: function (v) { return v.toFixed(2); } });
+      var c1 = Book.chart(L, { w: 364, h: 240, x: [D0, D1 - 1], y: [Math.min.apply(null, all) - 0.01, Math.max.apply(null, all) + 0.01], xlabel: 'Day', ylabel: 'Ranking accuracy vs. truth', yfmt: function (v) { return v.toFixed(2); } });
       var allC = []; res.forEach(function (r) { r.curve.forEach(function (c) { allC.push(c.cal); }); });
-      var c2 = Book.chart(R2, { w: 420, h: 240, x: [D0, D1 - 1], y: [Math.min(0.8, Math.min.apply(null, allC)), Math.max(1.2, Math.max.apply(null, allC))], xlabel: 'Day', ylabel: 'Calibration vs. truth', yfmt: function (v) { return v.toFixed(2); } });
+      var c2 = Book.chart(R2, { w: 364, h: 240, x: [D0, D1 - 1], y: [Math.min(0.8, Math.min.apply(null, allC)), Math.max(1.2, Math.max.apply(null, allC))], xlabel: 'Day', ylabel: 'Calibration vs. truth', yfmt: function (v) { return v.toFixed(2); } });
       c2.hline(1, {});
       res.forEach(function (r, i) { c1.line(r.curve.map(function (c) { return [c.d, c.auc]; }), { color: colors[i], width: 1.8 }); c2.line(r.curve.map(function (c) { return [c.d, c.cal]; }), { color: colors[i], width: 1.8 }); });
       Book.legend(out, res.map(function (r, i) { return { label: r.S.label, color: colors[i] }; }));

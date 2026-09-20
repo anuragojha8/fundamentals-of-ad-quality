@@ -237,7 +237,7 @@
       var shC = sh.map(function (x) { return x[1] / x[0]; }), nmC = nm.map(function (x) { return x[1] / x[0]; });
       var est = shC.map(function (x) { return x / shC[0]; }), naive = nmC.map(function (x) { return x / nmC[0]; });
       out.innerHTML = '';
-      var c = Book.chart(out, { w: 560, h: 240, x: [0.5, 3.5], y: [0, 1.1], xticks: [1, 2, 3], xlabel: 'Slot', ylabel: 'Examination vs. slot 1', xfmt: function (v) { return 'slot ' + v; }, yfmt: function (v) { return Math.round(v * 100) + '%'; } });
+      var c = Book.chart(out, { w: 746, h: 240, x: [0.5, 3.5], y: [0, 1.1], xticks: [1, 2, 3], xlabel: 'Slot', ylabel: 'Examination vs. slot 1', xfmt: function (v) { return 'slot ' + v; }, yfmt: function (v) { return Math.round(v * 100) + '%'; } });
       c.line([[1, EX[0]], [2, EX[1]], [3, EX[2]]], { color: 'var(--ink-3)', dash: '5 4' });
       c.line(naive.map(function (v, i) { return [i + 1, v]; }), { color: 'var(--s2)' });
       c.line(est.map(function (v, i) { return [i + 1, v]; }), { color: 'var(--s1)' });
@@ -302,7 +302,7 @@
       out.innerHTML = '';
       var g = el('div', { class: 'w-grid two' }), L = el('div'), R = el('div'); g.appendChild(L); g.appendChild(R); out.appendChild(g);
       var ymax = Math.max.apply(null, res.map(function (r) { return r.cum; })) * 1.05;
-      var c = Book.chart(L, { w: 420, h: 260, x: [0, 14], y: [0, ymax], xlabel: 'Day', ylabel: 'Cumulative revenue', yfmt: function (v) { return '$' + Math.round(v / 1000) + 'k'; } });
+      var c = Book.chart(L, { w: 364, h: 260, x: [0, 14], y: [0, ymax], xlabel: 'Day', ylabel: 'Cumulative revenue', yfmt: function (v) { return '$' + Math.round(v / 1000) + 'k'; } });
       res.forEach(function (r, i) { c.line(r.curve, { color: colors[i] }); });
       Book.legend(L, res.map(function (r, i) { return { label: 'ε = ' + Math.round(r.eps * 100) + '%', color: colors[i] }; }));
       StackUI.table(R, [

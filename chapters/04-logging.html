@@ -236,8 +236,16 @@
       { key: 'win', label: 'Attribution window', min: 0, max: 2, step: 1, value: 1, fmt: function (v) { return ['1 day', '7 days', '28 days'][v]; } }
     ], draw);
     var st = Book.stats(L, [{ key: 'all', label: 'Labeled CVR, all days' }, { key: 'last', label: 'Day 9 only' }]);
-    var c = Book.chart(R, { w: 520, h: 250, x: [-0.5, 9.5], y: [0, 0.12], xlabel: 'Day the impression was served', ylabel: 'Labeled post-click CVR', xticks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
-    Book.legend(R, [{ label: 'Labeled with your settings', color: 'var(--s2)' }, { label: 'Eventually (fully matured, 7-day window)', color: 'var(--ink-3)', dash: true }]);
+    /* Built on first draw, not now: a chart sizes its viewBox from the width it renders
+       at, and `body` is still display:none here. */
+    var c = null;
+    function ensureChart() {
+      if (!c) {
+        c = Book.chart(R, { w: 478, h: 250, x: [-0.5, 9.5], y: [0, 0.12], xlabel: 'Day the impression was served', ylabel: 'Labeled post-click CVR', xticks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+        Book.legend(R, [{ label: 'Labeled with your settings', color: 'var(--s2)' }, { label: 'Eventually (fully matured, 7-day window)', color: 'var(--ink-3)', dash: true }]);
+      }
+      return c;
+    }
     var log = null;
     StackUI.asyncButton(btnHost, 'Load logs and join', async function (progress) {
       log = await getLog(function (p) { progress(p, 'Serving traffic…'); });
@@ -254,6 +262,7 @@
       if (!log) return;
       var end = 240, v = ctl.values, win = [24, 168, 672][v.win];
       var a = cvrByDay(end + nowOpts[v.now], win), full = cvrByDay(end + 2000, 168);
+      var c = ensureChart();
       c.clear();
       c.line(full.byDay.map(function (y, d) { return [d, y]; }), { color: 'var(--ink-3)', dash: '5 4' });
       c.line(a.byDay.map(function (y, d) { return [d, y]; }), { color: 'var(--s2)' });

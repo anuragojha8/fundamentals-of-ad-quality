@@ -133,9 +133,9 @@
     { key: 'adv', label: 'Advertisers active' }
   ]);
   var cL = el('div'), cR = el('div'); charts.appendChild(cL); charts.appendChild(cR);
-  var ch1 = Book.chart(cL, { w: 420, h: 220, x: [0.5, WEEKS + 0.5], y: [0, 1], xticks: [1, 3, 5, 7, 9, 11], xlabel: 'Week', ylabel: 'Weekly revenue', yfmt: function (v) { return '$' + Math.round(v); } });
+  var ch1 = Book.chart(cL, { w: 364, h: 220, x: [0.5, WEEKS + 0.5], y: [0, 1], xticks: [1, 3, 5, 7, 9, 11], xlabel: 'Week', ylabel: 'Weekly revenue', yfmt: function (v) { return '$' + Math.round(v); } });
   Book.legend(cL, [{ label: 'You', color: 'var(--s1)' }, { label: 'Autopilot', color: 'var(--ink-3)', dash: true }]);
-  var ch2 = Book.chart(cR, { w: 420, h: 220, x: [0.5, WEEKS + 0.5], y: [0.8, 1.15], xticks: [1, 3, 5, 7, 9, 11], xlabel: 'Week', ylabel: 'Active users (start = 1)', yfmt: function (v) { return v.toFixed(2); } });
+  var ch2 = Book.chart(cR, { w: 364, h: 220, x: [0.5, WEEKS + 0.5], y: [0.8, 1.15], xticks: [1, 3, 5, 7, 9, 11], xlabel: 'Week', ylabel: 'Active users (start = 1)', yfmt: function (v) { return v.toFixed(2); } });
   Book.legend(cR, [{ label: 'You', color: 'var(--s1)' }, { label: 'Autopilot', color: 'var(--ink-3)', dash: true }]);
 
   function lever(title, options, key, hint) {

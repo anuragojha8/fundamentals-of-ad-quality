@@ -254,7 +254,7 @@
     var mx = 0;
     series.forEach(function (s) { s.bins.forEach(function (b) { mx = Math.max(mx, b.pred, b.actual); }); });
     mx = Math.min(1, mx * 1.1);
-    var c = Book.chart(host, { w: 480, h: 300, x: [0, mx], y: [0, mx], xlabel: 'Predicted CTR', ylabel: 'Actual CTR', xfmt: function (v) { return (v * 100).toFixed(0) + '%'; }, yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
+    var c = Book.chart(host, { w: 364, h: 300, x: [0, mx], y: [0, mx], xlabel: 'Predicted CTR', ylabel: 'Actual CTR', xfmt: function (v) { return (v * 100).toFixed(0) + '%'; }, yfmt: function (v) { return (v * 100).toFixed(0) + '%'; } });
     c.line([[0, 0], [mx, mx]], { color: 'var(--ink-3)', dash: '4 4', width: 1.2 });
     series.forEach(function (s) {
       if (s.dots) c.dots(s.bins.map(function (b) { return [b.pred, b.actual, 4.5, s.color]; }));

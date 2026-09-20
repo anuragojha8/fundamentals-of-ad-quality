@@ -322,6 +322,8 @@
      same reason. Height changes (a chart redrawing, an accordion opening) must not fire
      this, so it watches the viewport width and ignores small jitter. */
   var redraws = [], lastW = window.innerWidth, resizeT = null;
+  // A handler that returns false has nothing left to draw (its container is gone) and
+  // is dropped, so replaced widgets do not pile up.
   function onResize(fn) { redraws.push(fn); }
   window.addEventListener('resize', function () {
     clearTimeout(resizeT);
@@ -329,7 +331,7 @@
       if (Math.abs(window.innerWidth - lastW) < 8) return;
       lastW = window.innerWidth;
       // One widget failing to redraw must not stop the rest of the page.
-      redraws.forEach(function (fn) { try { fn(); } catch (e) { /* ignore */ } });
+      redraws = redraws.filter(function (fn) { try { return fn() !== false; } catch (e) { return true; } });
     }, 160);
   });
 
@@ -360,7 +362,13 @@
     /* Tick text no longer shrinks with the container, so a narrow chart needs fewer of
        them or the x labels collide. */
     var nx = o.nx || (W < 420 ? 4 : 6), ny = o.ny || (W < 420 ? 4 : 5);
-    var m = Object.assign({ t: 14, r: 16, b: o.xlabel ? 44 : 28, l: o.ylabel ? 58 : 44 }, o.margin || {});
+    /* `margin` may be a function of the measured width, for a chart whose labels need
+       more room once they stop being scaled down with the container. */
+    function margins() {
+      var extra = typeof o.margin === 'function' ? o.margin(W) : o.margin;
+      return Object.assign({ t: 14, r: 16, b: o.xlabel ? 44 : 28, l: o.ylabel ? 58 : 44 }, extra || {});
+    }
+    var m = margins();
     var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': o.label || 'chart' }, holder);
     var gAxes = sv('g', null, svg), gData = sv('g', null, svg), gTop = sv('g', null, svg);
     var X = o.x || [0, 1], Y = o.y || [0, 1];
@@ -391,10 +399,15 @@
       if (o.ylabel) sv('text', { x: 14, y: (m.t + H - m.b) / 2, 'text-anchor': 'middle', class: 'lbl', transform: 'rotate(-90 14 ' + ((m.t + H - m.b) / 2) + ')', text: o.ylabel }, gAxes);
     }
     axes();
+    /* Every drawing call is recorded so the chart can rebuild itself at a new width
+       without the call site having to know it happened. `clear()` empties the log the
+       same way it empties the canvas; `setDomain` is not recorded because X and Y
+       already persist. */
+    var log = [];
     var api = {
       svg: svg, g: gData, top: gTop, sx: sx, sy: sy, invx: invx, invy: invy, W: W, H: H, m: m,
       setDomain: function (x, y) { if (x) X = x; if (y) Y = y; axes(); },
-      clear: function () { while (gData.firstChild) gData.removeChild(gData.firstChild); while (gTop.firstChild) gTop.removeChild(gTop.firstChild); },
+      clear: function () { log = []; while (gData.firstChild) gData.removeChild(gData.firstChild); while (gTop.firstChild) gTop.removeChild(gTop.firstChild); },
       line: function (pts, s) {
         s = s || {};
         var d = pts.filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); })
@@ -420,11 +433,34 @@
       },
       text: function (x, y, str, s) {
         s = s || {};
-        return sv('text', { x: sx(x) + (s.dx || 0), y: sy(y) + (s.dy || 0), 'text-anchor': s.anchor || 'start', text: str, style: 'fill:' + (s.color || 'var(--ink-2)') + ';font-size:' + (s.size || 12) + 'px;font-weight:' + (s.weight || 500) }, gTop);
+        var px = sx(x) + (s.dx || 0), py = sy(y) + (s.dy || 0);
+        var a = { x: px, y: py, 'text-anchor': s.anchor || 'start', text: str, style: 'fill:' + (s.color || 'var(--ink-2)') + ';font-size:' + (s.size || 12) + 'px;font-weight:' + (s.weight || 500) };
+        if (s.rotate) a.transform = 'rotate(' + s.rotate + ' ' + px + ' ' + py + ')';
+        return sv('text', a, gTop);
       },
       vline: function (x, s) { s = s || {}; return sv('line', { x1: sx(x), x2: sx(x), y1: sy(Y[0]), y2: sy(Y[1]), stroke: s.color || 'var(--ink-3)', 'stroke-width': s.width || 1.5, 'stroke-dasharray': s.dash || '4 4' }, gTop); },
       hline: function (y, s) { s = s || {}; return sv('line', { x1: sx(X[0]), x2: sx(X[1]), y1: sy(y), y2: sy(y), stroke: s.color || 'var(--ink-3)', 'stroke-width': s.width || 1.5, 'stroke-dasharray': s.dash || '4 4' }, gTop); }
     };
+    ['line', 'area', 'dots', 'rect', 'text', 'vline', 'hline'].forEach(function (k) {
+      var fn = api[k];
+      api[k] = function () { log.push([k, [].slice.call(arguments)]); return fn.apply(api, arguments); };
+    });
+    /* The viewBox is the rendered width, so a width change makes the picture stale.
+       Redraw at the new width and replay; returning false unregisters a chart whose
+       container has since been replaced. */
+    onResize(function () {
+      if (!holder.isConnected) return false;
+      var nw = chartWidth(holder, o.w);
+      if (Math.abs(nw - W) < 2) return;
+      W = nw; api.W = W;
+      nx = o.nx || (W < 420 ? 4 : 6); ny = o.ny || (W < 420 ? 4 : 5);
+      m = margins(); api.m = m;
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      axes();
+      var replay = log;
+      api.clear();
+      replay.forEach(function (e) { api[e[0]].apply(api, e[1]); });
+    });
     return api;
   }
   function legend(container, items) {
