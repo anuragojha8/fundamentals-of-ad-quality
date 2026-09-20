@@ -75,6 +75,8 @@
   }
 
   function arrow(s, d) { S('path', { d: d, class: 'arrow', style: 'marker-end:url(#' + s._arrow + ')' }, s); }
+  /* Feeds into a junction that another path already terminates with an arrowhead. */
+  function link(s, d) { S('path', { d: d, class: 'aq-line' }, s); }
   function down(s, y, cx) {
     var g = geom();
     arrow(s, 'M ' + (cx == null ? g.pad + (g.W - g.pad - g.gut) / 2 : cx) + ' ' + y + ' V ' + (y + GAP));
@@ -158,7 +160,8 @@
         r.slice(0, 5).forEach(function (t, j) { txt(s, px + 20, py + 24 + j * (j ? 15 : 18) + (j ? 3 : 0), t, j ? 't-sm' : 't-md t-b'); });
         var cx = px + pw / 2;
         if (cols === 1) arrow(s, 'M ' + cx + ' ' + (py + ph) + ' V ' + (py + ph + (i ? 28 : 22)));
-        else arrow(s, 'M ' + cx + ' ' + (py + ph) + ' V ' + (py + ph + 20) + ' H 380' + (i ? '' : ' V ' + joinY));
+        else if (i) link(s, 'M ' + cx + ' ' + (py + ph) + ' V ' + (py + ph + 20) + ' H 380');
+        else arrow(s, 'M ' + cx + ' ' + (py + ph) + ' V ' + (py + ph + 20) + ' H 380 V ' + joinY);
       });
       band(s, joinY, 'Somebody pays the wrong price.', 'At the true 4% CTR: CPC $0.75; spend 3¢.', 'v', joinX, joinW);
     }
@@ -388,7 +391,8 @@
         r.slice(0, 4).forEach(function (t, j) { txt(s, px + 20, py + 24 + j * (j ? 15 : 18) + (j ? 3 : 0), t, j ? 't-sm' : 't-md t-b'); });
         var cx = px + pw / 2;
         if (one) arrow(s, 'M ' + cx + ' ' + (py + ph) + ' V ' + (py + ph + (i ? 28 : 22)));
-        else arrow(s, 'M ' + cx + ' ' + (py + ph) + ' V ' + (py + ph + 20) + ' H 380' + (i ? '' : ' V ' + joinY));
+        else if (i) link(s, 'M ' + cx + ' ' + (py + ph) + ' V ' + (py + ph + 20) + ' H 380');
+        else arrow(s, 'M ' + cx + ' ' + (py + ph) + ' V ' + (py + ph + 20) + ' H 380 V ' + joinY);
       });
       band(s, joinY, '10% − 6% = 4 percentage points', '40 extra conversions per 1,000 assigned users.', 'g', joinX, joinW);
     }
