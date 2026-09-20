@@ -22,3 +22,7 @@ Follow `ANURAG_WRITING_GUIDE.md` (in the My Projects folder) for all prose in th
 ## Precision
 - Formulas, exact numbers, and terminology are never sacrificed for a joke.
 - Keep teaching simulations separate from empirical claims about real ad systems.
+
+## Sentence rhythm
+- Avoid stacking short fragments to manufacture emphasis, especially in instructions and quiz explanations. Connect the action to its reason: what changes, why it matters, and what the reader should try next.
+- Keep a short sentence when it earns its place as a punchline or a clear landing after a developed thought. Do not flatten every paragraph into one long sentence.

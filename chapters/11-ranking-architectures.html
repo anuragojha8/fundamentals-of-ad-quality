@@ -85,7 +85,7 @@
 <tr><td>Where it lives</td><td>Retrieval, early ranking</td><td>Late ranking</td></tr>
 </tbody></table></div>
 
-<p>That's why your stack serves the deep model in two stages. A cheap early ranker (your LR) picks the top 30 by eCPM, and only those 30 get the expensive treatment. Yep, it's Chapter 1's funnel. Again. I told you it would keep coming back.</p>
+<p>That's why your stack serves the deep model in two stages. A cheap early ranker (your LR) picks the top 30 by eCPM, and only those 30 get the expensive treatment. Chapter 1's funnel has returned, as promised, because the deep model has no business running across the entire ad catalog.</p>
 
 <h2 id="wide"><span class="sec">11.3</span>Wide &amp; Deep: don't throw away what you know</h2>
 
@@ -97,7 +97,7 @@
 
 <div class="widget" id="w-train">
   <div class="w-title">Build and train a deep ranker</div>
-  <div class="w-sub">Trained on your logs. Evaluated on held-out traffic, offline and against the truth.</div>
+  <div class="w-sub">Train on your logs, then compare held-out performance with what the simulator knows about true click probabilities.</div>
 </div>
 
 <div class="callout trap"><div class="label">Common trap</div>
@@ -138,7 +138,7 @@
     <li data-why="Embeddings aren't the issue; both model types use them.">It doesn't use embeddings</li>
     <li data-why="Training data isn't the constraint here.">It needs conversion labels</li>
   </ul>
-  <div class="explain"><p>With target attention, "the user" is a <em>different</em> vector for every candidate ad. There's no single user vector to look up in an index, so the cost scales with (users × ads). Totally affordable for 30 candidates. Completely impossible for 3 million.</p></div>
+  <div class="explain"><p>With target attention, "the user" is a <em>different</em> vector for every candidate ad. There's no single user vector to look up in an index, so the work scales with the number of (user, ad) pairs you evaluate. Doing that for 30 shortlisted ads is one thing; doing it for three million ads on every request is why we needed retrieval first.</p></div>
 </div>
 
 <div class="quiz" data-id="ch11-q2">

@@ -32,7 +32,7 @@
 
 <p class="lead">Let's take stock. For thirteen chapters, we've optimized clicks, conversions, and revenue. Those are what advertisers pay for, and you can measure them within a day. Very satisfying.</p>
 
-<p>But here's the part nobody puts on the dashboard: ads have a cost that never shows up in the auction. Every irrelevant or annoying ad makes Pebble a tiny bit worse. People hide ads. They scroll faster. They open the app a little less often. Those effects are slow, spread thin, and super easy to ignore, right up until the day they aren't. Pebble's users didn't open the app to see ads. Every ad spends a little of their patience. The real job of a quality PM is to spend it wisely. So in this chapter we finally put users into your stack's objective.</p>
+<p>But here's the part the auction doesn't put on the dashboard: an irrelevant ad can make Pebble a little worse for the person seeing it. They might hide it, scroll faster, or open the app a little less often next week. Each effect is small and easy to ignore on its own; together they can change how much attention Pebble has left to sell. Users didn't open the app to see ads, and every ad spends a little of their patience. In this chapter we finally put that cost into your stack's objective.</p>
 
 <h2 id="objective"><span class="sec">15.1</span>The objective you actually own</h2>
 
@@ -40,7 +40,7 @@
 
 \[ \text{score (\$/impression)} = \underbrace{\text{CPC bid (\$/click)} \times \text{pCTR}}_{\text{bid-weighted value}} \;-\; \underbrace{\lambda\;(\$/\text{hide}) \times \text{pHide}}_{\text{user-cost penalty}} \]
 
-<p>The weight \(\lambda\) prices a predicted hide in dollars. How many ad slots to show (<dfn>ad load</dfn>) is a separate allocation constraint, outside the score. Both are policy choices about user experience and short-term auction value; click data alone cannot choose them. No pressure. (Okay, a lot of pressure.)</p>
+<p>The weight \(\lambda\) prices a predicted hide in dollars. How many ad slots to show (<dfn>ad load</dfn>) is a separate allocation constraint, outside the score. Both are policy choices about user experience and short-term auction value; click data alone cannot tell you which settings are worth shipping.</p>
 
 <figure id="d-objective"></figure>
 

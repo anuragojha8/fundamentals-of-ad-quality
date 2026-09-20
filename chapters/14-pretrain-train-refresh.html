@@ -30,7 +30,7 @@
 
 <p class="lead">You know how you find an old photo of yourself and think, "who <em>is</em> that?" Models have the same problem, except they don't know it.</p>
 
-<p>Every model in your stack was trained on days 0 through 9. But Pebble kept going after day 9. Users' interests wander. Seasons change what people click on. Advertisers launch new creatives every day that your model has literally never seen. A model is just a snapshot of a world that refuses to hold still, and keeping it current matters just as much as how cleverly you built it. In this chapter we measure how fast your model goes stale, design a retraining schedule, and meet the ideas modern systems use to learn faster from less: <strong>warm starts, pre-training, and distillation</strong>.</p>
+<p>Every model in your stack was trained on days 0 through 9, but Pebble kept going. Users' interests wander, seasonal trends change what they click, and advertisers launch creatives your model has never seen. A model is a snapshot of a world that refuses to hold still, and keeping it current matters just as much as how cleverly you built it. In this chapter we measure how fast your model goes stale, design a retraining schedule, and meet the ideas modern systems use to learn faster from less: <strong>warm starts, pre-training, and distillation</strong>.</p>
 
 <h2 id="drift"><span class="sec">14.1</span>Drift: watching a model go stale</h2>
 
@@ -38,7 +38,7 @@
 
 <div class="widget" id="w-drift">
   <div class="w-title">Stale vs. fresh</div>
-  <div class="w-sub">On each evaluation day: your model trained on days 0–9 vs. the same recipe trained on the 10 days just before. Same traffic, same features.</div>
+  <div class="w-sub">On each evaluation day, compare the model trained on days 0–9 with the same recipe trained on the preceding 10 days. Both see the same traffic and features.</div>
 </div>
 
 <div class="callout intuition"><div class="label">Intuition</div>
@@ -123,7 +123,7 @@
 <div class="recap">
   <h3>What you built</h3>
   <p>A <strong>retraining policy</strong> for your stack, cadence plus warm or cold start, picked by simulating a whole season of drift. It's saved, and the capstone will run your stack with it.</p>
-  <p>That's every model in the book. Retrieval, ranking, conversions, freshness, all built by you. So we're done, right? Not quite. There's one stakeholder we've mostly ignored this whole time, and they happen to be the whole reason Pebble exists: the users. They didn't open the app to see ads. Next time, we finally take them seriously.</p>
+  <p>You've now worked through retrieval, ranking, conversion predictions, and keeping those models fresh. There's still one stakeholder we've mostly left out of the objective: the users, who did not open Pebble to see ads. Next time we look at what all those auctions cost them.</p>
   <h3>Key terms</h3>
   <div class="terms">
     <div><b>Drift</b>The world changes: interests, seasons, new ads. Models go stale.</div>

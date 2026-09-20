@@ -32,9 +32,9 @@
 
 <div class="stack-panel" data-chapter="12"></div>
 
-<p class="lead">Every ad your stack has served so far was sold per click. And for eleven chapters, we've acted like clicks were the whole point. They're not. A click is just a means to an end. Sprout wants meal-kit subscriptions. Nimbus wants bank accounts. Orbit wants installs. Nobody's out there celebrating a really great click.</p>
+<p class="lead">Every ad your stack has served so far was sold per click, so for eleven chapters we've acted like clicks were the whole point. But Sprout wants meal-kit subscriptions, Nimbus wants bank accounts, and Orbit wants installs. A click is only useful to them if it helps produce one of those outcomes. Nobody's out there celebrating a really great click.</p>
 
-<p>So modern ad platforms let advertisers optimize for the outcome they actually want, and the platform takes on the job of predicting it. In this chapter we build the post-click conversion model (<dfn>pCVR</dfn>) your stack needs. These labels are <strong>rare</strong>, <strong>late</strong>, and, in Pebble's simulator, recorded only after a click. View-through conversions exist elsewhere; this chapter doesn't model them. Three problems, one chapter. Let's go.</p>
+<p>So modern ad platforms let advertisers optimize for the outcome they actually want, and the platform takes on the job of predicting it. In this chapter we build the post-click conversion model (<dfn>pCVR</dfn>) your stack needs. Pebble records these labels only after a click, and they arrive rarely and late. View-through conversions exist elsewhere; this chapter doesn't model them. Let's see what those constraints do to the model.</p>
 
 <h2 id="ocpm"><span class="sec">12.1</span>Bidding for outcomes</h2>
 

@@ -40,7 +40,7 @@
 
 <h2 id="towers"><span class="sec">10.1</span>Two towers and a dot product</h2>
 
-<p>Here's the constraint that shapes everything about retrieval: you cannot run a model over every (user, ad) pair on every request. You just can't. So how would you design around that? Give it a second.</p>
+<p>Here's the constraint that shapes retrieval: you cannot afford a separate model pass for every (user, ad) pair on every request. What part of the work could you do before the user opens the app? Give it a second.</p>
 
 <p>The two-tower trick is beautifully simple: <strong>split the model so the user side and the ad side never meet until the very last step</strong>.</p>
 

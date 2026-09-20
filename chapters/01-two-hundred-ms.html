@@ -65,9 +65,9 @@
 
 <p>Because the feed won't wait for you. The ad server gets something like 100 milliseconds end to end, and ranking gets a slice of that. A heavy ranking model might need half a millisecond per candidate. That sounds like nothing, until you do the math: two thousand candidates at 0.5 ms each is a full second. Your user has scrolled past, closed the app, and started a new hobby.</p>
 
-<p>So we do the next best thing: a funnel. Cheap models go over lots of candidates, expensive models go over a few. Problem solved?</p>
+<p>So we build a funnel: cheap models examine lots of ads, and expensive ones spend their time on a short list. That gets us inside the deadline, but it means making decisions before our best model has seen the candidates.</p>
 
-<p>Not quite. Here's the catch, and it's the single most important idea in this chapter: <strong>every stage can only lose good ads, never find them</strong>. If retrieval throws away the best ad, no ranking model downstream, however fancy, can bring it back.</p>
+<p>Here's the catch, and it's the single most important idea in this chapter: <strong>every stage can only lose good ads, never find them</strong>. If retrieval throws away the best ad, no ranking model downstream, however fancy, can bring it back.</p>
 
 <p>Play with the tradeoff below. The simulation draws 20,000 eligible ads, each with a hidden true value. Each stage estimates those values with some noise (cheaper models are noisier) and keeps its top K. Try to find the sweet spot without blowing the budget.</p>
 
@@ -97,13 +97,11 @@
 
 <div class="exercise" data-id="ch1-e1" data-answer="80" data-tol="0.5" data-unit="candidates">
   <p class="q">Your late-stage ranker costs 0.5 ms of compute per candidate, and the ranking budget is 40 ms. Ignoring parallelism and overheads, what's the most candidates it can score?</p>
-  <details class="hint"><summary>Hint</summary><p>Budget ÷ cost per candidate. Yes, it's that simple.</p></details>
+  <details class="hint"><summary>Hint</summary><p>Divide the 40 ms ranking budget by the time it takes to score one candidate. We're ignoring overhead and parallel work for this exercise.</p></details>
   <div class="explain"><p>40 ms ÷ 0.5 ms = <strong>80 candidates</strong>. Real systems batch candidates on GPUs, so cost isn't perfectly linear, but the principle holds. The late ranker's candidate count is set by its cost per candidate. Double the model size and you roughly halve how many candidates it gets to look at.</p></div>
 </div>
 
 <h2 id="eligibility"><span class="sec">1.3</span>Build: the eligibility filter</h2>
-
-<p>Alright, enough talking. Time to build.</p>
 
 <p>Your stack's very first job is deciding which ads are allowed to show up at all. In our simulated Pebble, each ad has <strong>flight dates</strong> (it runs from <code>startDay</code> up to, but not including, <code>endDay</code>) and optional <strong>targeting</strong>: a list of allowed countries and a list of allowed age buckets. <code>null</code> means "anyone's fine."</p>
 

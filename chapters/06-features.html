@@ -34,7 +34,7 @@
 
 <div class="stack-panel" data-chapter="6"></div>
 
-<p class="lead">Here's a slightly humbling fact about the model you're about to train in Chapter 7. It's a logistic regression, and all it does is add up some weights, one per feature, and squash the total into a probability. That's it. That's the whole trick.</p>
+<p class="lead">Here's a slightly humbling fact about the model you're about to train in Chapter 7: logistic regression adds up one weight per active feature and squashes the total into a probability. The trick is deciding which features deserve a weight in the first place.</p>
 
 <p>Which means that whatever patterns exist in how Pebble's users click, the model can only find them if some feature, or some combination of features, points right at them. The model can't see what you don't show it. So this chapter is about building those features, and honestly, it's the part of modeling where your product intuition is worth the most. Finally, a chapter where "I know our users" is a technical skill!</p>
 
@@ -173,7 +173,7 @@
 <div class="recap">
   <h3>What you built</h3>
   <p>Your stack now has <strong>your very own feature extractor</strong>: IDs, crosses, history, and a smoothed counting feature, logged at serve time and hashed into a weight table. You also know what a leak looks like, which puts you ahead of a surprising number of people.</p>
-  <p>We have logs. We have labels. We have features. There's really only one thing left to do. Next time, we finally train a model, and I promise it's less scary than it sounds. Mostly it's just walking downhill, a lot of times.</p>
+  <p>We've collected logs, decided what counts as a label, and built features the model can actually see. Next time we put them together and train it. I promise the scary part is mostly just walking downhill, a lot of times.</p>
   <h3>Key terms</h3>
   <div class="terms">
     <div><b>Hashing trick</b>Map feature strings to a fixed number of buckets; collisions are the price.</div>

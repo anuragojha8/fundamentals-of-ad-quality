@@ -34,9 +34,9 @@
 
 <div class="stack-panel" data-chapter="5"></div>
 
-<p class="lead">In Chapter 4 you turned events into labels: 1 if clicked, 0 if not. Clean, simple, honest. It's really tempting to treat those labels as the ground truth about what users like.</p>
+<p class="lead">In Chapter 4 you turned events into labels: 1 if clicked, 0 if not. The table looks wonderfully clean, which makes it tempting to treat those labels as the ground truth about what users like.</p>
 
-<p>Look, I hate to be the one to tell you this, but they aren't. A click is the product of two things: what the user wanted, <em>and</em> what your system did. Which ad it picked. Where it put it. And, sneakiest of all, what it never showed at all. This chapter is about pulling those two things apart.</p>
+<p>Look, I hate to be the one to tell you this, but they aren't. A click depends on what the user wanted <em>and</em> what your system did: the ad it picked, where it placed that ad, and all the ads it never showed. This chapter is about pulling those influences apart.</p>
 
 <h2 id="label"><span class="sec">5.1</span>Choosing the label is a product decision</h2>
 
@@ -161,7 +161,7 @@
     <li data-why="Advertisers can raise bids, but the question is about the model's learning.">The advertiser's bid automatically rises until it wins</li>
     <li data-why="Calibration fixes averages across many ads, not one ad the system never shows.">The calibration layer corrects it</li>
   </ul>
-  <div class="explain"><p>That's the feedback loop, in all its glory. No impressions, no labels. No labels, no change in the prediction. The remedies: an exploration budget, optimistic priors for new ads, or new-ad boosts with their own measurement.</p></div>
+  <div class="explain"><p>The low prediction keeps the ad out of auctions, so it collects almost no impressions or click labels. Without that evidence, the model has little reason to revise its prediction. An exploration budget, an optimistic prior for new ads, or a measured new-ad boost can give it a chance to learn.</p></div>
 </div>
 
 <div class="reflect" data-id="ch5-r1">
@@ -178,7 +178,7 @@
 
 <div class="recap">
   <h3>What you built</h3>
-  <p>Your stack can now <strong>measure position bias</strong> with a randomized experiment, <strong>correct for it with IPW</strong>, and <strong>explore</strong> at a rate you chose. Every log it collects from here on carries the consequences of that choice. No pressure.</p>
+  <p>Your stack can now <strong>measure position bias</strong> with a randomized experiment, <strong>correct for it with IPW</strong>, and <strong>explore</strong> at a rate you chose. The next model will learn from the impressions that choice makes possible, which is why I made you pick a rate before we started training.</p>
   <p>So now we have logs, labels, and a healthy distrust of both. Next up, we have to decide what the model actually gets to <em>see</em> about a user and an ad. That's features, and it's where your product intuition finally gets to shine.</p>
   <h3>Key terms</h3>
   <div class="terms">
