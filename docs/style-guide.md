@@ -44,10 +44,12 @@ Base unit is 4px; block-level spacing lands on multiples of 8.
 - Paragraph gap `1.05em`. Lists `1.1em`.
 - `h2` gets `2.2em` above, `.5em` below. `h3` gets `1.8em` / `.4em`. The large space above
   a heading is what creates the page's rhythm — don't collapse it to make things fit.
-- **Block elements in the reading flow all use `2em` vertical margin**: `figure`,
-  `.widget`, `.code-cell`, `.table-wrap`. Callouts sit slightly tighter at `1.6em`
+- **Block elements in the reading flow all use `2rem` vertical margin**: `figure`,
+  `.widget`, `.code-cell`, `.table-wrap`. Callouts sit slightly tighter at `1.6rem`
   because they are asides inside the argument, not breaks in it. `.quiz` / `.exercise` /
-  `.reflect` use `1.8em`.
+  `.reflect` use `1.8rem`. **These are `rem`, not `em`, on purpose**: widgets set 15px
+  type and figures 13.5px, so the same `em` value produced visibly different gaps
+  (28px, 30px and 38px on the same page). Root-relative units keep one rhythm.
 - `hr` uses `3em` — it is a real section break and should feel like one.
 - **Bleed.** Interactive blocks (`.widget`, `.code-cell`) break the 720px measure:
   `margin-inline: -8px` on narrow screens, `-40px` at ≥900px. Static figures do **not**

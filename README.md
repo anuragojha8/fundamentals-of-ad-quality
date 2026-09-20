@@ -12,6 +12,14 @@ python3 tools/serve.py
 
 Then open http://localhost:8765. `tools/serve.py` disables caching so edits always show up. Opening the files directly (`file://`) mostly works, but code-cell tests then run on the page instead of in a sandboxed Web Worker.
 
+## Deploying
+
+`tools/build.sh` copies the book into `dist/` and minifies the CSS and JS with esbuild
+(fetched on demand by `npx`, so nothing is installed in the repo). Netlify runs it via
+`netlify.toml`. Minification happens only on the way to the CDN: the repo, the local
+server, and the tests all use the readable sources. Shipped assets are about 59 KB
+gzipped, down from 76 KB unminified.
+
 ## Structure
 
 | Path | What it is |

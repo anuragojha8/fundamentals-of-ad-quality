@@ -617,8 +617,8 @@
       main.appendChild(completionEl);
       var navRow = el('div', { class: 'chapter-nav' });
       var prev = CHAPTERS[idx - 1], next = CHAPTERS[idx + 1];
-      if (prev) navRow.appendChild(el('a', { href: prev.id + '.html', class: 'prev' }, [el('small', { text: '← Previous' }), prev.title]));
-      if (next) navRow.appendChild(el('a', { href: next.id + '.html', class: 'next' }, [el('small', { text: 'Next →' }), next.title]));
+      if (prev) navRow.appendChild(el('a', { href: prev.id + '.html', class: 'prev' }, [el('small', { text: '← Previous' }), el('span', { class: 't', text: prev.title })]));
+      if (next) navRow.appendChild(el('a', { href: next.id + '.html', class: 'next' }, [el('small', { text: 'Next →' }), el('span', { class: 't', text: next.title })]));
       main.appendChild(navRow);
     }
 
