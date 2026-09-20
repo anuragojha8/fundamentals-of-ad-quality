@@ -86,6 +86,79 @@
     return true;
   }
 
+
+  /* ---------- chapter sections: the in-page rail ---------- */
+  // A section runs from one h2 to the next. We record whether it holds something to
+  // build or run, and which graded checks live inside it, so the rail can show progress.
+  function sections(page) {
+    var out = [];
+    Array.prototype.forEach.call(page.querySelectorAll('h2[id]'), function (h) {
+      var title = h.cloneNode(true), n = title.querySelector('.sec');
+      if (n) n.remove();
+      var checks = [], interactive = false, node = h.nextElementSibling;
+      while (node && node.tagName !== 'H2') {
+        if (node.matches('.code-cell') || node.querySelector('.code-cell')) interactive = true;
+        Array.prototype.forEach.call(node.querySelectorAll('[data-id]'), function (c) { checks.push(c.getAttribute('data-id')); });
+        if (node.hasAttribute && node.hasAttribute('data-id')) checks.push(node.getAttribute('data-id'));
+        node = node.nextElementSibling;
+      }
+      out.push({ id: h.id, title: title.textContent.trim(), el: h, checks: checks, interactive: interactive });
+    });
+    return out;
+  }
+
+  function refreshSectionMarks(page) {
+    sections(page).forEach(function (sec) {
+      var mark = document.querySelector('[data-sec-done="' + sec.id + '"]');
+      if (!mark) return;
+      var done = sec.checks.length && sec.checks.every(function (id) { return store.solved[id]; });
+      mark.textContent = done ? '✓' : '';
+    });
+  }
+
+  function scrollSpy(page, sub) {
+    var links = {};
+    Array.prototype.forEach.call(sub.querySelectorAll('[data-sec]'), function (a) { links[a.getAttribute('data-sec')] = a; });
+    // Look the headings up at measure time: the rail is built before the page is in
+    // the document, so anything captured now would measure zero.
+    var ids = sections(page).map(function (s) { return s.id; });
+    if (!ids.length) return;
+    var ticking = false;
+    function update() {
+      ticking = false;
+      // The current section is the last heading whose top has passed the reading line.
+      var line = 140, best = ids[0], i, node;
+      for (i = 0; i < ids.length; i++) {
+        node = document.getElementById(ids[i]);
+        if (node && node.getBoundingClientRect().top <= line) best = ids[i];
+      }
+      // At the very bottom, the last section is the one you're reading.
+      if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 4) best = ids[ids.length - 1];
+      Object.keys(links).forEach(function (id) { links[id].classList.toggle('here', id === best); });
+    }
+    // A timer rather than requestAnimationFrame: rAF is suspended while the tab is
+    // hidden, which would leave the rail stuck on whatever section it last saw.
+    addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; setTimeout(update, 60); }
+    }, { passive: true });
+    addEventListener('resize', update, { passive: true });
+    update();
+  }
+
+  /* ---------- chapter meta: what this chapter asks of you ---------- */
+  function chapterMeta(page) {
+    var head = page.querySelector('.chapter-head');
+    if (!head || page.querySelector('.ch-meta')) return;
+    var words = (page.textContent.match(/\S+/g) || []).length;
+    var mins = Math.max(1, Math.round(words / 220));
+    var builds = page.querySelectorAll('.code-cell').length;
+    var runs = page.querySelectorAll('.widget').length;
+    var bits = [mins + ' min read'];
+    if (builds) bits.push(builds + (builds === 1 ? ' build step' : ' build steps'));
+    if (runs) bits.push(runs + (runs === 1 ? ' experiment' : ' experiments'));
+    head.appendChild(el('p', { class: 'ch-meta', text: bits.join(' · ') }));
+  }
+
   /* ---------- tiny DOM helper ---------- */
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
@@ -447,6 +520,8 @@
     if (!chapterId) return;
     store.required[chapterId] = requiredIds.slice();
     saveStore(store);
+    var main = document.querySelector('main');
+    if (main) refreshSectionMarks(main);
     var solved = requiredIds.filter(function (id) { return store.solved[id]; }).length;
     if (completionEl) {
       if (!requiredIds.length) { completionEl.style.display = 'none'; }
@@ -517,17 +592,22 @@
       side.appendChild(a);
       if (c.id === chapterId) {
         var sub = el('div', { class: 'toc-sub' });
-        page.querySelectorAll('h2[id]').forEach(function (h) {
-          var t = h.cloneNode(true); var s = t.querySelector('.sec'); if (s) s.remove();
-          sub.appendChild(el('a', { href: '#' + h.id, text: t.textContent.trim() }));
+        sections(page).forEach(function (sec) {
+          var link = el('a', { href: '#' + sec.id, 'data-sec': sec.id }, [
+            el('span', { class: 'label', text: sec.title }),
+            sec.interactive ? el('span', { class: 'mark', title: 'You write code in this section', text: 'build' }) : null,
+            el('span', { class: 'done', 'data-sec-done': sec.id })
+          ].filter(Boolean));
+          sub.appendChild(link);
         });
-        if (sub.childNodes.length) side.appendChild(sub);
+        if (sub.childNodes.length) { side.appendChild(sub); scrollSpy(page, sub); }
       }
     });
     var scrim = el('div', { class: 'scrim' });
     scrim.addEventListener('click', function () { body.classList.remove('nav-open'); });
     side.addEventListener('click', function (e) { if (e.target.closest('a')) body.classList.remove('nav-open'); });
 
+    chapterMeta(page);
     body.appendChild(topbar); body.appendChild(side); body.appendChild(scrim); body.appendChild(page);
 
     // Chapter footer: completion + prev/next

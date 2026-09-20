@@ -117,6 +117,14 @@ body.nav-open .sidebar { transform: none; box-shadow: var(--shadow); }
 .sidebar .toc-sub { margin: 2px 0 8px 34px; border-left: 1px solid var(--rule); }
 .sidebar .toc-sub a { font-size: 13px; padding: 3px 10px; color: var(--ink-3); }
 .sidebar .toc-sub a:hover { color: var(--ink); }
+/* The in-chapter rail: where you are, what's left to run, what's already solved. */
+.sidebar .toc-sub a { display: flex; gap: 8px; align-items: baseline; }
+.sidebar .toc-sub a .label { flex: 1; min-width: 0; }
+.sidebar .toc-sub a .mark { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); opacity: .8; }
+.sidebar .toc-sub a .done { color: var(--green); font-size: 11px; }
+.sidebar .toc-sub a.here { color: var(--ink); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); background: var(--paper-2); }
+.sidebar .toc-sub a.here .mark { color: var(--accent); opacity: 1; }
+.ch-meta { font-family: var(--sans); font-size: 12.5px; color: var(--ink-3); margin: 10px 0 0; letter-spacing: .01em; }
 .scrim { display: none; }
 body.nav-open .scrim { display: block; position: fixed; inset: 52px 0 0 0; background: rgba(0,0,0,.25); z-index: 15; }
 
