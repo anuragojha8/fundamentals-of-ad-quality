@@ -22,7 +22,7 @@
     { id: '15-beyond-the-click', n: '15', part: 'V · The Job', title: 'Quality Beyond the Click', blurb: 'Ad load, user experience, negative feedback, long-term value, and the objective function you actually own.', mins: 6, builds: 0, runs: 3 },
     { id: '16-what-the-ad-caused', n: '16', part: 'V · The Job', title: 'What the Ad Actually Caused', blurb: 'Attribution windows as a label decision, view-through credit, incrementality, holdouts and ghost ads, and why lift is hard to measure.', mins: 8, builds: 1, runs: 2 },
     { id: '17-capstone', n: '17', part: 'V · The Job', title: 'Capstone: Run the Marketplace', blurb: 'A simulation game. Make the calls a real ads quality PM makes, and live with the results.', mins: 4, builds: 0, runs: 0 },
-    { id: '18-when-the-model-remembers', n: '18', part: 'Extra Credit', title: 'When the Model Remembers', blurb: 'Long and recent histories, generative retrieval, ad eligibility, and four different kinds of freshness.', mins: 7, builds: 0, runs: 0 },
+    { id: '18-when-the-model-remembers', n: '18', part: 'Extra Credit', title: 'When the Model Remembers', blurb: 'Long and recent histories, generative retrieval, ad eligibility, and four different kinds of freshness.', mins: 9, builds: 0, runs: 0 },
     { id: 'appendix-a-glossary', n: 'A', part: 'Appendices', title: 'Glossary', blurb: 'Every term in the book, in one place.', mins: 8, builds: 0, runs: 0 },
     { id: 'appendix-b-question-bank', n: 'B', part: 'Appendices', title: 'The Model Review Question Bank', blurb: 'The questions to ask in a launch review, a metrics readout, or a roadmap debate.', mins: 4, builds: 0, runs: 0 }
   ];

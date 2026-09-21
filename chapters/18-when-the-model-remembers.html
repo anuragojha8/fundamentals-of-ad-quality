@@ -25,22 +25,22 @@
 
 <p>That one request contains two stories. Pebble's older history says this person keeps coming back to running; the actions arriving this morning say they may be planning a trip. We want the second story to reach the next ad request quickly without deciding that a single morning has erased the first. Here <em>long-term</em> means older user behavior, a different question from the long-term user outcomes in Chapter 15.</p>
 
-<p>We'll follow those histories through candidate generation and into the auction. The four diagrams are <strong>illustrative mechanisms</strong>, not a new model trained on your Pebble logs. Pebble's actual history is only twelve items long, and its small ad catalog is searched exactly. It cannot honestly demonstrate the gains or serving costs of industrial sequence models.</p>
+<p>We'll follow those histories through candidate generation and into the auction. The four diagrams are <strong>illustrations</strong>, not models trained on your Pebble logs. Pebble keeps only twelve items of history and its catalog is small enough to search exactly, so it can't honestly show what industrial sequence models gain or what they cost to serve. Everything below is about mechanism.</p>
 
 <h2 id="two-horizons"><span class="sec">18.1</span>Two time horizons, one person</h2>
 
 <p>A <dfn>behavior sequence</dfn> is an ordered list of actions with their times attached. Imagine this user's older history: a race plan saved in April, trail shoes viewed in June, running routes revisited in August. That's different from opening three shoe posts during one bored afternoon, even if a simple category count calls both histories “three running actions.” You could collapse the older actions into one slowly updated user vector, or let a larger model reach back to particular events when it scores an ad. The second option can preserve more detail, but reading thousands of events on every request costs time. Our first diagram uses the compressed version so you can see the two time horizons separately.</p>
 
-<p>Now look at the live session. At 9:02 the user opens a campsite page; at 9:04 they save a campsite; at 9:06 they compare tents. A user vector built overnight knows about the running but misses this morning entirely. If the new actions reach serving before the next request, a sequence model can read them in order and give the tent search more weight. Order can matter: <em>shoes → campsite</em> and <em>campsite → shoes</em> contain the same two categories, but may point to different immediate interests. Neither sequence proves the user wants to buy anything.</p>
+<p>Now look at the live session. At 9:02 the user opens a campsite page; at 9:04 they save a campsite; at 9:06 they compare tents. A user vector built overnight knows about the running but misses this morning entirely. If the new actions reach serving before the next request, a sequence model can read them in order and give the tent search more weight. Order can matter: <em>shoes → campsite</em> and <em>campsite → shoes</em> contain the same two categories, but may point to different immediate interests.</p>
 
-<p>Let's put numbers on that tension. Our long-term summary says “80% running, 20% camping,” while the live score starts at “60% running, 40% camping” after the first campsite view. These are toy preference scores, <em>not</em> observed click probabilities. Each additional camping action moves the live score halfway toward camping; the combined score gives 40% weight to the older summary and 60% to the live one. Press Play to add the campsite save, tent comparison, and packing-list view. Watch when camping pulls ahead without deleting the running history.</p>
+<p>Let's put numbers on that tension. Our long-term summary says “80% running, 20% camping,” while the live score starts at “60% running, 40% camping” after the first campsite view. These are toy preference scores, <em>not</em> observed click probabilities. Each additional camping action moves the live score halfway toward camping; the combined score gives 40% weight to the older summary and 60% to the live one. Press Play to add the campsite save, tent comparison, and packing-list view, and watch when camping pulls ahead without deleting the running history. Then move the dials and find the setting where a single campsite search flips the recommendation. Is that responsive, or just jumpy?</p>
 
 <div class="widget aq-diagram ec-widget" id="w-ec-history">
   <div class="w-title">A sudden camping trip</div>
-  <div class="w-sub">Illustrative scores: recent ← ½ recent + ½ new action; combined = 40% long-term + 60% recent. Blue is running; orange is camping. No model is being trained here.</div>
+  <div class="w-sub">Toy scores: each new action moves the live score part of the way toward camping, and the combined score blends older history with the live one. Blue is running, orange is camping. The dials are yours.</div>
 </div>
 
-<p>The 40/60 blend is something I picked to make the crossing point visible; a real model would learn how to use these signals for a particular candidate. A running-shoe ad may still benefit from the months of older actions, while a tent ad may depend more on what happened ten minutes ago. You can update the recent-action input as events arrive while keeping the older representation on a slower schedule. Pinterest described a combination of recent actions and batch-built user embeddings in <a href="https://arxiv.org/abs/2306.00248">TransAct</a>; its later <a href="https://arxiv.org/abs/2506.02267">TransAct V2</a> explores much longer action sequences. These are recommendation examples, not claims that Pebble uses their architecture.</p>
+<p>The dials are doing, by hand, what a real model learns: how much weight each horizon deserves, and for which candidate. A running-shoe ad may still benefit from the months of older actions, while a tent ad may depend more on what happened ten minutes ago. You can update the recent-action input as events arrive while keeping the older representation on a slower schedule. Pinterest described a combination of recent actions and batch-built user embeddings in <a href="https://arxiv.org/abs/2306.00248">TransAct</a>; its later <a href="https://arxiv.org/abs/2506.02267">TransAct V2</a> explores much longer action sequences.</p>
 
 <div class="callout trap"><div class="label">Common trap</div>
 <p>“More history” is not automatically better. A long sequence can be expensive to read, noisy, and full of things you stopped caring about. Ask which events count, how old they can be, how the sequence is compressed, and whether the improvement survives a latency and cost budget.</p></div>
@@ -65,7 +65,7 @@
   <div class="w-sub">Fixed teaching example. Candidate identity stays visible across lookup, targeting and budget/policy checks. Real filtering order and rules vary by system.</div>
 </div>
 
-<p>For ads, this is a first-class serving problem, not a detail to bolt on after a retrieval paper. Recent <a href="https://arxiv.org/abs/2608.00938">research on generative ads retrieval</a> explicitly studies eligibility filtering and decoding cost. The PM question is simple: <em>how many eligible, useful ads do we get per millisecond and per dollar of serving cost?</em> Measure that before celebrating a better offline candidate score.</p>
+<p>For ads, this is a first-class serving problem, not a detail to bolt on after a retrieval paper. A 2026 paper on serving generative ads retrieval, <a href="https://arxiv.org/abs/2608.00938">GRACE</a>, reports that filtering by targeting <em>during</em> decoding raised the share of generated candidates that were actually eligible from about 24% to 40%. In other words, even with that fix, most of what the generator proposed couldn't be shown to that user. The PM question is simple: <em>how many eligible, useful ads do we get per millisecond and per dollar of serving cost?</em> Measure that before celebrating a better offline candidate score.</p>
 
 <h2 id="four-clocks"><span class="sec">18.4</span>“Real time” has four clocks</h2>
 
@@ -76,7 +76,7 @@
   <div class="w-sub">Hypothetical clock times to separate four mechanisms. Your actual system might use very different cadences.</div>
 </div>
 
-<p>By 10:02:02 in this example, the next request can include the campsite action even though the model's weights are still yesterday's. The input changed, so its prediction <em>can</em> change; it depends on whether training taught the model to use recent actions. The new lantern has a separate problem: until the ad index refreshes, retrieval cannot propose it at all. When weights eventually update, they incorporate newly available training examples rather than somehow making earlier requests retroactively fresh.</p>
+<p>By 10:02:02 in this example, the next request can include the campsite action even though the model's weights are still yesterday's (Chapter 14's retraining schedule hasn't run yet). The input changed, so its prediction <em>can</em> change; it depends on whether training taught the model to use recent actions. The new lantern has a separate problem: until the ad index refreshes, retrieval cannot propose it at all. When weights eventually update, they incorporate newly available training examples rather than somehow making earlier requests retroactively fresh.</p>
 
 <p>That gives you a more useful debugging path. If the latest action is missing, inspect event delivery and online features. If the new ad never appears, inspect indexing and eligibility. If the model sees the new action but keeps preferring yesterday's pattern, look at what its training taught it and when those weights were last updated. “The model is stale” is a tempting diagnosis. It is also a fairly efficient way to page the wrong team.</p>
 
@@ -85,9 +85,58 @@
 
 <h2 id="takeaway"><span class="sec">18.5</span>What would you ship?</h2>
 
-<p>For Pebble, I would start with a small, fresh recent-action signal alongside the existing long-term features, measure where it changes candidates, and check that the extra serving work pays for itself. Generative retrieval would earn an experiment when the catalog and behavior histories are large enough for the existing retrievers to leave meaningful recall on the table. That is a roadmap hypothesis, not a result from our toy world.</p>
+<p>For Pebble, I would start with a small, fresh recent-action signal alongside the existing long-term features, measure where it changes candidates, and check that the extra serving work pays for itself. Generative retrieval would earn an experiment when the catalog and behavior histories are large enough for the existing retrievers to leave meaningful recall on the table.</p>
 
-<p>The running shoes should still be somewhere in the model's memory when the campsite search arrives. The interesting question is whether that new signal earns the lantern a place among the candidates. If it does, the lantern still has to clear eligibility and justify the extra milliseconds before it gets anywhere near the auction. See ya back there.</p>
+<p>The running shoes should still be somewhere in the model's memory when the campsite search arrives. The interesting question is whether that new signal earns the lantern a place among the candidates. If it does, the lantern still has to clear eligibility and justify the extra milliseconds before it gets anywhere near the auction. That's the end of the extra credit. Go get yourself a lantern.</p>
+
+<div class="quiz" data-id="ch18-q1">
+  <p class="q">A user's actions switch from running to camping at 9 am, but the ads they're shown still skew toward running gear an hour later. What do you check first?</p>
+  <ul>
+    <li data-why="New weights won't help if the model never sees this morning's actions.">Retrain the model on more recent data</li>
+    <li data-correct>Whether the new actions reached the online features the model reads at serving time</li>
+    <li data-why="A longer history would add more running, not more camping.">Extend the long-term history the model reads</li>
+    <li data-why="The index only matters for ads that are new; the camping ads already exist.">Refresh the ad index</li>
+  </ul>
+  <div class="explain"><p>Start with the cheapest clock. If this morning's actions never reached serving, no model, however fresh, can react to them. If they did arrive and the ads still don't change, then look at what training taught the model about recent actions, and only then at when the weights last updated.</p></div>
+</div>
+
+<div class="quiz" data-id="ch18-q2">
+  <p class="q">A generative retriever and a two-tower retriever each return 200 candidates per request. After eligibility checks, 60 of the generative candidates survive and 150 of the two-tower ones do. What should decide between them?</p>
+  <ul>
+    <li data-why="Both return 200, so this tells you nothing.">The raw number of candidates each returns</li>
+    <li data-correct>Eligible, useful candidates per millisecond and per dollar, with recall measured against the same reference</li>
+    <li data-why="Offline recall before eligibility counts ads that can never be shown.">The generative model's offline recall on its own</li>
+    <li data-why="Newer isn't a metric.">Which architecture is more recent</li>
+  </ul>
+  <div class="explain"><p>A candidate that fails targeting, budget, or policy costs serving time and delivers nothing. Compare what survives the gates, what it costs to produce, and whether the survivors are the ones worth ranking. A hybrid that unions both sources can win, and it also costs more to run.</p></div>
+</div>
+
+<div class="reflect" data-id="ch18-r1">
+  <p class="q">Your ranking team proposes extending each user's history from the last 50 actions to the last 5,000. Draft the questions you'd bring to the review.</p>
+  <div class="model">
+    <ul>
+      <li><strong>Which actions, and how old?</strong> Clicks, saves, views, purchases? A three-year-old action may be noise. Ask how the sequence is filtered and weighted by age.</li>
+      <li><strong>Read or compress?</strong> Reading 5,000 events on every request is a latency and cost decision; a compressed summary refreshed offline is cheaper and loses detail. Ask for the serving cost per 1,000 requests of each.</li>
+      <li><strong>Who benefits?</strong> Heavy users with long histories should gain; new users gain nothing. Ask for slices by history length, and by users whose interests recently changed.</li>
+      <li><strong>Does fresh still win?</strong> A longer memory can drown out this morning's signal. Ask how recent actions reach serving and how they're weighted against the long history.</li>
+      <li><strong>Online proof:</strong> an A/B test with latency, revenue, advertiser value, and user-quality guardrails, since a retrieval or ranking gain has to survive the auction and the user.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="recap">
+  <h3>What you learned</h3>
+  <p>A user carries two stories at once, an older one and a live one, and a good system keeps both without letting either erase the other. Generative retrieval proposes candidates by decoding item codes from those stories, and in ads every proposal still has to survive eligibility before it's worth a millisecond. And "real time" is four separate clocks, which tells you which team to page when something looks stale.</p>
+  <h3>Key terms</h3>
+  <div class="terms">
+    <div><b>Behavior sequence</b>An ordered, timestamped list of a user's actions.</div>
+    <div><b>Long-term vs. live signal</b>A slowly refreshed summary of older behavior, next to actions from the current session.</div>
+    <div><b>Semantic ID</b>A learned code for an item, which a generative retriever decodes token by token.</div>
+    <div><b>Generative retrieval</b>Proposing candidates by generating item codes from a user's history, instead of nearest-neighbor search.</div>
+    <div><b>Eligibility filtering</b>Removing candidates that fail targeting, budget, or policy before ranking.</div>
+    <div><b>Four clocks of freshness</b>Event delivery, online features, index refresh, and weight updates, each on its own schedule.</div>
+  </div>
+</div>
 
 </main>
 </body>

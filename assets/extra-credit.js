@@ -79,11 +79,26 @@
   /* Two persistent segmented bars change width as recent actions arrive. */
   function history() {
     var host = document.getElementById('w-ec-history'), holder = E('div', { class: 'ec-drawing' });
+    // Two dials the reader owns: how much the older summary counts, and how far each
+    // new action pulls the live score. Everything below is computed from them.
+    var dials = E('div'); host.appendChild(dials);
     host.appendChild(holder);
+    var ctl = Book.controls(dials, [
+      { key: 'longW', label: 'Weight on older history', min: 0, max: 0.9, step: 0.1, value: 0.4, fmt: function (v) { return Math.round(v * 100) + '%'; } },
+      { key: 'pull', label: 'How far each new action moves the live score', min: 0.1, max: 0.9, step: 0.1, value: 0.5, fmt: function (v) { return Math.round(v * 100) + '% of the way'; } }
+    ], function () { if (control) control.redraw(); });
+    var LONG_CAMP = 0.2, FIRST_LIVE_CAMP = 0.4, ACTIONS = ['saves a campsite', 'compares tents', 'opens a packing list'];
+    function scores(n) {
+      var v = ctl.values, recent = 1 - (1 - FIRST_LIVE_CAMP) * Math.pow(1 - v.pull, n);
+      return { recent: recent, blended: v.longW * LONG_CAMP + (1 - v.longW) * recent };
+    }
+    function flipAt() {
+      for (var k = 0; k <= 3; k++) if (scores(k).blended > 0.5) return k;
+      return -1;
+    }
     var view, control = player(host, 3, function (n) {
-      if (!view) return 'After one campsite view, the blended toy score still favors running.';
-      var recentCamp = 1 - 0.6 * Math.pow(0.5, n), blendedCamp = 0.4 * 0.2 + 0.6 * recentCamp;
-      var camps = [0.2, recentCamp, blendedCamp];
+      if (!view) return 'After one campsite view, press Play to add three more camping actions.';
+      var sc = scores(n), camps = [LONG_CAMP, sc.recent, sc.blended];
       view.bars.forEach(function (bar, i) {
         var running = view.bw * (1 - camps[i]);
         bar.run.setAttribute('width', running.toFixed(1));
@@ -93,10 +108,13 @@
       });
       view.dots.forEach(function (dot, i) { dot.setAttribute('class', i < n ? 'ec-event ec-on' : 'ec-event'); });
       view.count.textContent = n ? n + ' more camping ' + (n === 1 ? 'action' : 'actions') : 'Campsite view already seen';
-      return n === 0 ? 'After the campsite view, the live score is 40% camping, but the combined score still favors running (68%).'
-        : n === 1 ? 'Saving a campsite brings the combined scores level: 50% each. The live input changed; the model weights did not.'
-        : n === 2 ? 'Comparing tents brings the combined camping score to 59%. The older running interest remains in the blend.'
-        : 'Opening a packing list brings the combined camping score to ' + Math.round(100 * blendedCamp) + '%. This is still a toy score, not a predicted click rate.';
+      var pct = Math.round(100 * sc.blended), k = flipAt();
+      var where = k === 0 ? 'Camping already leads after the first view: with these dials, one click moves the recommendation.'
+        : k > 0 ? 'Camping takes the lead after ' + k + ' more ' + (k === 1 ? 'action' : 'actions') + '.'
+        : 'Even after all three actions, running still leads: the older history is holding on.';
+      var what = n === 0 ? 'After the campsite view, the combined score is ' + pct + '% camping.'
+        : 'The user ' + ACTIONS[n - 1] + '; the combined score is now ' + pct + '% camping.';
+      return what + ' ' + where;
     });
     function build() {
       holder.replaceChildren();

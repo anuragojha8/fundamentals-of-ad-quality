@@ -35,3 +35,11 @@ Primary sources used: [Google's API retirement](https://privacysandbox.google.co
 ## Validation
 
 `node tests/run-tests.js` passed the full suite after both correction sets, including chapter script parsing, all code-slot reference tests, auction, conversion-model and A/B simulations. `git diff --check` passed. `tools/build.sh` produced `dist`; esbuild was unavailable in this local environment, so the build used its documented readable-asset fallback. This does not verify the CDN's minification step or a visual browser pass.
+
+## Chapter 18 pass (Claude, 21 September 2026)
+
+- Added the chapter furniture every other chapter has: two quizzes (`ch18-q1`, `ch18-q2`), a reflect exercise, a recap and key terms. The chapter can now count as complete, and the section rail can tick it off.
+- The first diagram gained two dials, weight on older history and how far each new action moves the live score. Status messages are computed from the dials; they previously hardcoded 68%, 50% and 59%, which would have been wrong the moment anything moved.
+- Cut six scattered disclaimers down to one clear statement up front that the diagrams illustrate mechanism.
+- Named GRACE (arXiv 2608.00938) in the text with its eligibility result; verified TransAct V2 (CIKM 2025).
+- Linked §18.4 back to Chapter 14's retraining schedule, and replaced the ambiguous sign-off.
