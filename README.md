@@ -31,7 +31,7 @@ gzipped, down from 76 KB unminified.
 
 | Path | What it is |
 |---|---|
-| `index.html`, `chapters/*.html` | The book: preface, 17 chapters, 2 appendices |
+| `index.html`, `chapters/*.html` | The book: preface, 17 chapters, an extra-credit Chapter 18, and 2 appendices |
 | `assets/world.js` | The synthetic world: users, advertisers, ads, and the **true** pCTR, pCVR, pHide, position bias, conversion delays, and drift. Deterministic from a seed; no DOM. |
 | `assets/nn.js` | A tiny reverse-mode autodiff (embeddings, dense, DCN cross layers, target attention, losses, Adam). |
 | `assets/stack.js` | The reader's stack: 15 **code slots** (reader-written functions with tests and reference solutions), the serving policy, the simulator loop, joins, trainers (LR, two-tower, wide & deep, naive pCVR / ESMM), evaluation, A/B testing, and localStorage persistence. No DOM. |
