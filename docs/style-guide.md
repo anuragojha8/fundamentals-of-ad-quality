@@ -1,9 +1,8 @@
 # Visual style guide
 
 The look is **warm editorial**: ivory paper, deep charcoal ink, one burnt-orange accent,
-serif for reading, sans for anything the reader operates. A page should read like a
-well-set book that happens to have working machinery in it — not like a dashboard and
-not like a slide deck.
+Inter for reading, headings and controls, with monospace for code and numeric readouts.
+A page should read like a well-set technical book with working machinery in it.
 
 This document is the contract. If you are adding or restyling anything, match these
 numbers rather than inventing new ones. Everything is driven by the custom properties in
@@ -13,18 +12,23 @@ numbers rather than inventing new ones. Everything is driven by the custom prope
 
 ## 1. Type scale
 
-Two families do all the work: `--serif` (Source Serif 4) for prose, `--sans` (Inter) for
-anything interactive, structural or annotative. `--mono` (JetBrains Mono) is for numbers
-the reader compares and for code.
+Two families do all the work: `--sans` (Inter) for prose, headings, controls and
+annotations; `--mono` (JetBrains Mono) for numbers the reader compares and for code.
+Chapter titles use 700 weight and −.035em tracking. Subtitles are upright; emphasis
+and story asides retain their italics, using the loaded Inter italic faces.
+
+Typography update, 2026-09-27: adopted the sans-serif direction from the working-machine
+mockup. This first step changes type only; the existing colour and layout system remains
+in place. Source Serif 4 is no longer loaded.
 
 | Level | Size | Family | Used for |
 |---|---|---|---|
-| `h1` | `clamp(34px, 6vw, 50px)` | serif 700 | Chapter title. One per page. |
-| `.dek` | 21px italic | serif, `--ink-2` | The one-line subtitle under `h1`. |
-| `h2` | 30px | serif | Section. Carries a `.sec` number in `--accent` sans. |
+| `h1` | `clamp(34px, 6vw, 50px)` | sans 700 | Chapter title. One per page. |
+| `.dek` | 21px | sans, `--ink-2` | The one-line subtitle under `h1`. |
+| `h2` | 30px | sans 700 | Section. Carries a `.sec` number in `--accent` sans. |
 | `h3` | 18px | sans | Subsection. Sans on purpose — it reads as a label, not prose. |
-| body | 19px / 1.65 | serif | Running text. 18px below 600px. |
-| `.lead` | 21px | serif | First paragraph of a chapter, sparingly. |
+| body | 19px / 1.65 | sans | Running text. 18px below 600px. |
+| `.lead` | 21px | sans | First paragraph of a chapter, sparingly. |
 | widget UI | 15px | sans | Anything inside `.widget`, `.quiz`, `.code-cell`. |
 | caption | 13.5px | sans, `--ink-3` | `figcaption`, `.w-sub`. |
 | micro | 11.5–12px | sans, `--ink-3` | Stat keys, table headers, legends, SVG detail text. |
